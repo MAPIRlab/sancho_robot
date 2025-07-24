@@ -1,0 +1,16 @@
+usb_cam_node:
+  ros__parameters:
+    video_device: "/dev/video0"
+    image_width: 1280
+    image_height: 720
+    framerate: 15.0  # Baja tasa de frames para menos carga de CPU
+    pixel_format: yuyv  # <<--- SIN compresión
+    camera_name: "sancho_camera"
+    camera_info_url: "package://sancho_bringup/config/camera_info_high.yaml"
+
+    # SOLO estos parámetros que son seguros:
+    brightness: 64
+    contrast: 32
+    saturation: 32
+    sharpness: 2
+    gamma: 120

@@ -1,0 +1,26 @@
+image_width: 2592
+image_height: 1944
+camera_name: sancho_camera
+camera_matrix:
+  rows: 3
+  cols: 3
+  data: [1005.06315,    2.52872, 1291.31142,
+            0.     , 1008.07662,  941.84803,
+            0.     ,    0.     ,    1.     ]
+distortion_model: equidistant
+distortion_coefficients:
+  rows: 1
+  cols: 4
+  data: [0.063032, -0.041329, 0.018593, -0.003341]
+rectification_matrix:
+  rows: 3
+  cols: 3
+  data: [1., 0., 0.,
+         0., 1., 0.,
+         0., 0., 1.]
+projection_matrix:
+  rows: 3
+  cols: 4
+  data: [1005.06315,    2.52872, 1291.31142,    0.     ,
+            0.     , 1008.07662,  941.84803,    0.     ,
+            0.     ,    0.     ,    1.     ,    0.     ]

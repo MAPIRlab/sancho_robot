@@ -1,0 +1,26 @@
+image_width: 640
+image_height: 480
+camera_name: calibrated_camera
+camera_matrix:
+  rows: 3
+  cols: 3
+  data: [458.654489, -0.753835, 328.032458,
+         0.000000, 468.017857 , 220.596994,
+         0.000000, 0.000000, 1.000000]
+distortion_model: equidistant
+distortion_coefficients:
+  rows: 1
+  cols: 4
+  data: [-0.612727, 0.271126, -0.008698, -0.011522]
+rectification_matrix:
+  rows: 3
+  cols: 3
+  data: [1., 0., 0.,
+         0., 1., 0.,
+         0., 0., 1.]
+projection_matrix:
+  rows: 3
+  cols: 4
+  data: [458.654489, -0.753835, 328.032458, 0,
+         0.000000, 468.017857 , 220.596994, 0,
+         0.000000, 0.000000, 1.000000, 0]

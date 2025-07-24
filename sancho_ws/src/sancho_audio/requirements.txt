@@ -1,0 +1,7 @@
+numpy<2
+rclpy
+playsound
+pyaudio
+scipy
+soundfile
+pyannote.audio

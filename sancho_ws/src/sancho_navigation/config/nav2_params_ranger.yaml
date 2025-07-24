@@ -1,0 +1,611 @@
+# =====================
+# AMCL
+# =====================
+amcl:
+  ros__parameters:
+    use_sim_time: False
+    odom_frame_id: "odom"
+    base_frame_id: "base_footprint"
+    scan_topic: "/scan_merged"
+    map_topic: "/localization_map"
+    min_particles: 1000
+    max_particles: 8000
+    alpha1: 0.2
+    alpha2: 0.2
+    alpha3: 0.2
+    alpha4: 0.2
+    alpha5: 0.2
+    robot_model_type: "nav2_amcl::OmniMotionModel"  # o "DifferentialMotionModel" si es un base diff
+    laser_model_type: "likelihood_field_prob"
+    do_beamskip: True
+    beam_skip_distance: 0.5
+    laser_max_range: 100.0
+    laser_min_range: -1.0
+    update_min_d: 0.2
+    update_min_a: 0.2
+    resample_interval: 1
+    transform_tolerance: 0.05
+    recovery_alpha_slow: 0.001
+    recovery_alpha_fast: 0.1
+    initial_pose_x: 0.0
+    initial_pose_y: 0.0
+    initial_pose_a: 0.0
+    initial_cov_xx: 0.05
+    initial_cov_yy: 0.05
+    initial_cov_aa: 0.06853
+
+# =====================
+# BT NAVIGATOR
+# =====================
+bt_navigator:
+  ros__parameters:
+    use_sim_time: False
+    global_frame: map
+    robot_base_frame: base_footprint
+    odom_topic: /odom
+    bt_loop_duration: 5
+    default_server_timeout: 10
+    enable_groot_monitoring: True
+    groot_zmq_publisher_port: 1666
+    groot_zmq_server_port: 1667
+
+    default_nav_to_pose_bt_xml: "/home/mapir/sancho_ws/src/sancho_navigation/bt/testBT.xml"
+
+
+    plugin_lib_names:
+      - nav2_compute_path_to_pose_action_bt_node
+      - nav2_controller_cancel_bt_node
+      - nav2_path_longer_on_approach_bt_node
+      - nav2_compute_path_through_poses_action_bt_node
+      - nav2_follow_path_action_bt_node
+      - nav2_back_up_action_bt_node
+      - nav2_spin_action_bt_node
+      - nav2_wait_action_bt_node
+      - nav2_clear_costmap_service_bt_node
+      - nav2_is_stuck_condition_bt_node
+      - nav2_goal_reached_condition_bt_node
+      - nav2_goal_updated_condition_bt_node
+      - nav2_initial_pose_received_condition_bt_node
+      - nav2_reinitialize_global_localization_service_bt_node
+      - nav2_rate_controller_bt_node
+      - nav2_distance_controller_bt_node
+      - nav2_speed_controller_bt_node
+      - nav2_truncate_path_action_bt_node
+      - nav2_goal_updater_node_bt_node
+      - nav2_recovery_node_bt_node
+      - nav2_pipeline_sequence_bt_node
+      - nav2_round_robin_node_bt_node
+      - nav2_transform_available_condition_bt_node
+      - nav2_time_expired_condition_bt_node
+      - nav2_distance_traveled_condition_bt_node
+      - nav2_single_trigger_bt_node
+      - nav2_is_battery_low_condition_bt_node
+      - nav2_navigate_through_poses_action_bt_node
+      - nav2_navigate_to_pose_action_bt_node
+      - nav2_remove_passed_goals_action_bt_node
+      - nav2_planner_selector_bt_node
+      - nav2_controller_selector_bt_node
+      - nav2_goal_checker_selector_bt_node
+
+bt_navigator_rclcpp_node:
+  ros__parameters:
+    use_sim_time: False
+
+# =====================
+# CONTROLLER SERVER (local)
+# =====================
+controller_server:
+  ros__parameters:
+    use_sim_time: False
+    controller_frequency: 20.0
+    min_x_velocity_threshold: 0.05
+    min_y_velocity_threshold: 0.05
+    min_theta_velocity_threshold: 0.1
+    failure_tolerance: 0.3
+
+    progress_checker_plugin: "progress_checker"
+    goal_checker_plugins: ["general_goal_checker"]  # o "precise_goal_checker"
+    smoother_plugins: ["velocity_smoother"]
+    controller_plugins: ["FollowPath"]
+
+    # Progress checker parameters
+    progress_checker:
+      plugin: "nav2_controller::SimpleProgressChecker"
+      required_movement_radius: 0.2
+      movement_time_allowance: 20.0
+
+    # Goal checker parameters
+    general_goal_checker:
+      stateful: True
+      plugin: "nav2_controller::SimpleGoalChecker"
+      xy_goal_tolerance: 0.2
+      yaw_goal_tolerance: 1.0   # Mayor tolerancia para evitar microajustes
+
+
+    FollowPath:
+      plugin: "nav2_rotation_shim_controller::RotationShimController"
+      primary_controller: "nav2_mppi_controller::MPPIController"
+
+      angular_dist_threshold: 1.00
+      forward_sampling_distance: 0.5
+      angular_disengage_threshold: 0.95
+      rotate_to_heading_angular_vel: 1.0
+      max_angular_accel: 3.0
+      simulate_ahead_time: 1.0
+      rotate_to_goal_heading: true
+
+      # MPPI Controller parameters
+      time_steps: 56
+      model_dt: 0.05
+      batch_size: 2000
+      vx_std: 0.2
+      vy_std: 0.2
+      wz_std: 0.4
+
+      vx_max: 0.4 # velocidad máxima
+      vx_min: 0.0
+
+      vy_max: 0.0
+      vy_min: -0.0
+
+      wz_max: 1.0
+
+      ax_max: 0.5
+      ax_min: -0.5
+
+      az_max: 1.0
+      
+      iteration_count: 1 
+      prune_distance: 1.7
+      transform_tolerance: 0.1
+      temperature: 0.5
+      gamma: 0.015
+      motion_model: "Ackermann"
+      visualize: true
+      retry_attempt_limit: 3
+
+      TrajectoryVisualizer:
+        trajectory_step: 5
+        time_step: 3
+
+      AckermannConstraints:
+        min_turning_r: 0.4764
+
+      # Críticos integrados para evaluaciones de trayectorias
+      critics: 
+         - "ConstraintCritic"
+         - "CostCritic"
+         - "GoalCritic"
+         - "GoalAngleCritic"
+         - "PathAlignCritic"
+         - "PathFollowCritic"
+         - "PathAngleCritic"
+         - "PreferForwardCritic"
+         - "VelocityDeadbandCritic"  # Opcional, para suavizar cambios muy pequeños
+
+      ConstraintCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 4.0
+
+      GoalCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 5.0
+        threshold_to_consider: 1.4
+
+      GoalAngleCritic:
+        enabled: false
+        cost_power: 1
+        cost_weight: 3.0
+        threshold_to_consider: 0.5
+
+      PreferForwardCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 5.0
+        threshold_to_consider: 0.5
+
+      CostCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 3.81
+        critical_cost: 300.0
+        consider_footprint: true
+        collision_cost: 1000000.0
+        near_goal_distance: 1.0
+        trajectory_point_step: 2
+
+      PathAlignCritic:
+        enabled: false
+        cost_power: 1
+        cost_weight: 14.0
+        max_path_occupancy_ratio: 0.05
+        trajectory_point_step: 4
+        threshold_to_consider: 0.5
+        offset_from_furthest: 20
+        use_path_orientations: false
+
+      PathFollowCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 5.0
+        offset_from_furthest: 5
+        threshold_to_consider: 1.4
+
+      PathAngleCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 2.0
+        offset_from_furthest: 4
+        threshold_to_consider: 0.5
+        max_angle_to_furthest: 1.0
+        forward_preference: true
+
+      # Opcionales: Activa estos críticos si observas comportamientos indeseados.
+      VelocityDeadbandCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 30.0
+        deadband_velocities: [0.00, 0.00, 0.1]
+
+      TwirlingCritic:
+        enabled: true
+        twirling_cost_power: 1
+        twirling_cost_weight: 8.0
+
+    velocity_smoother:
+      plugin: "nav2_velocity_smoother::VelocitySmoother"
+      smoothing_frequency: 20.0
+      scale_velocities: false
+      feedback: "OPEN_LOOP"  # "OPEN_LOOP" o "CLOSED_LOOP", OPEN_LOOP es más común
+      max_velocity: [0.4, 0.0, 1.0]      # [linear_x, linear_y, angular_z]
+      min_velocity: [0.05, 0.0, 0.1]
+      max_accel: [0.5, 0.0, 1.0]         # ajustado a tu config actual
+      max_decel: [-0.5, 0.0, -1.0]       # frenada controlada
+      deadband_velocity: [0.02, 0.0, 0.1]  # zona muerta para evitar vibraciones
+      velocity_timeout: 1.0
+
+    plugin_lib_names:
+      - "nav2_mppi_controller"
+
+controller_server_rclcpp_node:
+  ros__parameters:
+    use_sim_time: False
+
+# =====================
+# PLANNER SERVER (global)
+# =====================
+
+planner_server:
+  ros__parameters:
+    use_sim_time: False
+    planner_plugins: ["GridBased"]
+    GridBased:
+      plugin: "nav2_smac_planner/SmacPlannerLattice"
+      lattice_filepath: /home/mapir/sancho_ws/src/sancho_navigation/config/ranger_primitives.json
+      tolerance: 0.5                      # tolerance for planning if unable to reach exact pose, in meters
+      downsample_costmap: false           # whether or not to downsample the map
+      downsampling_factor: 1              # multiplier for the resolution of the costmap layer (e.g. 2 on a 5cm costmap would be 10cm)
+      allow_unknown: false                # allow traveling in unknown space
+      max_iterations: 1000000             # maximum total iterations to search for before failing (in case unreachable), set to -1 to disable
+      max_on_approach_iterations: 1000    # maximum number of iterations to attempt to reach goal once in tolerance
+      terminal_checking_interval: 5000     # number of iterations between checking if the goal has been cancelled or planner timed out
+      max_planning_time: 5.5              # max time in s for planner to plan, smooth, and upsample. Will scale maximum smoothing and upsampling times based on remaining time after planning.
+      motion_model_for_search: "REEDS_SHEPP"    # For Hybrid Dubin, Reeds-Shepp
+      cost_travel_multiplier: 2.0         # For 2D: Cost multiplier to apply to search to steer away from high cost areas. Larger values will place in the center of aisles more exactly (if non-`FREE` cost potential field exists) but take slightly longer to compute. To optimize for speed, a value of 1.0 is reasonable. A reasonable tradeoff value is 2.0. A value of 0.0 effective disables steering away from obstacles and acts like a naive binary search A*.
+      angle_quantization_bins: 64         # For Hybrid nodes: Number of angle bins for search, must be 1 for 2D node (no angle search)
+      analytic_expansion_ratio: 3.5       # For Hybrid/Lattice nodes: The ratio to attempt analytic expansions during search for final approach.
+      analytic_expansion_max_length: 3.0    # For Hybrid/Lattice nodes: The maximum length of the analytic expansion to be considered valid to prevent unsafe shortcutting (in meters). This should be scaled with minimum turning radius and be no less than 4-5x the minimum radius
+      analytic_expansion_max_cost: 200   # For Hybrid/Lattice nodes: The maximum single cost for any part of an analytic expansion to contain and be valid (except when necessary on approach to goal)
+      analytic_expansion_max_cost_override: false # For Hybrid/Lattice nodes: Whether or not to override the maximum cost setting if within critical distance to goal (ie probably required). If expansion is within 2*pi*min_r of the goal, then it will override the max cost if ``false``.
+      minimum_turning_radius: 0.4764        # For Hybrid/Lattice nodes: minimum turning radius in m of path / vehicle
+      reverse_penalty: 2.1                # For Reeds-Shepp model: penalty to apply if motion is reversing, must be => 1
+      change_penalty: 0.0                 # For Hybrid nodes: penalty to apply if motion is changing directions, must be >= 0
+      non_straight_penalty: 1.20          # For Hybrid nodes: penalty to apply if motion is non-straight, must be => 1
+      cost_penalty: 2.0                   # For Hybrid nodes: penalty to apply to higher cost areas when adding into the obstacle map dynamic programming distance expansion heuristic. This drives the robot more towards the center of passages. A value between 1.3 - 3.5 is reasonable.
+      retrospective_penalty: 0.025        # For Hybrid/Lattice nodes: penalty to prefer later maneuvers before earlier along the path. Saves search time since earlier nodes are not expanded until it is necessary. Must be >= 0.0 and <= 1.0
+      rotation_penalty: 5.0               # For Lattice node: Penalty to apply only to pure rotate in place commands when using minimum control sets containing rotate in place primitives. This should always be set sufficiently high to weight against this action unless strictly necessary for obstacle avoidance or there may be frequent discontinuities in the plan where it requests the robot to rotate in place to short-cut an otherwise smooth path for marginal path distance savings.
+      lookup_table_size: 20.0               # For Hybrid nodes: Size of the dubin/reeds-sheep distance window to cache, in meters.
+      cache_obstacle_heuristic: True      # For Hybrid nodes: Cache the obstacle map dynamic programming distance expansion heuristic between subsequent replannings of the same goal location. Dramatically speeds up replanning performance (40x) if costmap is largely static.
+      allow_reverse_expansion: False      # For Lattice nodes: Whether to expand state lattice graph in forward primitives or reverse as well, will double the branching factor at each step.
+      smooth_path: True                   # For Lattice/Hybrid nodes: Whether or not to smooth the path, always true for 2D nodes.
+      debug_visualizations: True                # For Hybrid/Lattice nodes: Whether to publish expansions on the /expansions topic as an array of poses (the orientation has no meaning) and the path's footprints on the /planned_footprints topic. WARNING: heavy to compute and to display, for debug only as it degrades the performance.
+      smoother:
+        max_iterations: 1000
+        w_smooth: 0.3
+        w_data: 0.2
+        tolerance: 1.0e-10
+        do_refinement: true               # Whether to recursively run the smoother 3 times on the results from prior runs to refine the results further
+
+planner_server_rclcpp_node:
+  ros__parameters:
+    use_sim_time: False
+
+# =====================
+# MAP SERVER
+# =====================
+map_server:
+  ros__parameters:
+    use_sim_time: False
+    yaml_filename: "/home/mapir/sancho_ws/src/sancho_navigation/maps/mapir_lab_navigation.yaml"
+
+map_server_localization:
+  ros__parameters:
+    use_sim_time: False
+    yaml_filename: "/home/mapir/sancho_ws/src/sancho_navigation/maps/mapir_lab_localization.yaml"
+# =====================
+# GLOBAL COSTMAP
+# =====================
+global_costmap:
+  global_costmap:
+    ros__parameters:
+      use_sim_time: False        # Robot real
+      global_frame: "map"        # Typically 'map'
+      track_unknown_space: false
+      robot_base_frame: "base_footprint"
+      resolution: 0.025
+      downsample_costmap: false
+
+      footprint_padding: 0.03
+      transform_tolerance: 0.2
+
+      # Frecuencias típicas
+      update_frequency: 1.0
+      publish_frequency: 1.0
+
+      # Radio del robot (o footprint)
+      footprint: "[[-0.375, -0.275], [-0.375, 0.275], [0.375, 0.275], [0.375, -0.275]]"
+
+
+      # Lista de capas
+      plugins:
+        - "static_layer"
+        - "obstacle_layer"
+        - "inflation_layer"
+
+      # Static layer
+      static_layer:
+        plugin: "nav2_costmap_2d::StaticLayer"
+        enabled: true
+        map_subscribe_transient_local: true
+        subscribe_to_updates: false
+        transform_tolerance: 0.2
+
+      # Obstacle layer
+      obstacle_layer:
+        plugin: "nav2_costmap_2d::ObstacleLayer"
+        enabled: True
+        footprint_clearing_enabled: true
+        max_obstacle_height: 2.0
+        combination_method: 1
+        observation_sources: "laser_front laser_back"
+
+        laser_front:
+          topic: "/scan_1st"
+          max_obstacle_height: 2.0
+          clearing: True
+          marking: True
+          observation_persistence: 0.5  
+
+        laser_back:
+          topic: "/scan_2nd"
+          max_obstacle_height: 2.0
+          clearing: True
+          marking: True
+          observation_persistence: 0.5
+        
+        # camera_depth:
+        #   topic: "/scan_camera"
+        #   max_obstacle_height: 2.0
+        #   clearing: True
+        #   marking: True
+        #   observation_persistence: 0.5
+
+      # Inflation layer
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        enabled: true
+        inflation_radius: 0.7       # Mucho mayor que el radio inscrito (~0.275 m)
+        cost_scaling_factor: 1.5    # Coste decrece de forma gradual
+        inflate_unknown: true
+        inflate_around_unknown: true
+
+
+      # Costmap completo
+      always_send_full_costmap: True
+
+# =====================
+# LOCAL COSTMAP
+# =====================
+local_costmap:
+  local_costmap:
+    ros__parameters:
+      use_sim_time: False          # Robot real
+      global_frame: "odom"         # Típico para local costmap
+      robot_base_frame: "base_footprint"
+      resolution: 0.05
+      transform_tolerance: 0.2
+
+      rolling_window: true
+      width: 5
+      height: 5
+
+      # Frecuencias del local costmap
+      update_frequency: 20.0
+      publish_frequency: 10.0
+
+      footprint: "[[-0.375, -0.275], [-0.375, 0.275], [0.375, 0.275], [0.375, -0.275]]"
+      footprint_padding: 0.03
+
+      plugins:
+        - "voxel_layer"
+        - "obstacle_layer"
+        - "inflation_layer"
+        - "social_layer"
+
+      voxel_layer:
+        plugin: "nav2_costmap_2d::VoxelLayer"
+        enabled: true
+        voxel_decay: 0.5         # Obstáculos desaparecen rápido
+        decay_model: 0           # 0: Tiempo fijo
+        voxel_size: 0.05
+        z_voxels: 10
+        max_obstacle_height: 2.0
+        mark_threshold: 0
+        observation_sources: "camera_depth"
+        publish_voxel_map: true
+        camera_depth:
+          topic: "/astra_camera/camera/depth/points"
+          data_type: "PointCloud2"
+          marking: true
+          clearing: true
+          obstacle_range: 5.0
+          raytrace_range: 5.5
+          min_obstacle_height: 0.1
+          max_obstacle_height: 1.8
+
+
+      # Obstacle layer local
+      obstacle_layer:
+        plugin: "nav2_costmap_2d::ObstacleLayer"
+        enabled: True
+        footprint_clearing_enabled: true
+        max_obstacle_height: 2.0
+        combination_method: 1
+        observation_sources: "laser_front laser_back camera_depth"
+        observation_persistence: 0.2
+        obstacle_range: 5.0
+        raytrace_range: 5.5
+
+        laser_front:
+          topic: "/scan_1st"
+          max_obstacle_height: 2.0
+          clearing: True
+          marking: True
+        laser_back:
+          topic: "/scan_2nd"
+          max_obstacle_height: 2.0
+          clearing: True
+          marking: True
+        camera_depth:
+          topic: "/scan_camera"
+          clearing: True
+          marking: True
+          min_obstacle_height: 0.1
+          max_obstacle_height: 1.8
+
+      # Inflation layer local
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        enabled: true
+        inflation_radius: 0.4       # Mucho mayor que el radio inscrito (~0.275 m)
+        cost_scaling_factor: 2.0    # Coste decrece de forma gradual
+        inflate_unknown: true
+        inflate_around_unknown: true
+
+
+      # Proxemics layer local
+      # proxemics_layer:
+      #   plugin: "proxemics_costmap_layer::ProxemicsLayer"
+      #   enabled: true
+      #   ellipse_a: 0.5
+      #   ellipse_b: 0.3
+      #   obstacle_cost: 254
+      #   person_topic: "/human_pose/persons_poses"
+      #   transform_tolerance: 0.1
+              
+      social_layer:
+        plugin: "nav2_social_costmap_plugin::SocialLayer"
+        people_topic: "/people"
+        enabled: True
+        cutoff: 10.0
+        amplitude: 100.0
+        publish_occgrid: True
+        use_passing: False
+        use_vel_factor: False
+        speed_factor_multiplier: 5.0
+        covariance_front_height: 0.05
+        covariance_front_width: 0.08
+        covariance_rear_height: 0.05
+        covariance_rear_width: 0.08
+        covariance_right_height: 0.05
+        covariance_right_width: 0.08
+        covariance_when_still: 0.40  # o podrías poner 0.65 como promedio
+
+# =====================
+# BEHAVIOR SERVER
+# =====================
+behavior_server:
+  ros__parameters:
+    use_sim_time: False
+    costmap_topic: "local_costmap/costmap_raw"
+    footprint_topic: "local_costmap/published_footprint"
+    cycle_frequency: 20.0
+    behavior_plugins: ["spin", "backup", "wait"]
+    spin:
+      plugin: "nav2_behaviors/Spin"
+    backup:
+      plugin: "nav2_behaviors/BackUp"
+    wait:
+      plugin: "nav2_behaviors/Wait"
+    global_frame: "odom"
+    robot_base_frame: "base_footprint"
+    transform_timeout: 0.1
+    simulate_ahead_time: 2.0
+    max_rotational_vel: 0.5    # Reducido para giros más controlados
+    min_rotational_vel: 0.3    # Incrementado para evitar giros demasiado lentos
+    rotational_acc_lim: 1.0    # Menor aceleración en rotación para suavizar el giro
+
+# Velocity Smoother Plugin
+velocity_smoother:
+  ros__parameters:
+    use_sim_time: False
+    smoothing_frequency: 20.0
+    max_velocity: [0.35, 0.0, 0.5]
+    deadband: [0.0, 0.0, 0.15]  # El angular deadband evita micro giros inferiores a 0.1 rad/s
+    max_accel: [0.5, 0.0, 1.0]
+    max_decel: [-0.5, 0.0, -1.0]
+    feedback: "OPEN_LOOP"
+
+
+# Collision Monitor Plugin
+collision_monitor:
+  ros__parameters:
+    use_sim_time: False
+    base_frame_id: "base_footprint"
+    odom_frame_id: "odom"
+    cmd_vel_in_topic: "cmd_vel_raw"
+    cmd_vel_out_topic: "cmd_vel"
+    transform_tolerance: 0.1
+    source_timeout: 2.0
+    stop_pub_timeout: 0.5
+    base_shift_correction: true
+    polygons: ["FootprintApproach"]
+    FootprintApproach:
+      type: "polygon"
+      action_type: "approach"
+      footprint: "[[-0.375, -0.275], [-0.375, 0.275], [0.375, 0.275], [0.375, -0.275]]"
+      time_before_collision: 1.0
+      simulation_time_step: 0.1
+      max_points: 1
+      visualize: true
+        
+    observation_sources: ["scan_front", "scan_back", "camera_depth"]
+    scan_front:
+      type: "scan"
+      topic: "/scan_1st"
+      min_height: 0.0
+      max_height: 2.0
+
+    scan_back:
+      type: "scan"
+      topic: "/scan_2nd"
+      min_height: 0.0
+      max_height: 2.0
+
+    camera_depth:
+      type: "scan"
+      topic: "/scan_camera"
+      min_height: 0.0
+      max_height: 2.0

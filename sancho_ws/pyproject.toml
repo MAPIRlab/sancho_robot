@@ -1,0 +1,25 @@
+[tool.black]
+line-length = 88
+target-version = ["py310"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"
+exclude = [
+  ".git",
+  "__pycache__",
+  "build",
+  "dist",
+  ".venv",
+  ".ruff_cache",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "C", "D", "UP", "PT"]
+ignore = ["D203", "D213"]
+extend-select = ["I"]
+per-file-ignores = { "__init__.py" = ["F401"] }
+fixable = ["ALL"]
+
+[tool.ruff.format]
+quote-style = "preserve"

@@ -1,0 +1,3 @@
+# GetNoiseFloor.srv
+---
+float32 noise_floor

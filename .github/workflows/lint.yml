@@ -1,0 +1,59 @@
+name: Lint Sancho Packages
+
+on: [push, pull_request]
+
+jobs:
+  build-and-lint:
+    runs-on: ubuntu-22.04
+    steps:
+      # 1. Checkout repository
+      - uses: actions/checkout@v3
+
+      # 2. Setup ROS2 Humble environment
+      - name: Setup ROS environment
+        uses: ros-tooling/setup-ros@0.7.13
+        with:
+          required-ros-distributions: humble
+
+      # 3. Install ROS dependencies
+      - name: Initialize rosdep (if needed)
+        run: |
+          if [ ! -f /etc/ros/rosdep/sources.list.d/20-default.list ]; then
+            sudo rosdep init
+          fi
+          rosdep update
+
+
+      - name: Install package dependencies
+        run: |
+          rosdep install \
+            --from-paths src \
+            --ignore-src \
+            -r -y
+
+      # 4. Build packages (excluyendo third_party_pkgs)
+      - name: Colcon build (exclude third_party_pkgs)
+        run: |
+          colcon build \
+            --base-paths src \
+            --packages-select-regex "^sancho_" \
+            --continue-on-error || true
+
+
+      # 5. Setup Python y herramientas de lint
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install lint tools
+        run: pip install pylint
+
+      # 6. Run linters sobre src/sancho_*/sancho_*
+      - name: Lint Sancho packages
+        run: |
+          set -e
+          for pkg in src/sancho_*/sancho_*; do
+            echo "🔍 Linting $pkg"
+            pylint "$pkg" --fail-under=3.0
+          done

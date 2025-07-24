@@ -1,0 +1,5 @@
+opencv-python
+mediapipe
+numpy<2
+tf-transformations
+dlib
