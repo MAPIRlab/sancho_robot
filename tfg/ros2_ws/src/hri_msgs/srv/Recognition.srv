@@ -1,0 +1,12 @@
+sensor_msgs/Image frame
+hri_msgs/FacePosition position
+float32 score
+---
+sensor_msgs/Image face_aligned
+float32[] features
+string classified_id
+string classified_name
+float32 distance
+int32 pos
+bool face_updated
+float32 recognition_time

@@ -1,0 +1,55 @@
+
+         /\      Grafana   /‾‾/  
+    /\  /  \     |\  __   /  /   
+   /  \/    \    | |/ /  /   ‾‾\ 
+  /          \   |   (  |  (‾)  |
+ / __________ \  |_|\_\  \_____/ 
+
+     execution: local
+        script: api-get-faceprints-smoke.js
+ web dashboard: http://127.0.0.1:5665
+        output: -
+
+     scenarios: (100.00%) 1 scenario, 5 max VUs, 1m30s max duration (incl. graceful stop):
+              * default: 5 looping VUs for 1m0s (gracefulStop: 30s)
+
+
+
+  █ THRESHOLDS 
+
+    http_req_duration
+    ✓ 'avg<200' avg=40.47ms
+
+    http_req_failed
+    ✓ 'rate==0' rate=0.00%
+
+
+  █ TOTAL RESULTS 
+
+    checks_total.......................: 7398    123.213664/s
+    checks_succeeded...................: 100.00% 7398 out of 7398
+    checks_failed......................: 0.00%   0 out of 7398
+
+    ✓ status is 200
+
+    HTTP
+    http_req_duration.......................................................: avg=40.47ms min=10.17ms med=40.08ms max=56.2ms  p(90)=42.58ms p(95)=44.01ms
+      { expected_response:true }............................................: avg=40.47ms min=10.17ms med=40.08ms max=56.2ms  p(90)=42.58ms p(95)=44.01ms
+    http_req_failed.........................................................: 0.00%  0 out of 7398
+    http_reqs...............................................................: 7398   123.213664/s
+
+    EXECUTION
+    iteration_duration......................................................: avg=40.55ms min=10.49ms med=40.15ms max=56.29ms p(90)=42.66ms p(95)=44.1ms 
+    iterations..............................................................: 7398   123.213664/s
+    vus.....................................................................: 5      min=5         max=5
+    vus_max.................................................................: 5      min=5         max=5
+
+    NETWORK
+    data_received...........................................................: 1.8 GB 30 MB/s
+    data_sent...............................................................: 836 kB 14 kB/s
+
+
+
+
+running (1m00.0s), 0/5 VUs, 7398 complete and 0 interrupted iterations
+default ✓ [======================================] 5 VUs  1m0s

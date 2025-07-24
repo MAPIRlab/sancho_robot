@@ -1,0 +1,10 @@
+string chat_id
+string text
+string asking_mode
+---
+string value_json
+string method
+string intent
+string args_json
+string provider
+string model

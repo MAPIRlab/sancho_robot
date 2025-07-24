@@ -1,0 +1,132 @@
+[
+  {
+    "name": "DELETE_USER",
+    "description": "Eliminar o borrar a un usuario del sistema.",
+    "arguments": {
+      "user": "Nombre del usuario a eliminar (si se menciona)."
+    },
+    "examples": [
+      {
+        "input": "borra al usuario Pedro",
+        "output": {
+          "intent": "DELETE_USER",
+          "arguments": {
+            "user": "Pedro"
+          }
+        }
+      },
+      {
+        "input": "elimina a Marta",
+        "output": {
+          "intent": "DELETE_USER",
+          "arguments": {
+            "user": "Marta"
+          }
+        }
+      },
+      {
+        "input": "quiero borrar a Juan del sistema",
+        "output": {
+          "intent": "DELETE_USER",
+          "arguments": {
+            "user": "Juan"
+          }
+        }
+      },
+      {
+        "input": "puedes quitar al usuario Ana",
+        "output": {
+          "intent": "DELETE_USER",
+          "arguments": {
+            "user": "Ana"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "name": "RENAME_USER",
+    "description": "Cambiar el nombre de un usuario conocido por uno nuevo.",
+    "arguments": {
+      "old_name": "Nombre actual del usuario.",
+      "new_name": "Nuevo nombre que se le quiere dar."
+    },
+    "examples": [
+      {
+        "input": "cambia el nombre de Lucía a Ana",
+        "output": {
+          "intent": "RENAME_USER",
+          "arguments": {
+            "old_name": "Lucía",
+            "new_name": "Ana"
+          }
+        }
+      },
+      {
+        "input": "renombra a Juan como Pedro",
+        "output": {
+          "intent": "RENAME_USER",
+          "arguments": {
+            "old_name": "Juan",
+            "new_name": "Pedro"
+          }
+        }
+      },
+      {
+        "input": "quiero cambiar el nombre de Marcos por Leo",
+        "output": {
+          "intent": "RENAME_USER",
+          "arguments": {
+            "old_name": "Marcos",
+            "new_name": "Leo"
+          }
+        }
+      },
+      {
+        "input": "puedes renombrar a Clara a nombre Cristina",
+        "output": {
+          "intent": "RENAME_USER",
+          "arguments": {
+            "old_name": "Clara",
+            "new_name": "Cristina"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "name": "TAKE_PICTURE",
+    "description": "Tomar una foto con la cámara del robot.",
+    "arguments": {},
+    "examples": [
+      {
+        "input": "haz una foto",
+        "output": {
+          "intent": "TAKE_PICTURE",
+          "arguments": {}
+        }
+      },
+      {
+        "input": "saca una foto ahora",
+        "output": {
+          "intent": "TAKE_PICTURE",
+          "arguments": {}
+        }
+      },
+      {
+        "input": "puedes hacer una foto",
+        "output": {
+          "intent": "TAKE_PICTURE",
+          "arguments": {}
+        }
+      },
+      {
+        "input": "toma una fotografía de lo que ves",
+        "output": {
+          "intent": "TAKE_PICTURE",
+          "arguments": {}
+        }
+      }
+    ]
+  }
+]

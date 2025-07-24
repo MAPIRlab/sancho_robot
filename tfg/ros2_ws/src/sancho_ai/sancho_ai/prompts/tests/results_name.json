@@ -1,0 +1,252 @@
+{
+  "openai": {
+    "gpt-3.5-turbo": {
+      "total_tests": 23,
+      "correct": 23,
+      "valid_json": 23,
+      "present_field": 23,
+      "field_match": 23,
+      "field_present_but_wrong": 0,
+      "empty_response": 0,
+      "total_time_sec": 17.748099327087402
+    },
+    "gpt-4": {
+      "total_tests": 23,
+      "correct": 23,
+      "valid_json": 23,
+      "present_field": 23,
+      "field_match": 23,
+      "field_present_but_wrong": 0,
+      "empty_response": 0,
+      "total_time_sec": 29.162748336791992
+    },
+    "gpt-4o": {
+      "total_tests": 23,
+      "correct": 23,
+      "valid_json": 23,
+      "present_field": 23,
+      "field_match": 23,
+      "field_present_but_wrong": 0,
+      "empty_response": 0,
+      "total_time_sec": 25.748056173324585
+    }
+  },
+  "llama": {
+    "meta-llama/Llama-3.1-8B-Instruct": {
+      "total_tests": 23,
+      "correct": 23,
+      "valid_json": 23,
+      "present_field": 23,
+      "field_match": 23,
+      "field_present_but_wrong": 0,
+      "empty_response": 0,
+      "total_time_sec": 9.862139463424683
+    },
+    "meta-llama/Llama-3.3-70B-Instruct": {
+      "total_tests": 23,
+      "correct": 23,
+      "valid_json": 23,
+      "present_field": 23,
+      "field_match": 23,
+      "field_present_but_wrong": 0,
+      "empty_response": 0,
+      "total_time_sec": 65.59733510017395
+    }
+  },
+  "mistral": {
+    "mistralai/Mistral-7B-Instruct-v0.1": {
+      "total_tests": 23,
+      "correct": 0,
+      "valid_json": 0,
+      "present_field": 0,
+      "field_match": 0,
+      "field_present_but_wrong": 0,
+      "empty_response": 0,
+      "total_time_sec": 135.597335100174
+    }
+  },
+  "phi": {
+    "microsoft/phi-2": {
+      "total_tests": 23,
+      "correct": 0,
+      "valid_json": 0,
+      "present_field": 0,
+      "field_match": 0,
+      "field_present_but_wrong": 0,
+      "empty_response": 0,
+      "total_time_sec": 122.973402500153
+    }
+  },
+  "qwen": {
+    "Qwen/Qwen1.5-7B-Chat": {
+      "total_tests": 23,
+      "correct": 23,
+      "valid_json": 23,
+      "present_field": 23,
+      "field_match": 23,
+      "field_present_but_wrong": 0,
+      "empty_response": 0,
+      "total_time_sec": 11.498095512390137
+    },
+    "Qwen/Qwen2.5-7B-Instruct": {
+      "total_tests": 23,
+      "correct": 23,
+      "valid_json": 23,
+      "present_field": 23,
+      "field_match": 23,
+      "field_present_but_wrong": 0,
+      "empty_response": 0,
+      "total_time_sec": 7.483087778091431
+    },
+    "Qwen/Qwen2.5-14B-Instruct": {
+      "total_tests": 23,
+      "correct": 23,
+      "valid_json": 23,
+      "present_field": 23,
+      "field_match": 23,
+      "field_present_but_wrong": 0,
+      "empty_response": 0,
+      "total_time_sec": 14.075734853744507
+    },
+    "Qwen/Qwen2.5-32B-Instruct": {
+      "total_tests": 23,
+      "correct": 23,
+      "valid_json": 23,
+      "present_field": 23,
+      "field_match": 23,
+      "field_present_but_wrong": 0,
+      "empty_response": 0,
+      "total_time_sec": 30.223602294921875
+    },
+    "Qwen/Qwen2.5-72B-Instruct": {
+      "total_tests": 23,
+      "correct": 23,
+      "valid_json": 23,
+      "present_field": 23,
+      "field_match": 23,
+      "field_present_but_wrong": 0,
+      "empty_response": 0,
+      "total_time_sec": 85.41385912895203
+    }
+  },
+  "deepseek": {
+    "deepseek-ai/deepseek-llm-7b-chat": {
+      "total_tests": 23,
+      "correct": 22,
+      "valid_json": 23,
+      "present_field": 23,
+      "field_match": 22,
+      "field_present_but_wrong": 1,
+      "empty_response": 0,
+      "total_time_sec": 10.34113883972168
+    },
+    "deepseek-ai/deepseek-llm-67b-chat": {
+      "total_tests": 23,
+      "correct": 23,
+      "valid_json": 23,
+      "present_field": 23,
+      "field_match": 23,
+      "field_present_but_wrong": 0,
+      "empty_response": 0,
+      "total_time_sec": 63.40655279159546
+    },
+    "deepseek-ai/DeepSeek-R1-Distill-Llama-70B": {
+      "total_tests": 23,
+      "correct": 22,
+      "valid_json": 23,
+      "present_field": 23,
+      "field_match": 22,
+      "field_present_but_wrong": 1,
+      "empty_response": 0,
+      "total_time_sec": 54.902174949646
+    },
+    "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B": {
+      "total_tests": 23,
+      "correct": 21,
+      "valid_json": 23,
+      "present_field": 23,
+      "field_match": 21,
+      "field_present_but_wrong": 2,
+      "empty_response": 0,
+      "total_time_sec": 31.994872093200684
+    }
+  },
+  "gemini": {
+    "gemini-1.5-flash-latest": {
+      "total_tests": 23,
+      "correct": 22,
+      "valid_json": 22,
+      "present_field": 22,
+      "field_match": 22,
+      "field_present_but_wrong": 0,
+      "empty_response": 1,
+      "total_time_sec": 17.803658962249756
+    },
+    "gemini-2.0-flash-lite": {
+      "total_tests": 23,
+      "correct": 21,
+      "valid_json": 21,
+      "present_field": 21,
+      "field_match": 21,
+      "field_present_but_wrong": 0,
+      "empty_response": 2,
+      "total_time_sec": 32.24811053276062
+    },
+    "gemini-2.5-flash": {
+      "total_tests": 23,
+      "correct": 23,
+      "valid_json": 23,
+      "present_field": 23,
+      "field_match": 23,
+      "field_present_but_wrong": 0,
+      "empty_response": 0,
+      "total_time_sec": 41.72948670387268
+    }
+  },
+  "gemma": {
+    "google/gemma-3-27b-it": {
+      "total_tests": 23,
+      "correct": 20,
+      "valid_json": 22,
+      "present_field": 22,
+      "field_match": 20,
+      "field_present_but_wrong": 2,
+      "empty_response": 1,
+      "total_time_sec": 63.47910261154175
+    }
+  },
+  "falcon": {
+    "tiiuae/Falcon3-10B-Instruct": {
+      "total_tests": 23,
+      "correct": 23,
+      "valid_json": 23,
+      "present_field": 23,
+      "field_match": 23,
+      "field_present_but_wrong": 0,
+      "empty_response": 0,
+      "total_time_sec": 13.733581066131592
+    }
+  },
+  "yi": {
+    "01-ai/Yi-1.5-9B-Chat": {
+      "total_tests": 23,
+      "correct": 12,
+      "valid_json": 10,
+      "present_field": 10,
+      "field_match": 10,
+      "field_present_but_wrong": 0,
+      "empty_response": 0,
+      "total_time_sec": 165.90828394889832
+    },
+    "01-ai/Yi-1.5-34B-Chat": {
+      "total_tests": 23,
+      "correct": 21,
+      "valid_json": 23,
+      "present_field": 23,
+      "field_match": 21,
+      "field_present_but_wrong": 2,
+      "empty_response": 0,
+      "total_time_sec": 72.14590215682983
+    }
+  }
+}

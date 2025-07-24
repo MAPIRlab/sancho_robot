@@ -1,0 +1,43 @@
+/**:
+  ros__parameters:
+    video_device: "/dev/video0"
+    framerate: 30.0  # Ajustado a 10 FPS para mayor estabilidad en condiciones de poca luz
+    io_method: "mmap"
+    frame_id: "camera"
+    pixel_format: "yuyv"  # Usando YUYV para calidad de imagen sin compresión
+    av_device_format: "YUV422P"
+    image_width: 640  # Aumentado para mejorar la resolución de la imagen
+    image_height: 480  # Aumentado para mejorar la resolución de la imagen
+    camera_name: "calibrated_camera"
+    camera_info_url: "package://usb_cam/config/camera_info_low.yaml"
+
+    # Desactivar configuraciones automáticas para un mayor control
+    auto_white_balance: false
+    white_balance: 4600    # Ajuste inicial, puede variar según la iluminación real del entorno
+    # Valores extremos: min=2800, max=6500
+
+    autoexposure: false
+    exposure: 157     # Valor por defecto en la configuración; aumenta o reduce según la iluminación
+    # Valores extremos: min=1, max=5000
+
+    # Ajustes para mejorar la imagen
+    brightness: 32  # Brillo medio para no saturar la imagen
+    # Valores extremos: min=-64, max=64
+
+    contrast: 32  # Ajuste de contraste medio
+    # Valores extremos: min=0, max=64
+
+    saturation: 64  # Saturación intermedia para evitar colores apagados
+    # Valores extremos: min=0, max=128
+
+    sharpness: 3  # Configuración de nitidez predeterminada
+    # Valores extremos: min=0, max=6
+
+    gain: 0  # Ganancia mínima para evitar ruido adicional
+    # Valores extremos: min=0, max=100
+
+    gamma: 100  # Valor por defecto para balancear brillo y contraste
+    # Valores extremos: min=72, max=500
+
+    power_line_frequency: 1  # Frecuencia de línea a 50 Hz para evitar parpadeos en Europa
+    # Valores extremos: 0=Desactivado, 1=50 Hz, 2=60 Hz
