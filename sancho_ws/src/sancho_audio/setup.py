@@ -28,6 +28,10 @@ setup(
             'microphone_capturer = sancho_audio.microphone_capturer_node:main',
             'voice_activity_detector = sancho_audio.vad_node:main',
             'stereo_recorder = sancho_audio.stereo_recorder_node:main',
+            'assistant_helper=sancho_audio.assistant_helper_node:main',
+            'assistant=sancho_audio.assistant_node:main',
+            'audio=sancho_audio.audio_node:main',
+            'microphone=sancho_audio.microphone_node:main'
         ],
     },
 )
