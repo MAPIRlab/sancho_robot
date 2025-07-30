@@ -1,8 +1,23 @@
-from .base_encoder import BaseEncoder
+from enum import Enum
 
-from .arcface_encoder import ArcFaceEncoder
-from .dinov2_encoder import DinoV2Encoder
-from .facenet_encoder import FacenetEncoder
-from .openface_encoder import OpenFaceEncoder
-from .sface_encoder import SFaceEncoder
-from .vggface_encoder import VGGFaceEncoder
+from .base_encoder import BaseEncoder
+from .factory import load_encoder
+
+class SmartStrEnum(str, Enum):
+    def __str__(self):
+        return self.value
+
+    def __repr__(self):
+        return self.value
+
+class DBMode(SmartStrEnum):
+    SAVE = "save",
+    NO_SAVE = "no_save"
+
+class EncoderType(SmartStrEnum):
+    FACENET = "facenet"
+    ARCFACE = "arcface"
+    DINOV2 = "dinov2"
+    OPENFACE = "openface"
+    SFACE = "sface"
+    VGGFACE = "vggface"

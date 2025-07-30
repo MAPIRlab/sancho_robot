@@ -21,7 +21,7 @@ from ros2web_msgs.srv import R2WSubscribe
 from .api.gui_utils import mark_face
 from .hri_bridge import HRIBridge
 
-from hri_vision.human_face_recognizer import EncoderType
+from sancho_ws.src.hri_vision.hri_vision.human_face_recognizer_lifecycle_node import EncoderType
 
 
 class TestEncoderNode(Node):

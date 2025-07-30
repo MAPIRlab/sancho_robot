@@ -18,6 +18,8 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/PersonPose.msg"
   "msg/PersonsPoses.msg"
   "msg/GroupInfo.msg"
+  "msg/FaceDetection.msg"
+  "msg/FaceDetectionArray.msg"
   "msg/Face.msg"
   "msg/FaceArray.msg"
   "msg/AudioData.msg"
