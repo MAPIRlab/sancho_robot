@@ -1,0 +1,400 @@
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Changelog for package image_view
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+5.0.11 (2025-05-21)
+-------------------
+* fix colour channel order for "rgb8" in image_view (backport `#1093 <https://github.com/ros-perception/image_pipeline/issues/1093>`_) (`#1094 <https://github.com/ros-perception/image_pipeline/issues/1094>`_)
+* Contributors: mergify[bot]
+
+5.0.10 (2025-04-22)
+-------------------
+
+5.0.9 (2025-02-27)
+------------------
+* image_view: sleep if no new image (backport `#1082 <https://github.com/ros-perception/image_pipeline/issues/1082>`_) (`#1083 <https://github.com/ros-perception/image_pipeline/issues/1083>`_)
+* Contributors: mergify[bot]
+
+5.0.8 (2025-02-13)
+------------------
+* image_view：set CvtColorForDisplay encoding as bgr8 (backport `#1071 <https://github.com/ros-perception/image_pipeline/issues/1071>`_) (`#1075 <https://github.com/ros-perception/image_pipeline/issues/1075>`_)
+  Co-authored-by: Zhaoyuan Cheng <zycczyby@gmail.com>
+* Contributors: mergify[bot]
+
+5.0.7 (2025-02-10)
+------------------
+
+5.0.6 (2024-12-11)
+------------------
+* `image_view_node`: support bayer images (backport `#1046 <https://github.com/ros-perception/image_pipeline/issues/1046>`_) (`#1058 <https://github.com/ros-perception/image_pipeline/issues/1058>`_)
+  so far bayer images always failed with an error:
+  ```
+  [ERROR] [..] [image_view_node]: Unable to convert 'bayer_rggb8' image for display: 'cv_bridge.cvtColorForDisplay() does not have an output encoding                that is color or mono, and has is bit in depth'
+  ```
+  the `stereo_view_node` on the other hand already supports bayer images,
+  however it always forcibly converts them to monochrome, even if they are
+  colour images.
+  for now, this adds the same logic for the single-image viewer and thus
+  only partially resolves `#1045 <https://github.com/ros-perception/image_pipeline/issues/1045>`_.<hr>This is an automatic backport of pull
+  request `#1046 <https://github.com/ros-perception/image_pipeline/issues/1046>`_ done by [Mergify](https://mergify.com).
+  Co-authored-by: Ralph Ursprung <39383228+rursprung@users.noreply.github.com>
+* Contributors: mergify[bot]
+
+5.0.5 (2024-10-31)
+------------------
+
+5.0.4 (2024-08-20)
+------------------
+* Finish QoS updates (backport `#1019 <https://github.com/ros-perception/image_pipeline/issues/1019>`_) (`#1024 <https://github.com/ros-perception/image_pipeline/issues/1024>`_)
+  This implements the remainder of `#847 <https://github.com/ros-perception/image_pipeline/issues/847>`_:
+  - Make sure publishers default to system defaults (reliable)
+  - Add QoS overriding where possible (some of the image_transport /
+  message_filters stuff doesn't really support that)
+  - Use the matching heuristic for subscribers consistently
+* Contributors: mergify[bot]
+
+5.0.3 (2024-07-16)
+------------------
+
+5.0.2 (2024-05-27)
+------------------
+
+5.0.1 (2024-03-26)
+------------------
+* unified changelog, add missing image, deduplicate tutorials (`#938 <https://github.com/ros-perception/image_pipeline/issues/938>`_)
+  Last bit of documentation updates - putting together a single changelog
+  summary for the whole release (rather than scattering among packages).
+  Unified the camera_info tutorial so it isn't duplicated. Added a missing
+  image from image_rotate (was on local disk, but hadn't committed it)
+* add docs for image_rotate/publisher (`#936 <https://github.com/ros-perception/image_pipeline/issues/936>`_)
+* migrate image_view docs (`#934 <https://github.com/ros-perception/image_pipeline/issues/934>`_)
+  * migrate docs from ROS wiki
+  * FIX: video recorder start/end services should only be advertised when
+  feature is enabled
+  * FIX: image remapping didn't work as expected/documented in
+  stereo_image_proc
+* default to encoding in the image message (`#921 <https://github.com/ros-perception/image_pipeline/issues/921>`_)
+  My camera is publishing rgb8 encoding - the existing code throws an
+  error that 8UC3 is not a valid encoding, but if we pass rgb8 from the
+  message then things work fine. The encoding in the image should always
+  be more descriptive than just the bit and channel size.
+  If encoding is not filled in, the existing behavior is used as a
+  fallback
+* Update extract_images_sync to add sec_per_frame parameter (`#920 <https://github.com/ros-perception/image_pipeline/issues/920>`_)
+  Added sec_per_frame parameter to allow decimation of frames being
+  synchronized and captured.
+  fixes `#726 <https://github.com/ros-perception/image_pipeline/issues/726>`_
+  ---------
+  Co-authored-by: Michael Ferguson <mfergs7@gmail.com>
+* Port extract_images_sync script to ROS 2 (`#919 <https://github.com/ros-perception/image_pipeline/issues/919>`_)
+  Change Description: The extract_images_sync python script was upgraded
+  to ROS 2.
+  Testing: Upgraded node tested against Iron on Ubuntu 22.04.3 LTS
+  Issue: fixes `#860 <https://github.com/ros-perception/image_pipeline/issues/860>`_
+  ---------
+  Co-authored-by: Alejandro Hernández Cordero <ahcorde@gmail.com>
+  Co-authored-by: Michael Ferguson <mfergs7@gmail.com>
+* Contributors: Michael Ferguson, Siddharth Vaghela
+
+5.0.0 (2024-01-24)
+------------------
+* remove the last bit of boost (`#912 <https://github.com/ros-perception/image_pipeline/issues/912>`_)
+  Last bit of `#407 <https://github.com/ros-perception/image_pipeline/issues/407>`_ - every other occurrence of "boost" when grepping the
+  repo is in the changelog
+* Removed Boost dependency (`#909 <https://github.com/ros-perception/image_pipeline/issues/909>`_)
+  Removed Boost dependency. Related with
+  https://github.com/ros-perception/image_pipeline/issues/407
+  ---------
+* Removed cfg files related with ROS 1 parameters (`#911 <https://github.com/ros-perception/image_pipeline/issues/911>`_)
+  Removed cfg files related with ROS 1 parameters
+* image_view: consistent image_transport (`#876 <https://github.com/ros-perception/image_pipeline/issues/876>`_)
+  All of these nodes already have the proper remapping support - but
+  image_transport parameter support was scattered
+* enable autosize parameter in disparity view (`#875 <https://github.com/ros-perception/image_pipeline/issues/875>`_)
+  appears to be bug left over from ROS 2 port
+* ROS 2: Add option to prepend timestamp to image filename in image_saver node (`#870 <https://github.com/ros-perception/image_pipeline/issues/870>`_)
+  Related to this PR in ROS 1
+  https://github.com/ros-perception/image_pipeline/pull/806/files
+  ---------
+* Add support for floating point fps (`#866 <https://github.com/ros-perception/image_pipeline/issues/866>`_)
+  Related with this PR
+  https://github.com/ros-perception/image_pipeline/pull/723
+  ---------
+* use cv::DestroyAllWindows (`#863 <https://github.com/ros-perception/image_pipeline/issues/863>`_)
+  This ports `#816 <https://github.com/ros-perception/image_pipeline/issues/816>`_ to ROS 2 and prevents weird exit conditions if you
+  already closed the window
+* properly remap compressed topics (`#851 <https://github.com/ros-perception/image_pipeline/issues/851>`_)
+  ## Before:
+  Pushing into namespace is broken, only image_raw changes (camera_info
+  and transport topics should change):
+  ```
+  ros2 run image_publisher image_publisher_node --ros-args -p filename:=test.png -r image_raw:=foo/image_raw
+  ---
+  ros2 topic list
+  /camera_info
+  /foo/image_raw
+  /image_raw/compressed
+  /image_raw/compressedDepth
+  /image_raw/theora
+  ```
+  ## After:
+  Pushing into namespace now works:
+  ```
+  ros2 run image_publisher image_publisher_node --ros-args -p filename:=test.png -r image_raw:=foo/image_raw
+  ---
+  ros2 topic list
+  /foo/camera_info
+  /foo/image_raw
+  /foo/image_raw/compressed
+  /foo/image_raw/compressedDepth
+  /foo/image_raw/theora
+  ```
+* image_view: fix encoding, help string (`#850 <https://github.com/ros-perception/image_pipeline/issues/850>`_)
+  * encoding shouldn't be hard coded, pull it from the message
+  * help string needs to be updated to proper parameter format
+* Improved Image view dynamic parameters description (`#829 <https://github.com/ros-perception/image_pipeline/issues/829>`_)
+* add myself as a maintainer (`#846 <https://github.com/ros-perception/image_pipeline/issues/846>`_)
+* feat: image_saver reports an error on file save
+* Contributors: Alejandro Hernández Cordero, Michael Ferguson, Russ Webber
+
+3.0.1 (2022-12-04)
+------------------
+* Replace deprecated headers
+  Fixing compiler warnings.
+* Contributors: Jacob Perron
+
+3.0.0 (2022-04-29)
+------------------
+* Cleanup image_view.
+* reformat for the uncrustify linter
+* fix code style divergence
+* reduce number of lines under 100
+* print correct topics, remap according to ros2 capabilities, print help with correct ros2 syntax
+* declare and get parameters for value replacement
+* transport shoudl be used as a ros arg parameter
+* use ros2 syntax
+* transport should be use as a ros-arg parameter
+* Fix image saver bug and time-based image saving
+* replace ROSTIME
+* Changing to RCL_SYSTEM_TIME
+* Fix timestamp creation
+* changes per comments
+* fix for stereo_image_proc_tests
+* Add maintainer (`#667 <https://github.com/ros-perception/image_pipeline/issues/667>`_)
+* please linters
+* Fix wrong usage of rclcpp::Duration constructor
+* Contributors: Chris Lalancette, Erwin Lejeune, Ivan Santiago Paunovic, Jacob Perron, Lars Lorentz Ludvigsen, Patrick Musau
+
+2.2.1 (2020-08-27)
+------------------
+* remove email blasts from steve macenski (`#596 <https://github.com/ros-perception/image_pipeline/issues/596>`_)
+* [Foxy] Use ament_auto Macros (`#573 <https://github.com/ros-perception/image_pipeline/issues/573>`_)
+* Contributors: Joshua Whitley, Steve Macenski
+
+2.2.0 (2020-07-27)
+------------------
+* Replacing deprecated header includes with new HPP versions. (`#566 <https://github.com/ros-perception/image_pipeline/issues/566>`_)
+* Opencv 3 compatibility (`#564 <https://github.com/ros-perception/image_pipeline/issues/564>`_)
+  * Remove GTK from image_view.
+  * Reinstate OpenCV 3 compatibility.
+* Use newer 'add_on_set_parameters_callback' API (`#562 <https://github.com/ros-perception/image_pipeline/issues/562>`_)
+  The old API was deprecated in Foxy and since removed in https://github.com/ros2/rclcpp/pull/1199.
+* Contributors: Chris Lalancette, Jacob Perron, Joshua Whitley
+
+* Patch boost failure in image_view (`#541 <https://github.com/ros-perception/image_pipeline/issues/541>`_)
+  * Patch boost failure in image_view
+  * remove ros2_deps from circle with new releases
+  * readd deps
+* Contributors: Steve Macenski
+
+* Initial ROS2 commit.
+* Contributors: Michael Carroll
+
+1.12.23 (2018-05-10)
+--------------------
+
+1.12.22 (2017-12-08)
+--------------------
+
+1.12.21 (2017-11-05)
+--------------------
+* call namedWindow from same thread as imshow, need waitKay, now cvStartWindowThreads is null funciton on window_QT.h (`#279 <https://github.com/ros-perception/image_pipeline/issues/279>`_)
+* Contributors: Kei Okada
+
+1.12.20 (2017-04-30)
+--------------------
+* DisparityViewNodelet: fixed freeze (`#244 <https://github.com/ros-perception/image_pipeline/issues/244>`_)
+* launch image view with a predefined window size (`#257 <https://github.com/ros-perception/image_pipeline/issues/257>`_)
+* Remove python-opencv run_depend for image_view (`#270 <https://github.com/ros-perception/image_pipeline/issues/270>`_)
+  The `python-opencv` dependency pulls in the system OpenCV v2.4 which is
+  not required since the `image_view` package depends on `cv_bridge` which
+  pulls in `opencv3` and `opencv3` provides the python library that
+  `image_view` can use.
+* Fix encoding error message (`#253 <https://github.com/ros-perception/image_pipeline/issues/253>`_)
+  * Fix encoding error message
+  * Update image_saver.cpp
+  Allow compilation on older compilers
+* Including stereo_msgs dep fixes `#248 <https://github.com/ros-perception/image_pipeline/issues/248>`_ (`#249 <https://github.com/ros-perception/image_pipeline/issues/249>`_)
+* Add no gui mode to just visualize & publish with image_view (`#241 <https://github.com/ros-perception/image_pipeline/issues/241>`_)
+* stere_view: fixed empty left, right, disparity windows with opencv3
+* Apply value scaling to depth/float image with min/max image value
+  If min/max image value is specified we just use it, and if not,
+  - 32FC1: we assume depth image with meter metric, and 10[m] as the max range.
+  - 16UC1: we assume depth image with milimeter metric, and 10 * 1000[mm] as the max range.
+* Depends on cv_bridge 1.11.13 for CvtColorForDisplayOptions
+  Close `#238 <https://github.com/ros-perception/image_pipeline/issues/238>`_
+* fix doc jobs
+  This is a proper fix for `#233 <https://github.com/ros-perception/image_pipeline/issues/233>`_
+* address gcc6 build error
+  With gcc6, compiling fails with `stdlib.h: No such file or directory`,
+  as including '-isystem /usr/include' breaks with gcc6, cf.,
+  https://gcc.gnu.org/bugzilla/show_bug.cgi?id=70129.
+  This commit addresses this issue for this package in the same way
+  it was addressed in various other ROS packages. A list of related
+  commits and pull requests is at:
+  https://github.com/ros/rosdistro/issues/12783
+  Signed-off-by: Lukas Bulwahn <lukas.bulwahn@oss.bmw-carit.de>
+* Contributors: Christopher Wecht, Kartik Mohta, Kei Okada, Kentaro Wada, Lukas Bulwahn, Leonard Gerard, Vincent Rabaud, cwecht, mryellow
+
+1.12.19 (2016-07-24)
+--------------------
+* Add colormap option in video_recorder
+* Merge pull request `#203 <https://github.com/ros-perception/image_pipeline/issues/203>`_ from wkentaro/video-recorder-timestamp
+  [image_view] Stamped video output filename for video recorder
+* bump version requirement for cv_bridge dep
+  Closes `#215 <https://github.com/ros-perception/image_pipeline/issues/215>`_
+* Request for saving image with start/end two triggers
+* Stamped video output filename
+  - _filename:=output.avi _stamped_filename:=false -> output.avi
+  - _filename:=_out.avi _stamped_filename:=true -> 1466299931.584632829_out.avi
+  - _filename:=$HOME/.ros/.avi _stamped_filename:=true -> /home/ubuntu/.ros/1466299931.584632829.avi
+* Revert max_depth_range to default value for cvtColorForDisplay
+* Contributors: Kentaro Wada, Vincent Rabaud
+
+1.12.18 (2016-07-12)
+--------------------
+* Use image_transport::Subscriber aside from ros::Subscriber
+* Refactor: Remove subscription of camera_info in video_recorder
+* Add colormap options for displaying image topic
+* Use CvtColorForDisplayOptions for cvtColorForDisplay
+* Contributors: Kentaro Wada, Vincent Rabaud
+
+1.12.17 (2016-07-11)
+--------------------
+* Fix timestamp to get correct fps in video_recorder
+* Get correct fps in video_recorder.cpp
+* Do dynamic scaling for float images
+* Contributors: Kentaro Wada
+
+1.12.16 (2016-03-19)
+--------------------
+* Remove code for roslib on .cfg files
+  Closes `#185 <https://github.com/ros-perception/image_pipeline/issues/185>`_
+* add cv::waitKey for opencv3 installed from source to fix freezing issue
+* when no image is saved, do not save camera info
+  When the images are not recorded because "save_all_image" is false and "save_image_service" is false, the frame count should not be incremented and the camera info should not be written to disk.
+* Add std_srvs to catkin find_package()
+* Contributors: Jeremy Kerfs, Jochen Sprickerhof, Kentaro Wada, Krishneel
+
+1.12.15 (2016-01-17)
+--------------------
+* simplify the OpenCV dependency
+* [image_view] Configure do_dynamic_scaling param with dynamic_reconfigure
+* [image_view] Scale 16UC1 depth image
+* fix compilation
+* Extract images which are synchronized with message_filters
+* [image_view] Show full path when failed to save image
+* [image_view] Enable to specify transport with arg
+* [image_view] feedback: no need threading for callback
+* [image_view/image_view] Make as a node
+* Added sensor_msgs::Image conversion to cv::Mat from rqt_image_view in
+  order to be able to create videos from kinect depth images (cv_bridge
+  currently doesn't support 16UC1 image encoding).
+  Code adapted from:
+  https://github.com/ros-visualization/rqt_common_plugins/blob/groovy-devel/rqt_image_view/src/rqt_image_view/image_view.cpp
+* simplify OpenCV3 conversion
+* use the color conversion for display from cv_bridge
+* Contributors: Carlos Costa, Kentaro Wada, Vincent Rabaud
+
+1.12.14 (2015-07-22)
+--------------------
+* reduce the differences between OpenCV2 and 3
+* do not build GUIs on Android
+  This fixes `#137 <https://github.com/ros-perception/image_pipeline/issues/137>`_
+* Contributors: Vincent Rabaud
+
+1.12.13 (2015-04-06)
+--------------------
+
+1.12.12 (2014-12-31)
+--------------------
+* Convert function to inline to avoid duplicates with image_transport
+* Revert "remove GTK dependency"
+  This reverts commit a6e15e796a40385fbbf8da05966aa47d179dcb46.
+  Conflicts:
+  image_view/CMakeLists.txt
+  image_view/src/nodelets/disparity_nodelet.cpp
+  image_view/src/nodes/stereo_view.cpp
+* Revert "make sure waitKey is called after imshow"
+  This reverts commit d13e3ed6af819459bca221ece779964a74beefac.
+* Revert "brings back window_thread"
+  This reverts commit 41a655e8e99910c13a3e7f1ebfdd083207cef76f.
+* Contributors: Gary Servin, Vincent Rabaud
+
+1.12.11 (2014-10-26)
+--------------------
+* brings back window_thread
+  This fixes `#102 <https://github.com/ros-perception/image_pipeline/issues/102>`_ fully
+* small optimizations
+* add the image_transport parameter
+* Contributors: Vincent Rabaud
+
+1.12.10 (2014-09-28)
+--------------------
+
+1.12.9 (2014-09-21)
+-------------------
+* get code to compile with OpenCV3
+  fixes `#96 <https://github.com/ros-perception/image_pipeline/issues/96>`_
+* Contributors: Vincent Rabaud
+
+1.12.8 (2014-08-19)
+-------------------
+
+1.12.6 (2014-07-27)
+-------------------
+* make sure waitKey is called after imshow
+* remove GTK dependency
+* small speedups
+* Contributors: Vincent Rabaud
+
+1.12.5 (2014-05-11)
+-------------------
+* image_view: Add depend on gtk2
+* Contributors: Scott K Logan
+
+1.12.4 (2014-04-28)
+-------------------
+* fixes `#65 <https://github.com/ros-perception/image_pipeline/issues/65>`_
+* Contributors: Vincent Rabaud
+
+1.12.3 (2014-04-12)
+-------------------
+
+1.12.2 (2014-04-08)
+-------------------
+
+1.12.1 (2014-04-06)
+-------------------
+* get proper opencv dependency
+* Contributors: Vincent Rabaud
+
+1.11.7 (2014-03-28)
+-------------------
+* Added requirement for core.
+* Contributors: Jonathan J Hunt
+
+1.11.3 (2013-10-06 20:21:55 +0100)
+----------------------------------
+- #41: allow image_saver to save image topics
+- #40: use proper download URL
