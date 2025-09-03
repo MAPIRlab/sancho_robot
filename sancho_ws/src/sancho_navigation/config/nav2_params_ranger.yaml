@@ -19,12 +19,12 @@ amcl:
     laser_model_type: "likelihood_field_prob"
     do_beamskip: True
     beam_skip_distance: 0.5
-    laser_max_range: 100.0
+    laser_max_range: 30.0
     laser_min_range: -1.0
     update_min_d: 0.2
     update_min_a: 0.2
     resample_interval: 1
-    transform_tolerance: 0.05
+    transform_tolerance: 0.15
     recovery_alpha_slow: 0.001
     recovery_alpha_fast: 0.1
     initial_pose_x: 0.0
@@ -43,7 +43,7 @@ bt_navigator:
     global_frame: map
     robot_base_frame: base_footprint
     odom_topic: /odom
-    bt_loop_duration: 5
+    bt_loop_duration: 50
     default_server_timeout: 10
     enable_groot_monitoring: True
     groot_zmq_publisher_port: 1666
@@ -54,6 +54,7 @@ bt_navigator:
 
     plugin_lib_names:
       - nav2_compute_path_to_pose_action_bt_node
+      - nav2_smac_planner
       - nav2_controller_cancel_bt_node
       - nav2_path_longer_on_approach_bt_node
       - nav2_compute_path_through_poses_action_bt_node
@@ -98,43 +99,45 @@ controller_server:
   ros__parameters:
     use_sim_time: False
     controller_frequency: 20.0
+
+    # Subimos umbral mínimo para publicar omega y evitamos invertir por ruido
     min_x_velocity_threshold: 0.05
     min_y_velocity_threshold: 0.05
-    min_theta_velocity_threshold: 0.1
-    failure_tolerance: 0.3
+    min_theta_velocity_threshold: 0.15   # antes 0.1
+
+    # No declares fallo tan pronto ante dudas al inicio del giro
+    failure_tolerance: 0.8               # antes 0.3
 
     progress_checker_plugin: "progress_checker"
-    goal_checker_plugins: ["general_goal_checker"]  # o "precise_goal_checker"
+    goal_checker_plugins: ["general_goal_checker"]
     smoother_plugins: ["velocity_smoother"]
     controller_plugins: ["FollowPath"]
 
-    # Progress checker parameters
     progress_checker:
       plugin: "nav2_controller::SimpleProgressChecker"
       required_movement_radius: 0.2
       movement_time_allowance: 20.0
 
-    # Goal checker parameters
     general_goal_checker:
       stateful: True
       plugin: "nav2_controller::SimpleGoalChecker"
       xy_goal_tolerance: 0.2
-      yaw_goal_tolerance: 1.0   # Mayor tolerancia para evitar microajustes
-
+      yaw_goal_tolerance: 1.0
 
     FollowPath:
       plugin: "nav2_rotation_shim_controller::RotationShimController"
       primary_controller: "nav2_mppi_controller::MPPIController"
 
-      angular_dist_threshold: 1.00
-      forward_sampling_distance: 0.5
-      angular_disengage_threshold: 0.95
-      rotate_to_heading_angular_vel: 1.0
-      max_angular_accel: 3.0
-      simulate_ahead_time: 1.0
-      rotate_to_goal_heading: true
+      # --- ANTI-OSCILACIÓN EN ROTATION SHIM ---
+      # Engancha el modo rotación con margen y no lo suelta hasta estar bien alineado
+      angular_dist_threshold: 1.20         # antes 1.00
+      angular_disengage_threshold: 0.40    # antes 0.95 (¡histeresis grande!)
+      rotate_to_heading_angular_vel: 1.0   # antes 1.0 (menos sobrepaso)
+      max_angular_accel: 3.0               # antes 3.0 (menos vaivén)
+      simulate_ahead_time: 0.0             # antes 1.0 (no “adivinar” la pose futura)
+      rotate_to_goal_heading: false        # evita decidir yaw final aquí; hazlo con Spin
 
-      # MPPI Controller parameters
+      # --- MPPI ---
       time_steps: 56
       model_dt: 0.05
       batch_size: 2000
@@ -142,20 +145,17 @@ controller_server:
       vy_std: 0.2
       wz_std: 0.4
 
-      vx_max: 0.4 # velocidad máxima
+      vx_max: 0.4
       vx_min: 0.0
-
       vy_max: 0.0
       vy_min: -0.0
-
       wz_max: 1.0
 
       ax_max: 0.5
       ax_min: -0.5
-
       az_max: 1.0
-      
-      iteration_count: 1 
+
+      iteration_count: 1
       prune_distance: 1.7
       transform_tolerance: 0.1
       temperature: 0.5
@@ -171,17 +171,17 @@ controller_server:
       AckermannConstraints:
         min_turning_r: 0.4764
 
-      # Críticos integrados para evaluaciones de trayectorias
-      critics: 
+      critics:
          - "ConstraintCritic"
          - "CostCritic"
          - "GoalCritic"
-         - "GoalAngleCritic"
+         # - "GoalAngleCritic"       # mantenlo off para no forzar giro “raro” parado
          - "PathAlignCritic"
          - "PathFollowCritic"
          - "PathAngleCritic"
          - "PreferForwardCritic"
-         - "VelocityDeadbandCritic"  # Opcional, para suavizar cambios muy pequeños
+         - "VelocityDeadbandCritic"
+         # - "TwirlingCritic"        # desactiva si penaliza giros en parado
 
       ConstraintCritic:
         enabled: true
@@ -193,28 +193,6 @@ controller_server:
         cost_power: 1
         cost_weight: 5.0
         threshold_to_consider: 1.4
-
-      GoalAngleCritic:
-        enabled: false
-        cost_power: 1
-        cost_weight: 3.0
-        threshold_to_consider: 0.5
-
-      PreferForwardCritic:
-        enabled: true
-        cost_power: 1
-        cost_weight: 5.0
-        threshold_to_consider: 0.5
-
-      CostCritic:
-        enabled: true
-        cost_power: 1
-        cost_weight: 3.81
-        critical_cost: 300.0
-        consider_footprint: true
-        collision_cost: 1000000.0
-        near_goal_distance: 1.0
-        trajectory_point_step: 2
 
       PathAlignCritic:
         enabled: false
@@ -242,32 +220,48 @@ controller_server:
         max_angle_to_furthest: 1.0
         forward_preference: true
 
-      # Opcionales: Activa estos críticos si observas comportamientos indeseados.
+      PreferForwardCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 3.0   # antes 5.0: menos sesgo que puede “pelearse” con el giro
+
+      CostCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 3.81
+        critical_cost: 300.0
+        consider_footprint: true
+        collision_cost: 1000000.0
+        near_goal_distance: 1.0
+        trajectory_point_step: 2
+
       VelocityDeadbandCritic:
         enabled: true
         cost_power: 1
-        cost_weight: 30.0
-        deadband_velocities: [0.00, 0.00, 0.1]
+        cost_weight: 20.0  # antes 30.0
+        deadband_velocities: [0.00, 0.00, 0.15]  # antes 0.1
 
-      TwirlingCritic:
-        enabled: true
-        twirling_cost_power: 1
-        twirling_cost_weight: 8.0
+      # TwirlingCritic:
+      #   enabled: false
+      #   twirling_cost_power: 1
+      #   twirling_cost_weight: 8.0
 
     velocity_smoother:
       plugin: "nav2_velocity_smoother::VelocitySmoother"
       smoothing_frequency: 20.0
       scale_velocities: false
-      feedback: "OPEN_LOOP"  # "OPEN_LOOP" o "CLOSED_LOOP", OPEN_LOOP es más común
-      max_velocity: [0.4, 0.0, 1.0]      # [linear_x, linear_y, angular_z]
-      min_velocity: [0.05, 0.0, 0.1]
-      max_accel: [0.5, 0.0, 1.0]         # ajustado a tu config actual
-      max_decel: [-0.5, 0.0, -1.0]       # frenada controlada
-      deadband_velocity: [0.02, 0.0, 0.1]  # zona muerta para evitar vibraciones
+      # Usa CLOSED_LOOP si tu odometría es buena; ayuda a amortiguar inversión de signo
+      feedback: "CLOSED_LOOP"             # antes OPEN_LOOP
+      max_velocity: [0.4, 0.0, 1.0]
+      min_velocity: [0.05, 0.0, 0.15]     # antes 0.1
+      max_accel: [0.5, 0.0, 1.0]
+      max_decel: [-0.5, 0.0, -1.0]
+      deadband_velocity: [0.02, 0.0, 0.15]  # antes 0.1
       velocity_timeout: 1.0
 
     plugin_lib_names:
       - "nav2_mppi_controller"
+
 
 controller_server_rclcpp_node:
   ros__parameters:
@@ -282,7 +276,8 @@ planner_server:
     use_sim_time: False
     planner_plugins: ["GridBased"]
     GridBased:
-      plugin: "nav2_smac_planner::SmacPlanner2D"
+
+      plugin: "nav2_smac_planner/SmacPlanner2D"
 
       # ===== Comportamiento general =====
       tolerance: 0.20                    # margen p/aceptar goal si no cae exacto (m)
@@ -299,7 +294,7 @@ planner_server:
       # ===== Evitar “pegarse” a obstáculos =====
       # Aumenta este factor si quieres ir más centrado en pasillos (con mapa inflado).
       # 1.0 = prioriza RÁPIDO, 2.0~3.0 = tradeoff seguro, >3 puede alargar un poco.
-      cost_travel_multiplier: 2.5
+      cost_travel_multiplier: 2.0
 
       # ===== Orientación en la aproximación =====
       # MUY IMPORTANTE para tu caso: NO imponer orientación final en el plan.
@@ -392,19 +387,12 @@ global_costmap:
           marking: True
           observation_persistence: 0.5
         
-        # camera_depth:
-        #   topic: "/scan_camera"
-        #   max_obstacle_height: 2.0
-        #   clearing: True
-        #   marking: True
-        #   observation_persistence: 0.5
-
       # Inflation layer
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         enabled: true
-        inflation_radius: 0.7       # Mucho mayor que el radio inscrito (~0.275 m)
-        cost_scaling_factor: 1.5    # Coste decrece de forma gradual
+        inflation_radius: 0.5       # Mucho mayor que el radio inscrito (~0.275 m)
+        cost_scaling_factor: 3.0    # Coste decrece de forma gradual
         inflate_unknown: true
         inflate_around_unknown: true
 
@@ -439,7 +427,6 @@ local_costmap:
         - "voxel_layer"
         - "obstacle_layer"
         - "inflation_layer"
-        - "social_layer"
 
       voxel_layer:
         plugin: "nav2_costmap_2d::VoxelLayer"
@@ -470,7 +457,7 @@ local_costmap:
         footprint_clearing_enabled: true
         max_obstacle_height: 2.0
         combination_method: 1
-        observation_sources: "laser_front laser_back camera_depth"
+        observation_sources: "laser_front laser_back"
         observation_persistence: 0.2
         obstacle_range: 5.0
         raytrace_range: 5.5
@@ -496,39 +483,12 @@ local_costmap:
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         enabled: true
-        inflation_radius: 0.4       # Mucho mayor que el radio inscrito (~0.275 m)
-        cost_scaling_factor: 2.0    # Coste decrece de forma gradual
+        inflation_radius: 0.35       # Mucho mayor que el radio inscrito (~0.275 m)
+        cost_scaling_factor: 3.0    # Coste decrece de forma gradual
         inflate_unknown: true
         inflate_around_unknown: true
 
 
-      # Proxemics layer local
-      # proxemics_layer:
-      #   plugin: "proxemics_costmap_layer::ProxemicsLayer"
-      #   enabled: true
-      #   ellipse_a: 0.5
-      #   ellipse_b: 0.3
-      #   obstacle_cost: 254
-      #   person_topic: "/human_pose/persons_poses"
-      #   transform_tolerance: 0.1
-              
-      social_layer:
-        plugin: "nav2_social_costmap_plugin::SocialLayer"
-        people_topic: "/people"
-        enabled: True
-        cutoff: 10.0
-        amplitude: 100.0
-        publish_occgrid: True
-        use_passing: False
-        use_vel_factor: False
-        speed_factor_multiplier: 5.0
-        covariance_front_height: 0.05
-        covariance_front_width: 0.08
-        covariance_rear_height: 0.05
-        covariance_rear_width: 0.08
-        covariance_right_height: 0.05
-        covariance_right_width: 0.08
-        covariance_when_still: 0.40  # o podrías poner 0.65 como promedio
 
 # =====================
 # BEHAVIOR SERVER
@@ -553,17 +513,6 @@ behavior_server:
     max_rotational_vel: 0.5    # Reducido para giros más controlados
     min_rotational_vel: 0.3    # Incrementado para evitar giros demasiado lentos
     rotational_acc_lim: 1.0    # Menor aceleración en rotación para suavizar el giro
-
-# Velocity Smoother Plugin
-velocity_smoother:
-  ros__parameters:
-    use_sim_time: False
-    smoothing_frequency: 20.0
-    max_velocity: [0.35, 0.0, 0.5]
-    deadband: [0.0, 0.0, 0.15]  # El angular deadband evita micro giros inferiores a 0.1 rad/s
-    max_accel: [0.5, 0.0, 1.0]
-    max_decel: [-0.5, 0.0, -1.0]
-    feedback: "OPEN_LOOP"
 
 
 # Collision Monitor Plugin
