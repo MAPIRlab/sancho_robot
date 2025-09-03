@@ -26,7 +26,7 @@ setup(
         'console_scripts': [
             'face_detector_lifecycle_node = sancho_vision.face_detector_lifecycle_node:main',
             'face_tracker_lifecycle_node = sancho_vision.face_tracker_lifecycle_node:main',
-            'dlib_inference_test = sancho_vision.dlib_inference_test:main',
+            'face_cluster_node = sancho_vision.face_cluster_node:main'
         ],
     },
 )
