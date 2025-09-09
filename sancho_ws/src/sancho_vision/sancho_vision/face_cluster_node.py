@@ -3,7 +3,7 @@ from rclpy.node import Node
 from std_msgs.msg import Header
 from geometry_msgs.msg import PointStamped
 from sensor_msgs.msg import CameraInfo
-from sancho_msgs.msg import Face, FaceArray
+from sancho_msgs.msg import FaceDetection, FaceRecognition, FaceRecognitionArray
 # from sancho_msgs.srv import ComputeCluster  # Custom srv: uint32[] member_ids; float32 centroid_x; float32 centroid_y; float32 centroid_z
 from std_srvs.srv import Empty as ComputeCluster  # Placeholder, replace with actual custom service
 from visualization_msgs.msg import Marker, MarkerArray
@@ -166,7 +166,7 @@ class FaceClusterServiceNode(Node):
                               dt=dt,
                               identity_penalty=identity_penalty)
 
-        self.face_sub = self.create_subscription(FaceArray, topic, self.face_cb, 10)
+        self.face_sub = self.create_subscription(FaceRecognitionArray, topic, self.face_cb, 10)
         self.info_sub = self.create_subscription(CameraInfo, self.camera_info_topic, self.info_cb, 10)
         self.tf_buffer = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
@@ -182,27 +182,35 @@ class FaceClusterServiceNode(Node):
         self.get_logger().info(f"Camera intrinsics set: {self.intrinsics}")
         self.destroy_subscription(self.info_sub)
 
-    def face_cb(self, msg: FaceArray):
+    def face_cb(self, msg: FaceRecognitionArray):
         if self.intrinsics is None:
             return
         detections = []  # list of (pos, person_id)
-        for face in msg.faces:
-            if face.height <= 0:
+        for det, recog in zip(msg.detections, msg.recognitions):
+            if det.height <= 0:
                 continue
-            # Confidence filtering
-            conf = getattr(face, 'recog_confidence', 0.0)
-            pid = face.person_id if conf >= 0.6 else 0
-            Z = self.k / face.height
-            u, v = face.center.x, face.center.y
+            # Use recognition info if available
+            pid = int(recog.classified_id) if recog.classified_id and recog.distance < 0.6 else 0
+                        
+            # Calculate 3D position from detection
+            Z = self.k / det.height
+            u, v = det.corner.x + det.width/2, det.corner.y + det.height/2  # center point
             X = (u - self.intrinsics['cx']) * Z / self.intrinsics['fx']
             Y = (v - self.intrinsics['cy']) * Z / self.intrinsics['fy']
-            pt_cam = PointStamped(header=Header(stamp=msg.header.stamp, frame_id=self.camera_frame), point=PointStamped().point)
+            pt_cam = PointStamped()
+            pt_cam.header.stamp = msg.header.stamp
+            pt_cam.header.frame_id = self.camera_frame
             pt_cam.point.x, pt_cam.point.y, pt_cam.point.z = X, Y, Z
             try:
                 pt_head = self.tf_buffer.transform(pt_cam, self.head_frame, timeout=rclpy.duration.Duration(seconds=0.1))
                 p = pt_head.point
                 detections.append(([p.x, p.y, p.z], pid))
-            except Exception:
+                
+                # Log recognized faces
+                if pid > 0:
+                    self.get_logger().info(f"Face detected: ID={pid}, Distance={recog.distance:.3f}")
+            except Exception as e:
+                self.get_logger().warning(f"Transform failed: {str(e)}")
                 continue
         self.tracker.update(detections)
         # Publish tracks
