@@ -153,7 +153,7 @@ class HRILogic:
                 if output < 0:
                     self.node.get_logger().info(f">> ERROR: Al refinar una clase: {message}")
 
-            mark_face(frame, [det.x, det.y, det.width, det.height], distance, self.MIDDLE_BOUND, self.UPPER_BOUND, classified=classified_name, 
+            mark_face(frame, [det.corner.x, det.corner.y, det.width, det.height], distance, self.MIDDLE_BOUND, self.UPPER_BOUND, classified=classified_name, 
                       drawRectangle=self.draw_rectangle, score=score, showDistance=self.show_distance, showScore=self.show_score) # TODO: mover a recognizer
 
         actual_people_time = self.people.get_all_last_seen()

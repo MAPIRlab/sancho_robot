@@ -15,6 +15,10 @@ setup(
         ('share/' + package_name, ['package.xml']),
         (os.path.join('share', package_name, 'launch'), glob('launch/*.launch.py'))
     ],
+    package_data={
+        package_name: ['models/*', 'fonts/*', 'database/*.json', 'gui/*.qss', 'gui/*.png'],
+    },
+    include_package_data=True,
     install_requires=['setuptools'],
     zip_safe=True,
     maintainer='antbaena',
@@ -27,6 +31,15 @@ setup(
             'face_detector_lifecycle_node = sancho_vision.face_detector_lifecycle_node:main',
             'face_tracker_lifecycle_node = sancho_vision.face_tracker_lifecycle_node:main',
             'face_cluster_node = sancho_vision.face_cluster_node:main'
+            'dlib_inference_test = sancho_vision.dlib_inference_test:main',
+            'camera = sancho_vision.camera_node:main',
+            'video = sancho_vision.video_node:main',
+            'detector = hri_visancho_visionsion.human_face_detector:main',       
+            'recognizer = sancho_vision.human_face_recognizer:main',
+            'logic = sancho_vision.hri_logic:main',
+            'gui = sancho_vision.hri_gui:main',
+            'test_detector = sancho_vision.test_detector_node:main',
+            'test_encoder = sancho_vision.test_encoder_node:main'
         ],
     },
 )

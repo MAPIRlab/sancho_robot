@@ -1,5 +1,4 @@
-float64 x
-float64 y
+geometry_msgs/Point corner # left down
 float64 width
 float64 height
 float32 confidence

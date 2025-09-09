@@ -6,6 +6,7 @@ from rclpy.lifecycle import LifecycleNode, TransitionCallbackReturn
 from rclpy.qos import QoSProfile
 from sensor_msgs.msg import Image
 from std_msgs.msg import Header
+from geometry_msgs.msg import Point
 from sancho_msgs.msg import FaceDetection, FaceDetectionArray
 from hri_msgs.srv import Detection
 
@@ -126,8 +127,8 @@ class HumanFaceDetectorLifecycle(LifecycleNode):
 
         for (x, y, w, h), score in zip(positions, scores):
             detection = FaceDetection()
-            detection.x = float(x)
-            detection.y = float(y)
+            
+            detection.corner = Point(x=float(x), y=float(y), z=0.0)
             detection.width = float(w)
             detection.height = float(h)
             detection.confidence = float(score)

@@ -116,7 +116,7 @@ class HumanFaceRecognizerLifecycle(LifecycleNode):
         msg_out.detections = msg.detections
 
         for det in msg.detections:
-            pos = [det.x, det.y, det.width, det.height]
+            pos = [det.corner.x, det.corner.y, det.width, det.height]
             face_aligned = align_face(frame, pos)
             features = self.encoder.encode_face(face_aligned)
             faceprint, distance, rank = self.classifier.classify_face(features)
@@ -152,8 +152,8 @@ class HumanFaceRecognizerLifecycle(LifecycleNode):
             return response
 
         position = [
-            request.position.x,
-            request.position.y,
+            request.position.corner.x,
+            request.position.corner.y,
             request.position.w,
             request.position.h,
         ]
