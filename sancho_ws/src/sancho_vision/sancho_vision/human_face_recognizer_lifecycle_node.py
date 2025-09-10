@@ -1,14 +1,13 @@
 import json
-import time
 
-import cv2
 import rclpy
 from rclpy.lifecycle import LifecycleNode, TransitionCallbackReturn
 from rclpy.qos import QoSProfile
 
 from std_msgs.msg import String
 from sensor_msgs.msg import Image
-from sancho_msgs.msg import FaceDetectionArray, FaceRecognition, FaceRecognitionArray
+from sancho_msgs.msg import FaceDetection, FaceDetectionArray, FaceRecognition, FaceRecognitionArray
+from geometry_msgs.msg import Point
 from hri_msgs.msg import FaceprintEvent
 from hri_msgs.srv import Recognition, Training, GetString
 
@@ -18,7 +17,7 @@ from .classifiers.complex_classifier import ComplexClassifier
 from .encoders import load_encoder
 
 
-class HumanFaceRecognizerLifecycle(LifecycleNode):
+class HumanFaceRecognizerLifecycleNode(LifecycleNode):
 
     def __init__(self):
         super().__init__("human_face_encoder")
@@ -28,19 +27,21 @@ class HumanFaceRecognizerLifecycle(LifecycleNode):
             ("recognitions_topic", "/face_recognitions"),
             ("encoder_name", "facenet"),
             ("db_mode", "save"),
-            ("show_metrics", False)
+            ("processing_rate", 10.0)
         ])
 
         self.bridge = HRIBridge()
+
         self.classifier = None
         self.encoder = None
+
         self.sub_dets = None
         self.pub_recog = None
+        self.pub_faceprint_event = None
 
         self.recognition_srv = None
         self.training_srv = None
         self.get_faceprint_srv = None
-        self.faceprint_event_pub = None
 
     def on_configure(self, state) -> TransitionCallbackReturn:
         self.get_logger().info("Configurando nodo de reconocimiento...")
@@ -49,7 +50,7 @@ class HumanFaceRecognizerLifecycle(LifecycleNode):
         self.recognitions_topic = self.get_parameter("recognitions_topic").value
         self.encoder_name = self.get_parameter("encoder_name").value
         self.db_mode = self.get_parameter("db_mode").value
-        self.show_metrics = self.get_parameter("show_metrics").value
+        self.processing_rate = self.get_parameter("processing_rate").value
 
         try:
             self.encoder = load_encoder(self.encoder_name)
@@ -60,7 +61,7 @@ class HumanFaceRecognizerLifecycle(LifecycleNode):
         self.classifier = ComplexClassifier(self.db_mode)
 
         qos = QoSProfile(depth=10)
-        self.faceprint_event_pub = self.create_publisher(FaceprintEvent, "recognition/event", qos)
+        self.pub_faceprint_event = self.create_publisher(FaceprintEvent, "recognition/event", qos)
         self.pub_recog = self.create_lifecycle_publisher(FaceRecognitionArray, self.recognitions_topic, qos)
 
         self.recognition_srv = self.create_service(Recognition, "recognition", self.recognition_service)
@@ -82,20 +83,30 @@ class HumanFaceRecognizerLifecycle(LifecycleNode):
             "add_features": FaceprintEvent.UPDATE,
         }
 
-        self.save_db_timer = self.create_timer(10.0, self.save_data)
-
         return TransitionCallbackReturn.SUCCESS
 
     def on_activate(self, state) -> TransitionCallbackReturn:
         self.get_logger().info("Activando nodo de reconocimiento...")
 
         qos = QoSProfile(depth=10)
-        self.sub_dets = self.create_subscription(FaceDetectionArray, self.detections_topic, self.detection_callback, qos)
+        self.sub_dets = self.create_subscription(FaceDetectionArray, self.detections_topic, self.detections_callback, qos)
+
+        self.last_detections = None
+        self.save_db_timer = self.create_timer(10.0, lambda: self.classifier.db.save())
+        self.spin_timer = self.create_timer(1.0 / self.processing_rate, self.process_detections)
 
         return TransitionCallbackReturn.SUCCESS
 
     def on_deactivate(self, state) -> TransitionCallbackReturn:
         self.get_logger().info("Desactivando nodo de reconocimiento...")
+
+        if self.spin_timer:
+            self.spin_timer.cancel()
+            self.spin_timer = None
+
+        if self.save_db_timer:
+            self.save_db_timer.cancel()
+            self.save_db_timer = None
 
         if self.sub_dets:
             self.destroy_subscription(self.sub_dets)
@@ -103,101 +114,74 @@ class HumanFaceRecognizerLifecycle(LifecycleNode):
 
         return TransitionCallbackReturn.SUCCESS
 
-    def detection_callback(self, msg: FaceDetectionArray):
-        try:
-            frame = self.bridge.imgmsg_to_cv2(msg.image, "bgr8")
-        except Exception as e:
-            self.get_logger().error(f"Error convirtiendo imagen: {e}")
+    def detections_callback(self, msg: FaceDetectionArray):
+        self.last_detections = msg
+    
+    def process_detections(self):
+        if self.last_detections is None:
             return
-
+        
+        msg = self.last_detections
         msg_out = FaceRecognitionArray()
         msg_out.header = msg.header
         msg_out.image = msg.image
         msg_out.detections = msg.detections
 
-        for det in msg.detections:
-            pos = [det.corner.x, det.corner.y, det.width, det.height]
-            face_aligned = align_face(frame, pos)
-            features = self.encoder.encode_face(face_aligned)
-            faceprint, distance, rank = self.classifier.classify_face(features)
+        for recog in self.recognize(msg.image, msg.detections):
+            face_aligned, features, faceprint, distance, pos, face_updated = recog
 
-            classified_id = faceprint["id"] if faceprint else ""
-            classified_name = faceprint["name"] if faceprint else ""
-            updated = False
-            if faceprint and det.confidence >= 1 and distance >= 0.9:
-                updated = self.classifier.save_face(classified_id, face_aligned, det.confidence)
-                if updated:
-                    self.send_faceprint_event(FaceprintEvent.UPDATE, classified_id, FaceprintEvent.ORIGIN_ROS)
-
-            recog = FaceRecognition()
-            recog.face_aligned = self.bridge.cv2_to_imgmsg(face_aligned, "bgr8")
-            recog.features = features
-            recog.classified_id = classified_id
-            recog.classified_name = classified_name
-            recog.distance = distance
-            recog.pos = rank
-            recog.face_updated = updated
+            recog = FaceRecognition(
+                face_aligned = self.bridge.cv2_to_imgmsg(face_aligned, "bgr8"),
+                features = features,
+                classified_id = faceprint["id"] if faceprint else "",
+                classified_name = faceprint["name"] if faceprint else "",
+                distance = distance,
+                pos = pos,
+                face_updated = face_updated
+            )
 
             msg_out.recognitions.append(recog)
 
         self.pub_recog.publish(msg_out)
 
     def recognition_service(self, request, response):
-        try:
-            frame = self.bridge.imgmsg_to_cv2(request.frame, "bgr8")
-        except Exception as e:
-            self.get_logger().error(f"Error al convertir imagen del servicio: {e}")
-            response.result = -1
-            response.message = String(data="Error al procesar imagen")
-            return response
+        [rx, ry, rw, rh] = [request.position.x, request.position.y, request.position.w, request.position.h]
+        face_detection = FaceDetection(corner=Point(x=rx, y=ry), width=rw, height=rh, confidence=request.score)
 
-        position = [
-            request.position.corner.x,
-            request.position.corner.y,
-            request.position.w,
-            request.position.h,
-        ]
-        score = request.score
+        face_aligned, features, faceprint, distance, pos, face_updated = self.recognize(request.frame, [face_detection])[0]
 
-        try:
-            face_aligned = align_face(frame, position)
-        except Exception as e:
-            self.get_logger().warn(f"Error al alinear rostro: {e}")
-            response.result = -1
-            response.message = String(data="No se pudo alinear el rostro")
-            return response
-
-        start_time = time.time()
-        features = self.encoder.encode_face(face_aligned)
-        recog_time = time.time() - start_time
-
-        faceprint, distance, pos = self.classifier.classify_face(features)
-
-        classified_id = faceprint["id"] if faceprint else ""
-        classified_name = faceprint["name"] if faceprint else ""
-        updated = False
-        if faceprint and score >= 1 and distance >= 0.9:
-            updated = self.classifier.save_face(classified_id, face_aligned, score)
-            if updated:
-                self.send_faceprint_event(FaceprintEvent.UPDATE, classified_id, FaceprintEvent.ORIGIN_ROS)
-
-        aligned_msg = self.bridge.cv2_to_imgmsg(face_aligned, "bgr8")
-
-        response.face_aligned = aligned_msg
+        response.face_aligned = self.bridge.cv2_to_imgmsg(face_aligned, "bgr8")
         response.features = features
-        response.classified_id = classified_id
-        response.classified_name = classified_name
+        response.classified_id = faceprint["id"] if faceprint else ""
+        response.classified_name = faceprint["name"] if faceprint else ""
         response.distance = distance
         response.pos = pos
-        response.face_updated = updated
-        response.recognition_time = recog_time
+        response.face_updated = face_updated
         response.result = 0
         response.message = String(data="Reconocimiento exitoso")
 
-        if self.show_metrics:
-            self.get_logger().info(f"[Servicio] Reconocimiento de '{classified_name}' en {recog_time:.3f}s")
-
         return response
+
+    def recognize(self, frame, detections):
+        if isinstance(frame, Image):
+            frame = self.bridge.imgmsg_to_cv2(frame, "bgr8")
+
+        for det in detections:
+            pos = [det.corner.x, det.corner.y, det.width, det.height]
+            confidence = det.confidence
+
+            face_aligned = align_face(frame, pos)
+            features = self.encoder.encode_face(face_aligned)
+            faceprint, distance, pos = self.classifier.classify_face(features)
+            classified_id = faceprint["id"] if faceprint else ""
+
+            face_updated = False
+            if faceprint and confidence >= 1.0 and distance >= 0.9:
+                face_updated = self.classifier.save_face(classified_id, face_aligned, 1)
+                if face_updated:
+                    self.send_faceprint_event(FaceprintEvent.UPDATE, classified_id, FaceprintEvent.ORIGIN_ROS)
+
+            yield face_aligned, features, faceprint, distance, pos, face_updated
 
     def training_service(self, request, response):
         try:
@@ -249,16 +233,14 @@ class HumanFaceRecognizerLifecycle(LifecycleNode):
         faceprint_event.event = event
         faceprint_event.id = id
         faceprint_event.origin = origin
-        self.faceprint_event_pub.publish(faceprint_event)
-
-    def save_data(self):
-        self.classifier.db.save()
-
+        self.pub_faceprint_event.publish(faceprint_event)
 
 def main(args=None):
     rclpy.init(args=args)
-    node = HumanFaceRecognizerLifecycle()
-    rclpy.spin(node)
+
+    lifecycle_node = HumanFaceRecognizerLifecycleNode()
+
+    rclpy.spin(lifecycle_node)
     rclpy.shutdown()
 
 

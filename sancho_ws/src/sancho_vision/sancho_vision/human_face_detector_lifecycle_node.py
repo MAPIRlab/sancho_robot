@@ -1,6 +1,5 @@
 import cv2
 import rclpy
-import time
 
 from rclpy.lifecycle import LifecycleNode, TransitionCallbackReturn
 from rclpy.qos import QoSProfile
@@ -14,7 +13,7 @@ from .hri_bridge import HRIBridge
 from .detectors import load_detector, BaseDetector
 
 
-class HumanFaceDetectorLifecycle(LifecycleNode):
+class HumanFaceDetectorLifecycleNode(LifecycleNode):
     def __init__(self):
         super().__init__("human_face_detector")
 
@@ -26,13 +25,13 @@ class HumanFaceDetectorLifecycle(LifecycleNode):
             ("processing_rate", 10.0)
         ])
 
-        self.detector = None
         self.bridge = HRIBridge()
 
-        self.pub = None
-        self.sub = None
-        self.timer = None
-        self.latest_img = None
+        self.detector = None
+
+        self.sub_camera = None
+        self.pub_dets = None
+
         self.detection_srv = None
 
     def on_configure(self, state) -> TransitionCallbackReturn:
@@ -52,52 +51,33 @@ class HumanFaceDetectorLifecycle(LifecycleNode):
             return TransitionCallbackReturn.FAILURE
 
         qos = QoSProfile(depth=10)
-        self.pub = self.create_lifecycle_publisher(FaceDetectionArray, self.detections_topic, qos)
+        self.pub_dets = self.create_lifecycle_publisher(FaceDetectionArray, self.detections_topic, qos)
 
         self.detection_srv = self.create_service(Detection, "detection", self.detection_service)
 
         return TransitionCallbackReturn.SUCCESS
 
     def on_activate(self, state) -> TransitionCallbackReturn:
-        self.get_logger().info("Activando nodo...")
+        self.get_logger().info("Activando nodo de detección...")
 
         qos = QoSProfile(depth=1)
-        self.sub = self.create_subscription(Image, self.image_topic, self.image_callback, qos)
-        self.timer = self.create_timer(1.0 / self.processing_rate, self.process_image)
+        self.sub_camera = self.create_subscription(Image, self.image_topic, self.image_callback, qos)
+
+        self.latest_img = None
+        self.spin_timer = self.create_timer(1.0 / self.processing_rate, self.process_image)
 
         return TransitionCallbackReturn.SUCCESS
 
     def on_deactivate(self, state) -> TransitionCallbackReturn:
-        self.get_logger().info("Desactivando nodo...")
+        self.get_logger().info("Desactivando nodo de detección...")
 
-        if self.timer:
-            self.timer.cancel()
-            self.timer = None
+        if self.spin_timer:
+            self.spin_timer.cancel()
+            self.spin_timer = None
 
-        if self.sub:
-            self.destroy_subscription(self.sub)
-            self.sub = None
-
-        return TransitionCallbackReturn.SUCCESS
-
-    def on_cleanup(self, state) -> TransitionCallbackReturn:
-        self.get_logger().info("Limpiando recursos...")
-
-        if self.timer:
-            self.timer.cancel()
-            self.timer = None
-
-        if self.sub:
-            self.destroy_subscription(self.sub)
-            self.sub = None
-
-        if self.pub:
-            self.destroy_publisher(self.pub)
-            self.pub = None
-
-        if self.detection_srv:
-            self.destroy_service(self.detection_srv)
-            self.detection_srv = None
+        if self.sub_camera:
+            self.destroy_subscription(self.sub_camera)
+            self.sub_camera = None
 
         return TransitionCallbackReturn.SUCCESS
 
@@ -108,59 +88,41 @@ class HumanFaceDetectorLifecycle(LifecycleNode):
         if self.latest_img is None:
             return
 
-        start_time = time.time()
-
-        try:
-            frame = self.bridge.imgmsg_to_cv2(self.latest_img, "bgr8")
-        except Exception as e:
-            self.get_logger().error(f"Error con imgmsg_to_cv2: {e}")
-            return
-
-        frame_equalized = self.preprocess_frame(frame)
-        positions, scores = self.detector.get_faces(frame_equalized)
+        msg = self.latest_img
+        positions, confidences = self.detect(msg)
 
         msg_array = FaceDetectionArray()
         msg_array.header = Header()
-        msg_array.header.stamp = self.latest_img.header.stamp
-        msg_array.header.frame_id = self.latest_img.header.frame_id
-        msg_array.image = self.latest_img  # <-- añadimos la imagen original
+        msg_array.header.stamp = msg.header.stamp
+        msg_array.header.frame_id = msg.header.frame_id
+        msg_array.image = msg  # <-- añadimos la imagen original
 
-        for (x, y, w, h), score in zip(positions, scores):
+        for (x, y, w, h), confidence in zip(positions, confidences):
             detection = FaceDetection()
             
             detection.corner = Point(x=float(x), y=float(y), z=0.0)
             detection.width = float(w)
             detection.height = float(h)
-            detection.confidence = float(score)
+            detection.confidence = float(confidence)
             msg_array.detections.append(detection)
 
-        self.pub.publish(msg_array)
-
-        if self.show_metrics:
-            elapsed = time.time() - start_time
-            self.get_logger().info(f"Detections: {len(positions)} | Tiempo: {elapsed:.3f}s")
+        self.pub_dets.publish(msg_array)
 
     def detection_service(self, request, response):
-        start_detection = time.time()
+        positions, confidences = self.detect(request.image)
 
-        try:
-            frame = self.bridge.imgmsg_to_cv2(request.frame, "bgr8")
-        except Exception as e:
-            self.get_logger().error(f"Error al convertir imagen del servicio: {e}")
-            return response
-
-        frame_equalized = self.preprocess_frame(frame)
-        positions, scores = self.detector.get_faces(frame_equalized)
-        positions_msg, scores_msg = self.bridge.detector_to_msg(positions, scores)
-
-        response.positions = positions_msg
-        response.scores = scores_msg
-        response.detection_time = time.time() - start_detection
-
-        if self.show_metrics:
-            self.get_logger().info(f"[Servicio] Detecciones: {len(positions)} | Tiempo: {response.detection_time:.3f}s")
+        response.positions, response.scores = self.bridge.detector_to_msg(positions, confidences)
 
         return response
+
+    def detect(self, frame):
+        if isinstance(frame, Image):
+            frame = self.bridge.imgmsg_to_cv2(frame, "bgr8")
+
+        frame_equalized = self.preprocess_frame(frame)
+        positions, confidences = self.detector.get_faces(frame_equalized)
+        
+        return positions, confidences
 
     def preprocess_frame(self, frame):
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -173,8 +135,10 @@ class HumanFaceDetectorLifecycle(LifecycleNode):
 
 def main(args=None):
     rclpy.init(args=args)
-    node = HumanFaceDetectorLifecycle()
-    rclpy.spin(node)
+
+    lifecycle_node = HumanFaceDetectorLifecycleNode()
+
+    rclpy.spin(lifecycle_node)
     rclpy.shutdown()
 
 

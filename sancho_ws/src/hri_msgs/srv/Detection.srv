@@ -2,4 +2,3 @@ sensor_msgs/Image frame
 ---
 hri_msgs/FacePosition[] positions
 float32[] scores
-float32 detection_time

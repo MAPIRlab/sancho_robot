@@ -9,4 +9,3 @@ string classified_name
 float32 distance
 int32 pos
 bool face_updated
-float32 recognition_time
