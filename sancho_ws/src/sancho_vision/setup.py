@@ -21,8 +21,8 @@ setup(
     include_package_data=True,
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='antbaena',
-    maintainer_email='antbaena@uma.es',
+    maintainer='antbaena, eulogioqt',
+    maintainer_email='antbaena@uma.es, eulogioquemada@uma.es',
     description='A vision module providing face detection and tracking functionality with lifecycle management.',
     license='GPL-3.0-or-later',
     tests_require=['pytest'],
@@ -34,7 +34,7 @@ setup(
 
             'human_face_detector_lifecycle = sancho_vision.human_face_detector_lifecycle_node:main',       
             'human_face_recognizer_lifecycle = sancho_vision.human_face_recognizer_lifecycle_node:main',
-            'logic = sancho_vision.hri_logic:main',
+            'human_face_manager_lifecycle = sancho_vision.human_face_manager_lifecycle_node:main',
             'gui = sancho_vision.hri_gui:main',
 
             'camera = sancho_vision.camera_node:main',

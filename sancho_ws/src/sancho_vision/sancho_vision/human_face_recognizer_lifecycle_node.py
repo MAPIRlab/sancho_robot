@@ -93,7 +93,7 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
 
         self.last_detections = None
         self.save_db_timer = self.create_timer(10.0, lambda: self.classifier.db.save())
-        self.spin_timer = self.create_timer(1.0 / self.processing_rate, self.process_detections)
+        self.spin_timer = self.create_timer(1.0 / self.processing_rate, self.do_recognition)
 
         return TransitionCallbackReturn.SUCCESS
 
@@ -117,7 +117,7 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
     def detections_callback(self, msg: FaceDetectionArray):
         self.last_detections = msg
     
-    def process_detections(self):
+    def do_recognition(self):
         if self.last_detections is None:
             return
         
@@ -133,8 +133,8 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
             recog = FaceRecognition(
                 face_aligned = self.bridge.cv2_to_imgmsg(face_aligned, "bgr8"),
                 features = features,
-                classified_id = faceprint["id"] if faceprint else "",
-                classified_name = faceprint["name"] if faceprint else "",
+                classified_id = faceprint["id"],
+                classified_name = faceprint["name"],
                 distance = distance,
                 pos = pos,
                 face_updated = face_updated
@@ -152,8 +152,8 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
 
         response.face_aligned = self.bridge.cv2_to_imgmsg(face_aligned, "bgr8")
         response.features = features
-        response.classified_id = faceprint["id"] if faceprint else ""
-        response.classified_name = faceprint["name"] if faceprint else ""
+        response.classified_id = faceprint["id"]
+        response.classified_name = faceprint["name"]
         response.distance = distance
         response.pos = pos
         response.face_updated = face_updated
@@ -173,13 +173,15 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
             face_aligned = align_face(frame, pos)
             features = self.encoder.encode_face(face_aligned)
             faceprint, distance, pos = self.classifier.classify_face(features)
-            classified_id = faceprint["id"] if faceprint else ""
+
+            if not faceprint or distance < 0.75:
+                faceprint = self.classifier.add_class("", features, face_aligned, confidence)
 
             face_updated = False
-            if faceprint and confidence >= 1.0 and distance >= 0.9:
-                face_updated = self.classifier.save_face(classified_id, face_aligned, 1)
+            if confidence >= 1.0 and distance >= 0.9:
+                face_updated = self.classifier.save_face(faceprint["id"], face_aligned, 1)
                 if face_updated:
-                    self.send_faceprint_event(FaceprintEvent.UPDATE, classified_id, FaceprintEvent.ORIGIN_ROS)
+                    self.send_faceprint_event(FaceprintEvent.UPDATE, faceprint["id"], FaceprintEvent.ORIGIN_ROS)
 
             yield face_aligned, features, faceprint, distance, pos, face_updated
 
@@ -202,7 +204,7 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
         if result >= 0 and "class_name" in args:
             event = self.faceprint_event_map.get(cmd_type)
             if event is not None:
-                id = message if cmd_type == "add_class" else args["class_id"]
+                id = message["id"] if cmd_type == "add_class" else args["class_id"]
                 self.send_faceprint_event(event, id, origin)
 
         response.result = result

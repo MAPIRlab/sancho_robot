@@ -15,12 +15,12 @@ from .api.gui_utils import mark_face
 from .hri_bridge import HRIBridge
 
 
-class HRILogicNode(Node):
+class HumanFaceManagerLifecycleNode(Node):
 
-    def __init__(self, hri_logic: "HRILogic"):
-        super().__init__('hri_logic')
+    def __init__(self, human_face_manager: "HumanFaceManager"):
+        super().__init__('human_face_manager')
 
-        self.hri_logic = hri_logic
+        self.human_face_manager = human_face_manager
         self.face_recognitions_queue = Queue()
         self.face_name_queue = Queue()
         self.face_question_queue = Queue()
@@ -57,10 +57,10 @@ class HRILogicNode(Node):
         self.face_question_queue.put(msg.answer)
 
     def face_timeout_response_callback(self, _):
-        self.hri_logic.gui_request_sent_info = None
+        self.human_face_manager.gui_request_sent_info = None
 
 
-class HRILogic:
+class HumanFaceManager:
 
     LOWER_BOUND = 0.75
     MIDDLE_BOUND = 0.80
@@ -75,7 +75,7 @@ class HRILogic:
         self.last_frame = None
         self.gui_request_sent_info = None
 
-        self.node = HRILogicNode(self)
+        self.node = HumanFaceManagerLifecycleNode(self)
         self.people = PeopleManager(self.node)
 
     def spin(self):
@@ -266,6 +266,8 @@ class HRILogic:
 
 def main(args=None):
     rclpy.init(args=args)
-    hri_logic = HRILogic()
-    hri_logic.spin()
+
+    lifecycle_node = HumanFaceManagerLifecycleNode()
+
+    rclpy.spin(lifecycle_node)
     rclpy.shutdown()
