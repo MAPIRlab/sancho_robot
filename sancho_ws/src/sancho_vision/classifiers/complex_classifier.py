@@ -141,6 +141,20 @@ class ComplexClassifier:
         self.db.save()
         return result, message
     
+    def clear_no_name(self):
+        '''Removes all classes without name'''
+
+        to_delete = [fp["id"] for fp in self.db.get_all() if fp["name"] == ""]
+
+        for class_id in to_delete:
+            self.db.remove(class_id)
+
+        result = 1
+        message = to_delete
+
+        self.db.save()
+        return result, message
+
     def save_face(self, class_id, face, face_score):
         '''Saves face image as a representation of the class
 

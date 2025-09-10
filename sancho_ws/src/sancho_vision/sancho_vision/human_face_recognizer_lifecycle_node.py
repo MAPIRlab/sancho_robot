@@ -5,6 +5,7 @@ from rclpy.lifecycle import LifecycleNode, TransitionCallbackReturn
 from rclpy.qos import QoSProfile
 
 from std_msgs.msg import String
+from std_srvs.srv import SetBool, Empty
 from sensor_msgs.msg import Image
 from sancho_msgs.msg import FaceDetection, FaceDetectionArray, FaceRecognition, FaceRecognitionArray
 from geometry_msgs.msg import Point
@@ -27,6 +28,7 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
             ("recognitions_topic", "/face_recognitions"),
             ("encoder_name", "facenet"),
             ("db_mode", "save"),
+            ("learn_without_name", False),
             ("processing_rate", 10.0)
         ])
 
@@ -50,6 +52,7 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
         self.recognitions_topic = self.get_parameter("recognitions_topic").value
         self.encoder_name = self.get_parameter("encoder_name").value
         self.db_mode = self.get_parameter("db_mode").value
+        self.learn_without_name = self.get_parameter("learn_without_name").value
         self.processing_rate = self.get_parameter("processing_rate").value
 
         try:
@@ -67,6 +70,8 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
         self.recognition_srv = self.create_service(Recognition, "recognition", self.recognition_service)
         self.training_srv = self.create_service(Training, "recognition/training", self.training_service)
         self.get_faceprint_srv = self.create_service(GetString, "recognition/get_faceprint", self.get_people_service)
+        self.clear_no_name_srv = self.create_service(Empty, "recognition/clear_no_name", self.set_learn_without_name_service)
+        self.set_learn_without_name_srv = self.create_service(SetBool, "recognition/set_learn_without_name", self.set_learn_without_name_service)
 
         self.training_dispatcher = {
             "refine_class": self.classifier.refine_class,
@@ -174,7 +179,7 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
             features = self.encoder.encode_face(face_aligned)
             faceprint, distance, pos = self.classifier.classify_face(features)
 
-            if not faceprint or distance < 0.75:
+            if self.learn_without_name and (not faceprint or distance < 0.75):
                 faceprint = self.classifier.add_class("", features, face_aligned, confidence)
 
             face_updated = False
@@ -228,6 +233,25 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
             result = [filter_fields(fp) for fp in result]
 
         response.text = json.dumps(result)
+        return response
+
+    def clear_no_name_service(self, request, response):
+        removed_ids = self.classifier.clear_no_name()
+        
+        response.success = True
+        response.message = String(data=f"Removed {len(removed_ids)} faceprints without name")
+
+        for id in removed_ids:
+            self.send_faceprint_event(FaceprintEvent.DELETE, id, FaceprintEvent.ORIGIN_ROS)
+
+        return response
+
+    def set_learn_without_name_service(self, request, response):
+        self.learn_without_name = request.data
+
+        response.success = True
+        response.message = String(data=f"Needs name set to {request.data}")
+
         return response
 
     def send_faceprint_event(self, event, id, origin):
