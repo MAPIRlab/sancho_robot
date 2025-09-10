@@ -17,13 +17,13 @@ from .hri_bridge import HRIBridge
 
 class HumanFaceManagerLifecycleNode(Node):
 
-    def __init__(self, human_face_manager: "HumanFaceManager"):
+    def __init__(self):
         super().__init__('human_face_manager')
 
-        self.human_face_manager = human_face_manager
         self.face_recognitions_queue = Queue()
         self.face_name_queue = Queue()
         self.face_question_queue = Queue()
+        self.face_timeout_response = False
 
         self.face_name_response_sub = self.create_subscription(FaceNameResponse, 'gui/face_name_response', self.face_name_response_callback, 10)
         self.face_question_response_sub = self.create_subscription(FaceQuestionResponse, 'gui/face_question_response', self.face_question_response_callback, 10)
@@ -57,12 +57,12 @@ class HumanFaceManagerLifecycleNode(Node):
         self.face_question_queue.put(msg.answer)
 
     def face_timeout_response_callback(self, _):
-        self.human_face_manager.gui_request_sent_info = None
+        self.face_timeout_response = True
 
 
 class HumanFaceManager:
 
-    LOWER_BOUND = 0.75
+    LOWER_BOUND = 0.75 # Poner como variables globales en un archivo a parte en este paquete o en este mismo archivo e importarlas en los nodos que las usen
     MIDDLE_BOUND = 0.80
     UPPER_BOUND = 0.90
 
@@ -91,6 +91,10 @@ class HumanFaceManager:
             if not self.node.face_question_queue.empty():
                 answer = self.node.face_question_queue.get()
                 self.process_face_question_response(answer)
+            
+            if self.node.face_timeout_response:
+                self.node.face_timeout_response = False
+                self.gui_request_sent_info = None
 
             rclpy.spin_once(self.node)
 
