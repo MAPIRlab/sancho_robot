@@ -147,6 +147,10 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
 
             msg_out.recognitions.append(recog)
 
+        self.get_logger().info("No se ha reconocido a nadie" if len(msg_out.recognitions) == 0 else 
+            f"Se han reconocido {len(msg_out.recognitions)} personas: " + ", ".join([f"({r.classified_id})" for r in msg_out.recognitions]))
+        self.get_logger().info(f"Hay {self.classifier.db.get_all_ids()} personas en la base de datos")
+
         self.pub_recog.publish(msg_out)
 
     def recognition_service(self, request, response):

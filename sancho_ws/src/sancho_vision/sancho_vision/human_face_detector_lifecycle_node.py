@@ -106,6 +106,9 @@ class HumanFaceDetectorLifecycleNode(LifecycleNode):
             detection.confidence = float(confidence)
             msg_array.detections.append(detection)
 
+        self.get_logger().info("No se han detectado caras" if len(msg_array.detections) == 0 else 
+            f"Se han detectado {len(msg_array.detections)} caras")
+
         self.pub_dets.publish(msg_array)
 
     def detection_service(self, request, response):

@@ -2,7 +2,7 @@ import json
 from queue import Queue
 
 import rclpy
-from rclpy.node import Node
+from rclpy.lifecycle import LifecycleNode
 from std_msgs.msg import String, Empty
 from hri_msgs.srv import Training, TriggerUserInteraction
 from hri_msgs.msg import Log, FaceNameResponse, FaceQuestionResponse
@@ -15,7 +15,7 @@ from .api.gui_utils import mark_face
 from .hri_bridge import HRIBridge
 
 
-class HumanFaceManagerLifecycleNode(Node):
+class HumanFaceManagerLifecycleNode(LifecycleNode):
 
     def __init__(self):
         super().__init__('human_face_manager')
@@ -75,7 +75,7 @@ class HumanFaceManager:
         self.last_frame = None
         self.gui_request_sent_info = None
 
-        self.node = HumanFaceManagerLifecycleNode(self)
+        self.node = HumanFaceManagerLifecycleNode()
         self.people = PeopleManager(self.node)
 
     def spin(self):
