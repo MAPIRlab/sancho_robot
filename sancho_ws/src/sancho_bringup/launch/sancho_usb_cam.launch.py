@@ -35,7 +35,10 @@ def generate_launch_description():
                 ('image', '/sancho_camera/image_raw'),
                 ('camera_info', '/sancho_camera/camera_info'),
                 ('image_rect', '/sancho_camera/image_rect')
-            ]
+            ],
+            parameters=[{
+                    'queue_size': 20,           # da margen a la emparejadora
+                }],
         )
     return LaunchDescription([
         usb_cam_node,
