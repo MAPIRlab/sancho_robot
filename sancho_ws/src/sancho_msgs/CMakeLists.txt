@@ -23,6 +23,8 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/Face.msg"
   "msg/FaceArray.msg"
   "msg/AudioData.msg"
+  "msg/FaceRecognition.msg"
+  "msg/FaceRecognitionArray.msg"
   "msg/BoolStamped.msg"
   "msg/VADSegment.msg"
   "srv/SetHome.srv"
