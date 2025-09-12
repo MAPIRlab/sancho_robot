@@ -55,12 +55,12 @@ class NodeConfigurator(Node):
 
         # 1) Declarar y obtener parámetro “node_names” (lista de cadenas)
         self.declare_parameter("node_names", ["placeholder"])
+        self.declare_parameter("activate", False)
+        self.should_activate = self.get_parameter("activate").value 
         param = self.get_parameter("node_names")
+        
         self.node_names = list(param.get_parameter_value().string_array_value)
-
-        # Limpia posibles 'placeholder' vacíos
-        self.node_names = [n for n in self.node_names if n.strip() != ""]
-
+        
         if not self.node_names:
             self.get_logger().error(
                 'No se proporcionaron nodos válidos en "node_names".'
@@ -75,13 +75,17 @@ class NodeConfigurator(Node):
         #      - state flags:
         #           get_in_flight[node_name]        → bool
         #           pending_configure_id[node_name] → int | None
+        #           pending_activate_id[node_name]  → int | None
         #           change_in_flight[node_name]     → bool
         #           configured[node_name]           → bool
+        #           activated[node_name]           → bool
         self._node_clients = {}
         self.get_in_flight = {}
         self.pending_configure_id = {}
+        self.pending_activate_id = {}
         self.change_in_flight = {}
         self.configured = {}
+        self.activated = {}
 
         for node_name in self.node_names:
             srv_get = f"/{node_name}/get_available_transitions"
@@ -94,8 +98,10 @@ class NodeConfigurator(Node):
             # Flags iniciales:
             self.get_in_flight[node_name] = False
             self.pending_configure_id[node_name] = None
+            self.pending_activate_id[node_name] = None
             self.change_in_flight[node_name] = False
             self.configured[node_name] = False
+            self.activated[node_name] = False
 
         # Conjunto de nodos que aún no están configurados:
         self._pending = set(self.node_names)
@@ -106,77 +112,114 @@ class NodeConfigurator(Node):
 
     def _on_timer(self):
         """Cada segundo revisamos todos los nodos pendientes. Para cada nodo pendiente:
-          A) Si no hay get_in_flight y no hemos identificado aún configure_id:
+          A) Si no hay get_in_flight y no hemos identificado aún configure_id o activate_id:
              - Si el servicio get_available_transitions está listo, enviamos la petición
                asíncrona y marcamos get_in_flight=True.
-          B) Si ya tenemos pending_configure_id[node] != None (ya sabemos que existe la transición configure)
-             y aún no hemos enviado el ChangeState (change_in_flight=False):
-             - Si el servicio change_state está listo, enviamos la petición asíncrona de configure
-               y marcamos change_in_flight=True.
-        Cuando el conjunto _pending queda vacío, hacemos rclpy.shutdown().
+          B) Si ya tenemos pending_configure_id[node] != None y aún no hemos enviado el ChangeState:
+             - Si el servicio change_state está listo, enviamos la petición asíncrona de configure.
+          C) Si self.should_activate=True, el nodo está configurado y tenemos pending_activate_id:
+             - Si el servicio change_state está listo, enviamos la petición asíncrona de activate.
+        Cuando el conjunto _pending queda vacío y no hay activaciones pendientes, hacemos shutdown.
         """
-        if not self._pending:
+        # Si no hay nodos pendientes y no queremos activar o todos están activados, terminamos
+        all_done = not self._pending and (not self.should_activate or all(
+            self.activated[node] for node in self.node_names
+        ))
+        
+        if all_done:
             self.get_logger().info(
-                "Todos los nodos han sido configurados. Finalizando node_configurator."
+                "Todos los nodos han sido configurados" +
+                (" y activados" if self.should_activate else "") +
+                ". Finalizando node_configurator."
             )
             rclpy.shutdown()
             return
 
         for node_name in list(self._pending):
-            # Si ya se configuró (por alguna razón adicional), lo saltamos
-            if self.configured.get(node_name, False):
-                continue
 
             cli_get = self._node_clients[node_name]["get_avail"]
             cli_chg = self._node_clients[node_name]["change"]
 
-            # A) ¿Estamos a la espera de GetAvailableTransitions?
-            if self.pending_configure_id[node_name] is None:
-                if not self.get_in_flight[node_name]:
-                    # Sólo enviamos la petición GET si el servicio está READY
-                    if cli_get.service_is_ready():
-                        self.get_logger().debug(
-                            f"→ Solicitando transiciones de {node_name}"
-                        )
-                        req = GetAvailableTransitions.Request()
-                        fut = cli_get.call_async(req)
-                        # Asociamos callback parciales para saber de qué nodo viene
-                        fut.add_done_callback(
-                            partial(self._on_get_available, node_name)
-                        )
-                        self.get_in_flight[node_name] = True
-                    else:
-                        self.get_logger().debug(
-                            f'Servicio "get_available_transitions" de {node_name} NO listo aún.'
-                        )
-                # Si get_in_flight = True → estamos esperando respuesta, nada más
+            # Flujo 1: CONFIGURE
+            if not self.configured[node_name]:
+                # A) ¿Necesitamos descubrir id de "configure"?
+                if self.pending_configure_id[node_name] is None:
+                    if not self.get_in_flight[node_name]:
+                        if cli_get.service_is_ready():
+                            self.get_logger().debug(
+                                f"→ Solicitando transiciones de {node_name} (buscar 'configure')"
+                            )
+                            req = GetAvailableTransitions.Request()
+                            fut = cli_get.call_async(req)
+                            fut.add_done_callback(partial(self._on_get_available, node_name))
+                            self.get_in_flight[node_name] = True
+                        else:
+                            self.get_logger().debug(
+                                f'Servicio "get_available_transitions" de {node_name} NO listo aún.'
+                            )
+                    # Esperando respuesta de GET
+                else:
+                    # B) Ya tenemos id de configure → ejecutar ChangeState
+                    if not self.change_in_flight[node_name]:
+                        if cli_chg.service_is_ready():
+                            tid = self.pending_configure_id[node_name]
+                            self.get_logger().debug(
+                                f"→ Solicitando ChangeState(configure={tid}) en {node_name}"
+                            )
+                            reqc = ChangeState.Request()
+                            reqc.transition.id = tid
+                            futc = cli_chg.call_async(reqc)
+                            futc.add_done_callback(partial(self._on_change_state, node_name))
+                            self.change_in_flight[node_name] = True
+                        else:
+                            self.get_logger().debug(
+                                f'Servicio "change_state" de {node_name} NO listo aún.'
+                            )
+                # Pasamos al siguiente nodo
                 continue
 
-            # B) Ya tenemos pending_configure_id[node_name] → enviamos ChangeState si no está en vuelo
-            if (
-                self.pending_configure_id[node_name] is not None
-                and not self.change_in_flight[node_name]
-            ):
-                if cli_chg.service_is_ready():
-                    tid = self.pending_configure_id[node_name]
-                    self.get_logger().debug(
-                        f"→ Solicitando ChangeState(configure={tid}) en {node_name}"
-                    )
-                    reqc = ChangeState.Request()
-                    reqc.transition.id = tid
-                    futc = cli_chg.call_async(reqc)
-                    futc.add_done_callback(partial(self._on_change_state, node_name))
-                    self.change_in_flight[node_name] = True
+            # Flujo 2: ACTIVATE (sólo si se ha pedido activar y aún no está activado)
+            if self.should_activate and not self.activated[node_name]:
+                # C) ¿Necesitamos descubrir id de "activate"?
+                if self.pending_activate_id[node_name] is None:
+                    if not self.get_in_flight[node_name]:
+                        if cli_get.service_is_ready():
+                            self.get_logger().debug(
+                                f"→ Solicitando transiciones de {node_name} (buscar 'activate')"
+                            )
+                            req = GetAvailableTransitions.Request()
+                            fut = cli_get.call_async(req)
+                            fut.add_done_callback(partial(self._on_get_available, node_name))
+                            self.get_in_flight[node_name] = True
+                        else:
+                            self.get_logger().debug(
+                                f'Servicio "get_available_transitions" de {node_name} NO listo aún.'
+                            )
                 else:
-                    self.get_logger().debug(
-                        f'Servicio "change_state" de {node_name} NO listo aún.'
-                    )
+                    # D) Ya tenemos id de activate → ejecutar ChangeState
+                    if not self.change_in_flight[node_name]:
+                        if cli_chg.service_is_ready():
+                            tid = self.pending_activate_id[node_name]
+                            self.get_logger().debug(
+                                f"→ Solicitando ChangeState(activate={tid}) en {node_name}"
+                            )
+                            reqa = ChangeState.Request()
+                            reqa.transition.id = tid
+                            futa = cli_chg.call_async(reqa)
+                            futa.add_done_callback(partial(self._on_change_state, node_name))
+                            self.change_in_flight[node_name] = True
+                        else:
+                            self.get_logger().debug(
+                                f'Servicio "change_state" de {node_name} NO listo aún.'
+                            )
                 continue
 
     def _on_get_available(self, node_name, future):
         """Callback de ‘get_available_transitions’ para <node_name>.
         - Desmarca get_in_flight.
-        - Si la respuesta contiene “configure” en available_transitions, guarda pending_configure_id[node_name].
+        - Según el estado del nodo:
+            • Si no está configurado: busca “configure” y guarda pending_configure_id[node_name].
+            • Si hay que activar y no está activado: busca “activate” y guarda pending_activate_id[node_name].
         """
         self.get_in_flight[node_name] = False
 
@@ -194,27 +237,47 @@ class NodeConfigurator(Node):
             )
             return
 
-        # Buscar “configure” (puede venir como “configure” o “CONFIGURE”, etc.)
-        found = False
-        for t in resp.available_transitions:
-            if t.transition.label.lower() == "configure":
-                self.pending_configure_id[node_name] = t.transition.id
-                self.get_logger().info(
-                    f'→ Nodo "{node_name}" ofrece transition "configure" con id={t.transition.id}'
-                )
-                break
+        # Determinar qué transición necesitamos ahora
+        need_configure = not self.configured[node_name]
+        need_activate = (self.should_activate and self.configured[node_name] and not self.activated[node_name])
 
-        if not found:
-            self.get_logger().debug(
-                f'El nodo "{node_name}" NO tiene todavía la transición "configure" disponible.'
-            )
-            # next timer tick volverá a preguntar
+        if need_configure:
+            found = False
+            for t in resp.available_transitions:
+                if t.transition.label.lower() == "configure":
+                    self.pending_configure_id[node_name] = t.transition.id
+                    self.get_logger().info(
+                        f'→ Nodo "{node_name}" ofrece transition "configure" con id={t.transition.id}'
+                    )
+                    found = True
+                    break
+            if not found:
+                self.get_logger().debug(
+                    f'El nodo "{node_name}" NO tiene todavía la transición "configure" disponible.'
+                )
+            return
+
+        if need_activate:
+            found = False
+            for t in resp.available_transitions:
+                if t.transition.label.lower() == "activate":
+                    self.pending_activate_id[node_name] = t.transition.id
+                    self.get_logger().info(
+                        f'→ Nodo "{node_name}" ofrece transition "activate" con id={t.transition.id}'
+                    )
+                    found = True
+                    break
+            if not found:
+                self.get_logger().debug(
+                    f'El nodo "{node_name}" NO tiene todavía la transición "activate" disponible.'
+                )
+            return
 
     def _on_change_state(self, node_name, future):
-        """Callback de ‘change_state’ para <node_name>.
+        """Callback de 'change_state' para <node_name>.
         - Desmarca change_in_flight.
-        - Si resp.success == True, marca configurado y saca de _pending.
-        - En caso contrario, deja pending_configure_id como estaba para reintentar.
+        - Si resp.success == True, marca configurado/activado según corresponda.
+        - En caso contrario, deja pending_*_id como estaba para reintentar.
         """
         self.change_in_flight[node_name] = False
 
@@ -222,7 +285,7 @@ class NodeConfigurator(Node):
             resp = future.result()
         except Exception as e:
             self.get_logger().warning(
-                f"Error al llamar a ChangeState(configure) en {node_name}: {e}"
+                f"Error al llamar a ChangeState en {node_name}: {e}"
             )
             return
 
@@ -231,14 +294,23 @@ class NodeConfigurator(Node):
             return
 
         if resp.success:
-            self.get_logger().info(f'✔ Nodo "{node_name}" configurado EXITOSAMENTE.')
-            self.configured[node_name] = True
-            self._pending.discard(node_name)
+            if self.pending_configure_id[node_name] is not None:
+                self.get_logger().info(f'✔ Nodo "{node_name}" configurado EXITOSAMENTE.')
+                self.configured[node_name] = True
+                self.pending_configure_id[node_name] = None
+                if not self.should_activate:
+                    self._pending.discard(node_name)
+            elif self.pending_activate_id[node_name] is not None:
+                self.get_logger().info(f'✔ Nodo "{node_name}" activado EXITOSAMENTE.')
+                self.activated[node_name] = True
+                self.pending_activate_id[node_name] = None
+                self._pending.discard(node_name)
         else:
+            action = "configure" if self.pending_configure_id[node_name] is not None else "activate"
             self.get_logger().error(
-                f"Fallo al ejecutar ChangeState(configure) en {node_name}. Intentaremos de nuevo."
+                f"Fallo al ejecutar ChangeState({action}) en {node_name}. Intentaremos de nuevo."
             )
-            # dejamos pending_configure_id intacto para reintentar en el siguiente tick
+            # dejamos pending_*_id intacto para reintentar en el siguiente tick
 
 
 def main(args=None):
