@@ -14,6 +14,7 @@ from sklearn.cluster import DBSCAN
 from scipy.optimize import linear_sum_assignment
 from filterpy.kalman import KalmanFilter
 from filterpy.common import Q_discrete_white_noise
+from typing import cast
 
 
 def euclidean(a, b):
@@ -136,9 +137,9 @@ class FaceClusterServiceNode(Node):
     def __init__(self):
         super().__init__('face_cluster_service_node')
         # Parameters
-        self.declare_parameter('input_topic', '/face_detections')
-        self.declare_parameter('camera_frame', 'camera_frame')
-        self.declare_parameter('head_frame', 'head_frame')
+        self.declare_parameter('input_topic', '/face_recognitions')
+        self.declare_parameter('camera_frame', 'camera_link')
+        self.declare_parameter('head_frame', 'base_link')
         self.declare_parameter('camera_info_topic', '/sancho_camera/camera_info')
         self.declare_parameter('depth_scale.k', 8400.0)
         self.declare_parameter('dbscan.eps', 0.35)
@@ -187,6 +188,9 @@ class FaceClusterServiceNode(Node):
             return
         detections = []  # list of (pos, person_id)
         for det, recog in zip(msg.detections, msg.recognitions):
+            det = cast(FaceDetection, det)
+            recog = cast(FaceRecognition, recog)
+            
             if det.height <= 0:
                 continue
             # Use recognition info if available
