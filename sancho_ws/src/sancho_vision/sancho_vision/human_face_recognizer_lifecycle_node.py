@@ -21,14 +21,14 @@ from .encoders import load_encoder
 class HumanFaceRecognizerLifecycleNode(LifecycleNode):
 
     def __init__(self):
-        super().__init__("human_face_encoder")
+        super().__init__("human_face_recognizer")
 
         self.declare_parameters(namespace='', parameters=[
             ("detections_topic", "/face_detections"),
             ("recognitions_topic", "/face_recognitions"),
             ("encoder_name", "facenet"),
             ("db_mode", "save"),
-            ("learn_without_name", False),
+            ("learn_without_name", True),
             ("processing_rate", 10.0)
         ])
 
@@ -60,7 +60,7 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
         except Exception as e:
             self.get_logger().error(f"Error cargando reconocedor '{self.encoder_name}': {e}")
             return TransitionCallbackReturn.FAILURE
-
+    
         self.classifier = ComplexClassifier(self.db_mode)
 
         qos = QoSProfile(depth=10)
@@ -88,7 +88,7 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
             "add_features": FaceprintEvent.UPDATE,
         }
 
-        return TransitionCallbackReturn.SUCCESS
+        return super().on_configure(state)
 
     def on_activate(self, state) -> TransitionCallbackReturn:
         self.get_logger().info("Activando nodo de reconocimiento...")
@@ -100,7 +100,7 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
         self.save_db_timer = self.create_timer(10.0, lambda: self.classifier.db.save())
         self.spin_timer = self.create_timer(1.0 / self.processing_rate, self.do_recognition)
 
-        return TransitionCallbackReturn.SUCCESS
+        return super().on_activate(state)
 
     def on_deactivate(self, state) -> TransitionCallbackReturn:
         self.get_logger().info("Desactivando nodo de reconocimiento...")
@@ -117,7 +117,7 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
             self.destroy_subscription(self.sub_dets)
             self.sub_dets = None
 
-        return TransitionCallbackReturn.SUCCESS
+        return super().on_deactivate(state)
 
     def detections_callback(self, msg: FaceDetectionArray):
         self.last_detections = msg
@@ -149,7 +149,7 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
 
         self.get_logger().info("No se ha reconocido a nadie" if len(msg_out.recognitions) == 0 else 
             f"Se han reconocido {len(msg_out.recognitions)} personas: " + ", ".join([f"({r.classified_id})" for r in msg_out.recognitions]))
-        self.get_logger().info(f"Hay {self.classifier.db.get_all_ids()} personas en la base de datos")
+        self.get_logger().info(f"Hay {len(self.classifier.db.get_all_ids())} personas en la base de datos")
 
         self.pub_recog.publish(msg_out)
 
@@ -184,7 +184,8 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
             faceprint, distance, pos = self.classifier.classify_face(features)
 
             if self.learn_without_name and (not faceprint or distance < 0.75):
-                faceprint = self.classifier.add_class("", features, face_aligned, confidence)
+                face = self.bridge.cv2_to_base64(face_aligned)
+                _, faceprint = self.classifier.add_class("", features, face, confidence)
 
             face_updated = False
             if confidence >= 1.0 and distance >= 0.9:

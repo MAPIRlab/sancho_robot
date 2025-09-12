@@ -29,6 +29,8 @@ class FaceprintsDatabase:
             return self.faceprints.get(id)
 
     def add(self, name, features, face, score):
+        features = [float(x) for x in features]
+
         with self._lock:
             id = self.get_next_id()
             new_faceprint = {

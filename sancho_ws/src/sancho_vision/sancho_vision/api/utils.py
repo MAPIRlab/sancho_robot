@@ -30,4 +30,4 @@ def normalized_cosine_similarity_distance(features_a, features_b):
     norm_a = np.linalg.norm(features_a)
     norm_b = np.linalg.norm(features_b)
 
-    return (1 + (dot_product / (norm_a * norm_b))) / 2
+    return float((1 + (dot_product / (norm_a * norm_b))) / 2)

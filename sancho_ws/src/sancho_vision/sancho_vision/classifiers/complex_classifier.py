@@ -14,7 +14,7 @@ class ComplexClassifier:
         self.db_mode = db_mode
         self.db_path = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(__file__)), "database/faceprints_db.json"))
         self.db = FaceprintsDatabase(self.db_path, self.db_mode)
-
+        
         self.print_people()
 
     def classify_face(self, new_features):
@@ -101,7 +101,7 @@ class ComplexClassifier:
             face (str): Base64 face image.
             score (float): Score of the detection
         '''
-
+        
         faceprint = self.db.add(class_name, features, face, score)
 
         result = 1

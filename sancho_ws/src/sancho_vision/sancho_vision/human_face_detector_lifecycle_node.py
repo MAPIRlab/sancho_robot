@@ -18,9 +18,9 @@ class HumanFaceDetectorLifecycleNode(LifecycleNode):
         super().__init__("human_face_detector")
 
         self.declare_parameters(namespace="", parameters=[
-            ("image_topic", "/camera/color/image_raw"),
+            ("image_topic", "/sancho_camera/image_raw"),
             ("detections_topic", "/face_detections"),
-            ("detector_name", "dlib_cnn"),
+            ("detector_name", "dlib_frontal"),
             ("show_metrics", False),
             ("processing_rate", 10.0)
         ])
@@ -55,7 +55,7 @@ class HumanFaceDetectorLifecycleNode(LifecycleNode):
 
         self.detection_srv = self.create_service(Detection, "detection", self.detection_service)
 
-        return TransitionCallbackReturn.SUCCESS
+        return super().on_configure(state)
 
     def on_activate(self, state) -> TransitionCallbackReturn:
         self.get_logger().info("Activando nodo de detección...")
@@ -66,7 +66,7 @@ class HumanFaceDetectorLifecycleNode(LifecycleNode):
         self.latest_img = None
         self.spin_timer = self.create_timer(1.0 / self.processing_rate, self.do_detection)
 
-        return TransitionCallbackReturn.SUCCESS
+        return super().on_activate(state)
 
     def on_deactivate(self, state) -> TransitionCallbackReturn:
         self.get_logger().info("Desactivando nodo de detección...")
@@ -79,7 +79,7 @@ class HumanFaceDetectorLifecycleNode(LifecycleNode):
             self.destroy_subscription(self.sub_camera)
             self.sub_camera = None
 
-        return TransitionCallbackReturn.SUCCESS
+        return super().on_deactivate(state)
 
     def image_callback(self, msg: Image):
         self.latest_img = msg

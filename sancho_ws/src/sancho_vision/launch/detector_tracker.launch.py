@@ -10,23 +10,23 @@ from launch_ros.actions import LifecycleNode, Node
 def generate_launch_description():
     prefix_cmd = LaunchConfiguration('prefix')
     face_node_name = LaunchConfiguration('face_node_name')
-    tracker_node_name = LaunchConfiguration('tracker_node_name')
+    face_recognizer_node_name = LaunchConfiguration('face_recognizer_node_name')
 
     face_detector_node = LifecycleNode(
         namespace='',
         package='sancho_vision',
-        executable='face_detector_lifecycle_node',
+        executable='human_face_detector_lifecycle',
         name=face_node_name,
         output='screen',
         prefix=prefix_cmd,
         emulate_tty=True,
     )
 
-    face_tracker_node = LifecycleNode(
+    face_recognizer_node = LifecycleNode(
         namespace='',
         package='sancho_vision',
-        executable='face_tracker_lifecycle_node',
-        name=tracker_node_name,
+        executable='human_face_recognizer_lifecycle',
+        name=face_recognizer_node_name,
         output='screen',
         prefix=prefix_cmd,
         emulate_tty=True,
@@ -40,8 +40,8 @@ def generate_launch_description():
         output='screen',
         parameters=[
             {
-
-                'node_names': ['face_detector', 'face_tracker']
+                'activate': True,
+                'node_names': ['face_detector', 'face_recognizer']
             }
         ],
     )
@@ -61,9 +61,9 @@ def generate_launch_description():
             description='Nombre del nodo de detección (face_detector)'
         ),
         DeclareLaunchArgument(
-            'tracker_node_name',
-            default_value='face_tracker',
-            description='Nombre del nodo de seguimiento (face_tracker)'
+            'face_recognizer_node_name',
+            default_value='face_recognizer',
+            description='Nombre del nodo de seguimiento (face_recognizer)'
         ),
 
         # --------------------
@@ -71,7 +71,7 @@ def generate_launch_description():
         # --------------------
         GroupAction([
             face_detector_node,
-            face_tracker_node,
+            face_recognizer_node,
             configurator_node,
         ]),
     ])

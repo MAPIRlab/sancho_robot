@@ -14,7 +14,7 @@ def load_encoder(encoder_name: str) -> BaseEncoder:
     try:
         module_class = encoder_map[encoder_name]
         module_name, class_name = module_class.rsplit(".", 1)
-        module = importlib.import_module(f".{module_name}", package="hri_vision.encoders")
+        module = importlib.import_module(f".{module_name}", package="sancho_vision.encoders")
         encoder_class = getattr(module, class_name)
         return encoder_class()
     except KeyError:

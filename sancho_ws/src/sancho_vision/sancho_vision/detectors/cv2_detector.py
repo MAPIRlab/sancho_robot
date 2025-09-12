@@ -6,7 +6,7 @@ from .base_detector import BaseDetector
 class CV2Detector(BaseDetector):
 
     def __init__(self):
-        self.face_detector = cv2.CascadeClassifier('/home/ubuntu/tfg/ros2_ws/src/hri_vision/hri_vision/models/haarcascade_frontalface_default.xml')
+        self.face_detector = cv2.CascadeClassifier('/home/mapir/sancho_robot/sancho_ws/src/sancho_vision/sancho_vision/models/haarcascade_frontalface_default.xml')
 
     def get_faces(self, frame, verbose=False):
         frame_copy = frame.copy()

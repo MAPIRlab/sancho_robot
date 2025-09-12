@@ -17,7 +17,7 @@ import numpy as np
 from .base_encoder import BaseEncoder
 
 
-class FacenetEncoder(BaseEncoder):
+class FaceNetEncoder(BaseEncoder):
 
     def __init__(self):
         self.model = FaceNet()

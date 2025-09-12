@@ -16,9 +16,10 @@ def align_face(frame, face_position):
         face_aligned (Image): The face at face_position aligned
     """
 
+    [x, y, h, w] =  [int(n) for n in face_position]
+
     gray = cv2.cvtColor(frame.copy(), cv2.COLOR_BGR2GRAY)
-    box = dlib.rectangle(face_position[0], face_position[1], face_position[0] + face_position[2] - 1,
-                         face_position[1] + face_position[3] - 1)
+    box = dlib.rectangle(x, y, x + h - 1, y + w - 1)
     landmarks = face_landmark_predictor(gray, box)
 
     face_aligned = dlib.get_face_chip(frame, landmarks, size=256, padding=0.5)

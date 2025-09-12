@@ -16,7 +16,7 @@ def load_detector(detector_name: str) -> BaseDetector:
     try:
         module_class = detector_map[detector_name]
         module_name, class_name = module_class.rsplit(".", 1)
-        module = importlib.import_module(f".{module_name}", package="hri_vision.detectors")
+        module = importlib.import_module(f".{module_name}", package="sancho_vision.detectors")
         detector_class = getattr(module, class_name)
         return detector_class()
     except KeyError:
