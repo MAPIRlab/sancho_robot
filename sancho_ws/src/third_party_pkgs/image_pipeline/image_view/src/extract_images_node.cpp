@@ -50,7 +50,7 @@
 #include <mutex>
 #include <string>
 
-#include "cv_bridge/cv_bridge.hpp"
+#include "cv_bridge/cv_bridge.h"
 
 #include <opencv2/highgui/highgui.hpp>
 
@@ -59,8 +59,9 @@
 #include <rclcpp_components/register_node_macro.hpp>
 #include <sensor_msgs/msg/image.hpp>
 
+#include <boost/format.hpp>
+
 #include "image_view/extract_images_node.hpp"
-#include "utils.hpp"
 
 namespace image_view
 {
@@ -69,24 +70,20 @@ ExtractImagesNode::ExtractImagesNode(const rclcpp::NodeOptions & options)
 : rclcpp::Node("extract_images_node", options),
   filename_format_(""), count_(0), _time(this->now())
 {
-  // For compressed topics to remap appropriately, we need to pass a
-  // fully expanded and remapped topic name to image_transport
-  auto node_base = this->get_node_base_interface();
-  std::string topic = node_base->resolve_topic_or_service_name("image", false);
+  auto topic = rclcpp::expand_topic_or_service_name(
+    "image", this->get_name(), this->get_namespace());
 
-  // TransportHints does not actually declare the parameter
-  this->declare_parameter<std::string>("image_transport", "raw");
-  image_transport::TransportHints hints(this);
+  this->declare_parameter<std::string>("transport", std::string("raw"));
   std::string transport = this->get_parameter("transport").as_string();
 
   sub_ = image_transport::create_subscription(
     this, topic, std::bind(
       &ExtractImagesNode::image_cb, this, std::placeholders::_1),
-    hints.getTransport(), rmw_qos_profile_sensor_data);
+    transport);
 
   auto topics = this->get_topic_names_and_types();
 
-  if (topics.find(topic) == topics.end()) {
+  if (topics.find(topic) != topics.end()) {
     RCLCPP_WARN(
       this->get_logger(), "extract_images: image has not been remapped! "
       "Typical command-line usage:\n\t$ ros2 run image_view extract_images "
@@ -94,7 +91,8 @@ ExtractImagesNode::ExtractImagesNode(const rclcpp::NodeOptions & options)
   }
 
   this->declare_parameter<std::string>("filename_format", std::string("frame%04i.jpg"));
-  filename_format_ = this->get_parameter("filename_format").as_string();
+  std::string format_string = this->get_parameter("filename_format").as_string();
+  filename_format_.parse(format_string);
 
   this->declare_parameter<double>("sec_per_frame", 0.1);
   sec_per_frame_ = this->get_parameter("sec_per_frame").as_double();
@@ -128,7 +126,7 @@ void ExtractImagesNode::image_cb(const sensor_msgs::msg::Image::ConstSharedPtr &
     _time = this->now();
 
     if (!image.empty()) {
-      std::string filename = string_format(filename_format_, count_);
+      std::string filename = (filename_format_ % count_).str();
 
       cv::imwrite(filename, image);
 

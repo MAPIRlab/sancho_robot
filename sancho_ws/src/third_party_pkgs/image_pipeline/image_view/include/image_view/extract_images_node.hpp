@@ -56,6 +56,8 @@
 #include <image_transport/image_transport.hpp>
 #include <sensor_msgs/msg/image.hpp>
 
+#include <boost/format.hpp>
+
 namespace image_view
 {
 
@@ -72,7 +74,7 @@ private:
   std::mutex image_mutex_;
 
   std::string window_name_;
-  std::string filename_format_;
+  boost::format filename_format_;
   int count_;
   rclcpp::Time _time;
   double sec_per_frame_;

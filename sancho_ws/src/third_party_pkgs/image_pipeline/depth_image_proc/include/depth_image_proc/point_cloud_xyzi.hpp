@@ -37,7 +37,7 @@
 #include <mutex>
 
 #include "depth_image_proc/visibility.h"
-#include "image_geometry/pinhole_camera_model.hpp"
+#include "image_geometry/pinhole_camera_model.h"
 #include "message_filters/subscriber.h"
 #include "message_filters/sync_policies/approximate_time.h"
 #include "message_filters/synchronizer.h"
@@ -71,14 +71,13 @@ private:
   using Synchronizer = message_filters::Synchronizer<SyncPolicy>;
   std::shared_ptr<Synchronizer> sync_;
 
-  // parameters
-  float invalid_depth_;
-
   // Publications
   std::mutex connect_mutex_;
   rclcpp::Publisher<PointCloud>::SharedPtr pub_point_cloud_;
 
   image_geometry::PinholeCameraModel model_;
+
+  void connectCb();
 
   void imageCb(
     const Image::ConstSharedPtr & depth_msg,

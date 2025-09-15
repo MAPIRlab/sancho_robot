@@ -2,7 +2,7 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>image_rotate</name>
-  <version>5.0.11</version>
+  <version>3.0.8</version>
   <description>
     <p>
       Contains a node that rotates an image stream in a way that minimizes
@@ -27,14 +27,12 @@
   <maintainer email="vincent.rabaud@gmail.com">Vincent Rabaud</maintainer>
   <maintainer email="whitleysoftwareservices@gmail.com">Joshua Whitley</maintainer>
   <maintainer email="jacob@openrobotics.org">Jacob Perron</maintainer>
-  <maintainer email="mfergs7@gmail.com">Michael Ferguson</maintainer>
 
   <license>BSD</license>
   <url type="website">https://index.ros.org/p/image_rotate/</url>
   <url type="bugtracker">https://github.com/ros-perception/image_pipeline/issues</url>
   <url type="repository">https://github.com/ros-perception/image_pipeline</url>
   <author>Blaise Gassend</author>
-  <author email="robotics@cnu.edu">David Conner</author>
 
   <buildtool_depend>ament_cmake_auto</buildtool_depend>
 

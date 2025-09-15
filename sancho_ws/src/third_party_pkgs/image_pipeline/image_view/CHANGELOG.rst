@@ -2,166 +2,44 @@
 Changelog for package image_view
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-5.0.11 (2025-05-21)
--------------------
-* fix colour channel order for "rgb8" in image_view (backport `#1093 <https://github.com/ros-perception/image_pipeline/issues/1093>`_) (`#1094 <https://github.com/ros-perception/image_pipeline/issues/1094>`_)
+3.0.8 (2025-04-22)
+------------------
+
+3.0.7 (2025-02-27)
+------------------
+* image_view: sleep if no new image (backport `#1082 <https://github.com/ros-perception/image_pipeline/issues/1082>`_) (`#1084 <https://github.com/ros-perception/image_pipeline/issues/1084>`_)
 * Contributors: mergify[bot]
 
-5.0.10 (2025-04-22)
--------------------
-
-5.0.9 (2025-02-27)
-------------------
-* image_view: sleep if no new image (backport `#1082 <https://github.com/ros-perception/image_pipeline/issues/1082>`_) (`#1083 <https://github.com/ros-perception/image_pipeline/issues/1083>`_)
-* Contributors: mergify[bot]
-
-5.0.8 (2025-02-13)
-------------------
-* image_view：set CvtColorForDisplay encoding as bgr8 (backport `#1071 <https://github.com/ros-perception/image_pipeline/issues/1071>`_) (`#1075 <https://github.com/ros-perception/image_pipeline/issues/1075>`_)
-  Co-authored-by: Zhaoyuan Cheng <zycczyby@gmail.com>
-* Contributors: mergify[bot]
-
-5.0.7 (2025-02-10)
+3.0.6 (2024-08-20)
 ------------------
 
-5.0.6 (2024-12-11)
-------------------
-* `image_view_node`: support bayer images (backport `#1046 <https://github.com/ros-perception/image_pipeline/issues/1046>`_) (`#1058 <https://github.com/ros-perception/image_pipeline/issues/1058>`_)
-  so far bayer images always failed with an error:
-  ```
-  [ERROR] [..] [image_view_node]: Unable to convert 'bayer_rggb8' image for display: 'cv_bridge.cvtColorForDisplay() does not have an output encoding                that is color or mono, and has is bit in depth'
-  ```
-  the `stereo_view_node` on the other hand already supports bayer images,
-  however it always forcibly converts them to monochrome, even if they are
-  colour images.
-  for now, this adds the same logic for the single-image viewer and thus
-  only partially resolves `#1045 <https://github.com/ros-perception/image_pipeline/issues/1045>`_.<hr>This is an automatic backport of pull
-  request `#1046 <https://github.com/ros-perception/image_pipeline/issues/1046>`_ done by [Mergify](https://mergify.com).
-  Co-authored-by: Ralph Ursprung <39383228+rursprung@users.noreply.github.com>
-* Contributors: mergify[bot]
-
-5.0.5 (2024-10-31)
+3.0.5 (2024-07-24)
 ------------------
 
-5.0.4 (2024-08-20)
-------------------
-* Finish QoS updates (backport `#1019 <https://github.com/ros-perception/image_pipeline/issues/1019>`_) (`#1024 <https://github.com/ros-perception/image_pipeline/issues/1024>`_)
-  This implements the remainder of `#847 <https://github.com/ros-perception/image_pipeline/issues/847>`_:
-  - Make sure publishers default to system defaults (reliable)
-  - Add QoS overriding where possible (some of the image_transport /
-  message_filters stuff doesn't really support that)
-  - Use the matching heuristic for subscribers consistently
-* Contributors: mergify[bot]
-
-5.0.3 (2024-07-16)
+3.0.4 (2024-03-01)
 ------------------
 
-5.0.2 (2024-05-27)
+3.0.3 (2022-01-24)
 ------------------
-
-5.0.1 (2024-03-26)
-------------------
-* unified changelog, add missing image, deduplicate tutorials (`#938 <https://github.com/ros-perception/image_pipeline/issues/938>`_)
-  Last bit of documentation updates - putting together a single changelog
-  summary for the whole release (rather than scattering among packages).
-  Unified the camera_info tutorial so it isn't duplicated. Added a missing
-  image from image_rotate (was on local disk, but hadn't committed it)
-* add docs for image_rotate/publisher (`#936 <https://github.com/ros-perception/image_pipeline/issues/936>`_)
-* migrate image_view docs (`#934 <https://github.com/ros-perception/image_pipeline/issues/934>`_)
-  * migrate docs from ROS wiki
-  * FIX: video recorder start/end services should only be advertised when
-  feature is enabled
-  * FIX: image remapping didn't work as expected/documented in
-  stereo_image_proc
-* default to encoding in the image message (`#921 <https://github.com/ros-perception/image_pipeline/issues/921>`_)
-  My camera is publishing rgb8 encoding - the existing code throws an
-  error that 8UC3 is not a valid encoding, but if we pass rgb8 from the
-  message then things work fine. The encoding in the image should always
-  be more descriptive than just the bit and channel size.
-  If encoding is not filled in, the existing behavior is used as a
-  fallback
-* Update extract_images_sync to add sec_per_frame parameter (`#920 <https://github.com/ros-perception/image_pipeline/issues/920>`_)
-  Added sec_per_frame parameter to allow decimation of frames being
-  synchronized and captured.
-  fixes `#726 <https://github.com/ros-perception/image_pipeline/issues/726>`_
-  ---------
+* [backport Humble] Removed cfg files related with ROS 1 parameters (`#911 <https://github.com/ros-perception/image_pipeline/issues/911>`_) (`#913 <https://github.com/ros-perception/image_pipeline/issues/913>`_)
+  Removed cfg files related with ROS 1 parameters. Backport
+  https://github.com/ros-perception/image_pipeline/pull/911
+* [backport humble] enable autosize parameter in disparity view (`#875 <https://github.com/ros-perception/image_pipeline/issues/875>`_) (`#897 <https://github.com/ros-perception/image_pipeline/issues/897>`_)
+  backport `#875 <https://github.com/ros-perception/image_pipeline/issues/875>`_
   Co-authored-by: Michael Ferguson <mfergs7@gmail.com>
-* Port extract_images_sync script to ROS 2 (`#919 <https://github.com/ros-perception/image_pipeline/issues/919>`_)
-  Change Description: The extract_images_sync python script was upgraded
-  to ROS 2.
-  Testing: Upgraded node tested against Iron on Ubuntu 22.04.3 LTS
-  Issue: fixes `#860 <https://github.com/ros-perception/image_pipeline/issues/860>`_
-  ---------
-  Co-authored-by: Alejandro Hernández Cordero <ahcorde@gmail.com>
-  Co-authored-by: Michael Ferguson <mfergs7@gmail.com>
-* Contributors: Michael Ferguson, Siddharth Vaghela
-
-5.0.0 (2024-01-24)
-------------------
-* remove the last bit of boost (`#912 <https://github.com/ros-perception/image_pipeline/issues/912>`_)
-  Last bit of `#407 <https://github.com/ros-perception/image_pipeline/issues/407>`_ - every other occurrence of "boost" when grepping the
-  repo is in the changelog
-* Removed Boost dependency (`#909 <https://github.com/ros-perception/image_pipeline/issues/909>`_)
-  Removed Boost dependency. Related with
-  https://github.com/ros-perception/image_pipeline/issues/407
-  ---------
-* Removed cfg files related with ROS 1 parameters (`#911 <https://github.com/ros-perception/image_pipeline/issues/911>`_)
-  Removed cfg files related with ROS 1 parameters
-* image_view: consistent image_transport (`#876 <https://github.com/ros-perception/image_pipeline/issues/876>`_)
-  All of these nodes already have the proper remapping support - but
-  image_transport parameter support was scattered
-* enable autosize parameter in disparity view (`#875 <https://github.com/ros-perception/image_pipeline/issues/875>`_)
-  appears to be bug left over from ROS 2 port
-* ROS 2: Add option to prepend timestamp to image filename in image_saver node (`#870 <https://github.com/ros-perception/image_pipeline/issues/870>`_)
-  Related to this PR in ROS 1
-  https://github.com/ros-perception/image_pipeline/pull/806/files
-  ---------
-* Add support for floating point fps (`#866 <https://github.com/ros-perception/image_pipeline/issues/866>`_)
-  Related with this PR
-  https://github.com/ros-perception/image_pipeline/pull/723
-  ---------
-* use cv::DestroyAllWindows (`#863 <https://github.com/ros-perception/image_pipeline/issues/863>`_)
+* [backport humble] ROS 2: Add option to prepend timestamp to image filename in image_saver node (`#870 <https://github.com/ros-perception/image_pipeline/issues/870>`_) (`#885 <https://github.com/ros-perception/image_pipeline/issues/885>`_)
+  backport `#870 <https://github.com/ros-perception/image_pipeline/issues/870>`_
+* [backport humble] Add support for floating point fps (`#866 <https://github.com/ros-perception/image_pipeline/issues/866>`_) (`#877 <https://github.com/ros-perception/image_pipeline/issues/877>`_)
+  Backport `#866 <https://github.com/ros-perception/image_pipeline/issues/866>`_
+* [backport Humble] use cv::DestroyAllWindows (`#863 <https://github.com/ros-perception/image_pipeline/issues/863>`_) (`#864 <https://github.com/ros-perception/image_pipeline/issues/864>`_)
   This ports `#816 <https://github.com/ros-perception/image_pipeline/issues/816>`_ to ROS 2 and prevents weird exit conditions if you
   already closed the window
-* properly remap compressed topics (`#851 <https://github.com/ros-perception/image_pipeline/issues/851>`_)
-  ## Before:
-  Pushing into namespace is broken, only image_raw changes (camera_info
-  and transport topics should change):
-  ```
-  ros2 run image_publisher image_publisher_node --ros-args -p filename:=test.png -r image_raw:=foo/image_raw
-  ---
-  ros2 topic list
-  /camera_info
-  /foo/image_raw
-  /image_raw/compressed
-  /image_raw/compressedDepth
-  /image_raw/theora
-  ```
-  ## After:
-  Pushing into namespace now works:
-  ```
-  ros2 run image_publisher image_publisher_node --ros-args -p filename:=test.png -r image_raw:=foo/image_raw
-  ---
-  ros2 topic list
-  /foo/camera_info
-  /foo/image_raw
-  /foo/image_raw/compressed
-  /foo/image_raw/compressedDepth
-  /foo/image_raw/theora
-  ```
-* image_view: fix encoding, help string (`#850 <https://github.com/ros-perception/image_pipeline/issues/850>`_)
-  * encoding shouldn't be hard coded, pull it from the message
-  * help string needs to be updated to proper parameter format
-* Improved Image view dynamic parameters description (`#829 <https://github.com/ros-perception/image_pipeline/issues/829>`_)
-* add myself as a maintainer (`#846 <https://github.com/ros-perception/image_pipeline/issues/846>`_)
-* feat: image_saver reports an error on file save
-* Contributors: Alejandro Hernández Cordero, Michael Ferguson, Russ Webber
+  backport https://github.com/ros-perception/image_pipeline/pull/863
+  Co-authored-by: Michael Ferguson <mfergs7@gmail.com>
+* Contributors: Alejandro Hernández Cordero
 
-3.0.1 (2022-12-04)
+3.0.2 (2022-01-17)
 ------------------
-* Replace deprecated headers
-  Fixing compiler warnings.
-* Contributors: Jacob Perron
 
 3.0.0 (2022-04-29)
 ------------------

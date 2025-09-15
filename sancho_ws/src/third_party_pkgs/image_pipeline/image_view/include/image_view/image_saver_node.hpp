@@ -52,6 +52,8 @@
 #include <memory>
 #include <string>
 
+#include <boost/format.hpp>
+
 #include <rclcpp/rclcpp.hpp>
 #include <image_transport/image_transport.hpp>
 #include <std_srvs/srv/empty.hpp>
@@ -67,7 +69,7 @@ public:
   explicit ImageSaverNode(const rclcpp::NodeOptions & options);
 
 private:
-  std::string g_format;
+  boost::format g_format;
   bool stamped_filename_;
   bool save_all_image_{false};
   bool save_image_service_{false};

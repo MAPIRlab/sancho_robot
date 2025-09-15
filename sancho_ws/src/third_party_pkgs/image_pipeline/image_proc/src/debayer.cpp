@@ -32,11 +32,10 @@
 
 #include <functional>
 #include <memory>
-#include <string>
 
 #include <opencv2/imgproc/imgproc.hpp>
 
-#include "cv_bridge/cv_bridge.hpp"
+#include "cv_bridge/cv_bridge.h"
 
 #include <image_proc/debayer.hpp>
 #include <image_proc/utils.hpp>
@@ -53,43 +52,16 @@ namespace image_proc
 DebayerNode::DebayerNode(const rclcpp::NodeOptions & options)
 : Node("DebayerNode", options)
 {
-  // TransportHints does not actually declare the parameter
-  this->declare_parameter<std::string>("image_transport", "raw");
+  auto qos_profile = getTopicQosProfile(this, "image_raw");
+  sub_raw_ = image_transport::create_subscription(
+    this, "image_raw",
+    std::bind(
+      &DebayerNode::imageCb, this,
+      std::placeholders::_1), "raw", qos_profile);
 
+  pub_mono_ = image_transport::create_publisher(this, "image_mono", qos_profile);
+  pub_color_ = image_transport::create_publisher(this, "image_color", qos_profile);
   debayer_ = this->declare_parameter("debayer", 3);
-
-  // For compressed topics to remap appropriately, we need to pass a
-  // fully expanded and remapped topic name to image_transport
-  auto node_base = this->get_node_base_interface();
-  image_topic_ = node_base->resolve_topic_or_service_name("image_raw", false);
-  std::string mono_topic = node_base->resolve_topic_or_service_name("image_mono", false);
-  std::string color_topic = node_base->resolve_topic_or_service_name("image_color", false);
-
-  // Setup lazy subscriber using publisher connection callback
-  rclcpp::PublisherOptions pub_options;
-  pub_options.event_callbacks.matched_callback =
-    [this](rclcpp::MatchedInfo &)
-    {
-      if (pub_mono_.getNumSubscribers() == 0 && pub_color_.getNumSubscribers() == 0) {
-        sub_raw_.shutdown();
-      } else if (!sub_raw_) {
-        // Create subscriber with QoS matched to subscribed topic publisher
-        auto qos_profile = getTopicQosProfile(this, image_topic_);
-        image_transport::TransportHints hints(this);
-        sub_raw_ = image_transport::create_subscription(
-          this, image_topic_,
-          std::bind(
-            &DebayerNode::imageCb, this,
-            std::placeholders::_1), hints.getTransport(), qos_profile);
-      }
-    };
-
-  // Create publisher - allow overriding QoS settings (history, depth, reliability)
-  pub_options.qos_overriding_options = rclcpp::QosOverridingOptions::with_default_policies();
-  pub_mono_ = image_transport::create_publisher(this, mono_topic, rmw_qos_profile_default,
-      pub_options);
-  pub_color_ = image_transport::create_publisher(this, color_topic, rmw_qos_profile_default,
-      pub_options);
 }
 
 void DebayerNode::imageCb(const sensor_msgs::msg::Image::ConstSharedPtr & raw_msg)
@@ -219,9 +191,7 @@ void DebayerNode::imageCb(const sensor_msgs::msg::Image::ConstSharedPtr & raw_ms
     }
 
     pub_color_.publish(color_msg);
-  } else if (raw_msg->encoding == sensor_msgs::image_encodings::YUV422 ||  // NOLINT
-    raw_msg->encoding == sensor_msgs::image_encodings::YUV422_YUY2)
-  {
+  } else if (raw_msg->encoding == sensor_msgs::image_encodings::YUV422) {
     // Use cv_bridge to convert to BGR8
     sensor_msgs::msg::Image::SharedPtr color_msg;
 

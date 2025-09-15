@@ -45,9 +45,7 @@ def generate_launch_description():
     return LaunchDescription([
         # install realsense from https://github.com/intel/ros2_intel_realsense
         launch_ros.actions.Node(
-            package='realsense2_camera',
-            executable='realsense2_camera_node',
-            namespace='',
+            package='realsense_ros2_camera', node_executable='realsense_ros2_camera',
             output='screen'),
 
         # launch plugin through rclcpp_components container
@@ -63,6 +61,7 @@ def generate_launch_description():
                     plugin='depth_image_proc::ConvertMetricNode',
                     name='convert_metric_node',
                     remappings=[('image_raw', '/camera/depth/image_rect_raw'),
+                                ('camera_info', '/camera/depth/camera_info'),
                                 ('image', '/camera/depth/converted_image')]
                 ),
             ],
@@ -71,6 +70,6 @@ def generate_launch_description():
 
         # rviz
         launch_ros.actions.Node(
-            package='rviz2', executable='rviz2', output='screen',
+            package='rviz2', node_executable='rviz2', output='screen',
             arguments=['--display-config', default_rviz]),
     ])

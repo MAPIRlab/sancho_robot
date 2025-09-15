@@ -73,20 +73,9 @@ def generate_test_description():
             package='stereo_image_proc',
             executable='disparity_node',
             name='disparity_node',
-            parameters=[{
-                'qos_overrides': {
-                    '/left/image_rect_color': {
-                        'subscription': {
-                            'reliability': 'reliable'
-                        }
-                    },
-                    '/right/image_rect_color': {
-                        'subscription': {
-                            'reliability': 'reliable'
-                        }
-                    }
-                },
-            }],
+            parameters=[
+                {'use_system_default_qos': True}
+            ],
             output='screen'
         ),
         launch_testing.actions.ReadyToTest(),

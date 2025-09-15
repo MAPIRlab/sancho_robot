@@ -35,11 +35,10 @@
 #include <mutex>
 #include <string>
 
-#include "cv_bridge/cv_bridge.hpp"
+#include "cv_bridge/cv_bridge.h"
 
 #include <depth_image_proc/conversions.hpp>
 #include <depth_image_proc/point_cloud_xyzrgb_radial.hpp>
-#include <image_transport/camera_common.hpp>
 #include <image_transport/image_transport.hpp>
 #include <image_transport/subscriber_filter.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
@@ -51,13 +50,10 @@
 namespace depth_image_proc
 {
 
+
 PointCloudXyzrgbRadialNode::PointCloudXyzrgbRadialNode(const rclcpp::NodeOptions & options)
 : Node("PointCloudXyzrgbRadialNode", options)
 {
-  // TransportHints does not actually declare the parameter
-  this->declare_parameter<std::string>("image_transport", "raw");
-  this->declare_parameter<std::string>("depth_image_transport", "raw");
-
   // Read parameters
   int queue_size = this->declare_parameter<int>("queue_size", 5);
   bool use_exact_sync = this->declare_parameter<bool>("exact_sync", false);
@@ -88,43 +84,44 @@ PointCloudXyzrgbRadialNode::PointCloudXyzrgbRadialNode(const rclcpp::NodeOptions
         std::placeholders::_3));
   }
 
-  // Create publisher with connect callback
-  rclcpp::PublisherOptions pub_options;
-  pub_options.event_callbacks.matched_callback =
-    [this](rclcpp::MatchedInfo & s)
-    {
-      std::lock_guard<std::mutex> lock(connect_mutex_);
-      if (s.current_count == 0) {
-        sub_depth_.unsubscribe();
-        sub_rgb_.unsubscribe();
-        sub_info_.unsubscribe();
-      } else if (!sub_depth_.getSubscriber()) {
-        // For compressed topics to remap appropriately, we need to pass a
-        // fully expanded and remapped topic name to image_transport
-        auto node_base = this->get_node_base_interface();
-        std::string depth_topic =
-          node_base->resolve_topic_or_service_name("depth/image_raw", false);
-        std::string rgb_topic =
-          node_base->resolve_topic_or_service_name("rgb/image_raw", false);
-        // Allow also remapping camera_info to something different than default
-        std::string rgb_info_topic =
-          node_base->resolve_topic_or_service_name(
-          image_transport::getCameraInfoTopic(rgb_topic), false);
+  // Monitor whether anyone is subscribed to the output
+  // TODO(ros2) Implement when SubscriberStatusCallback is available
+  // ros::SubscriberStatusCallback connect_cb =
+  //   boost::bind(&PointCloudXyzrgbRadialNode::connectCb, this);
+  connectCb();
+  // TODO(ros2) Implement when SubscriberStatusCallback is available
+  // Make sure we don't enter connectCb() between advertising and assigning to pub_point_cloud_
+  // std::lock_guard<std::mutex> lock(connect_mutex_);
+  // TODO(ros2) Implement connect_cb when SubscriberStatusCallback is available
+  // pub_point_cloud_ = depth_nh.advertise<PointCloud>("points", 1, connect_cb, connect_cb);
+  pub_point_cloud_ = create_publisher<PointCloud2>("points", rclcpp::SensorDataQoS());
+  // TODO(ros2) Implement connect_cb when SubscriberStatusCallback is available
+}
 
-        // depth image can use different transport.(e.g. compressedDepth)
-        image_transport::TransportHints depth_hints(this, "raw", "depth_image_transport");
-        sub_depth_.subscribe(this, depth_topic, depth_hints.getTransport());
+// Handles (un)subscribing when clients (un)subscribe
+void PointCloudXyzrgbRadialNode::connectCb()
+{
+  std::lock_guard<std::mutex> lock(connect_mutex_);
+  // TODO(ros2) Implement getNumSubscribers when rcl/rmw support it
+  // if (pub_point_cloud_->getNumSubscribers() == 0)
+  if (0) {
+    // TODO(ros2) Implement getNumSubscribers when rcl/rmw support it
+    sub_depth_.unsubscribe();
+    sub_rgb_.unsubscribe();
+    sub_info_.unsubscribe();
+  } else if (!sub_depth_.getSubscriber()) {
+    // parameter for depth_image_transport hint
+    std::string depth_image_transport_param = "depth_image_transport";
+    image_transport::TransportHints depth_hints(this, "raw", depth_image_transport_param);
 
-        // rgb uses normal ros transport hints.
-        image_transport::TransportHints hints(this, "raw");
-        sub_rgb_.subscribe(this, rgb_topic, hints.getTransport());
-        sub_info_.subscribe(this, rgb_info_topic);
-      }
-    };
-  // Allow overriding QoS settings (history, depth, reliability)
-  pub_options.qos_overriding_options = rclcpp::QosOverridingOptions::with_default_policies();
-  pub_point_cloud_ = create_publisher<PointCloud2>("points", rclcpp::SystemDefaultsQoS(),
-      pub_options);
+    // depth image can use different transport.(e.g. compressedDepth)
+    sub_depth_.subscribe(this, "depth_registered/image_rect", depth_hints.getTransport());
+
+    // rgb uses normal ros transport hints.
+    image_transport::TransportHints hints(this, "raw");
+    sub_rgb_.subscribe(this, "rgb/image_rect_color", hints.getTransport());
+    sub_info_.subscribe(this, "rgb/camera_info");
+  }
 }
 
 void PointCloudXyzrgbRadialNode::imageCb(

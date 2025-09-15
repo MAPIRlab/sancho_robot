@@ -39,7 +39,7 @@
 #include <vector>
 
 #include "depth_image_proc/visibility.h"
-#include "image_geometry/pinhole_camera_model.hpp"
+#include "image_geometry/pinhole_camera_model.h"
 #include "message_filters/subscriber.h"
 #include "message_filters/synchronizer.h"
 #include "message_filters/sync_policies/exact_time.h"
@@ -92,6 +92,8 @@ private:
   cv::Mat transform_;
 
   image_geometry::PinholeCameraModel model_;
+
+  void connectCb();
 
   void imageCb(
     const Image::ConstSharedPtr & depth_msg,

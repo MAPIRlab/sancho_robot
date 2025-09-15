@@ -35,7 +35,7 @@
 
 #include <string>
 
-#include "cv_bridge/cv_bridge.hpp"
+#include "cv_bridge/cv_bridge.h"
 
 #include <image_transport/image_transport.hpp>
 #include <rclcpp/rclcpp.hpp>
@@ -69,7 +69,6 @@ private:
   int queue_size_;
   std::string target_frame_id_;
   int decimation_x_, decimation_y_, offset_x_, offset_y_, width_, height_;
-  std::string image_topic_;
   CropDecimateModes interpolation_;
 
   void imageCb(

@@ -2,13 +2,12 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>image_proc</name>
-  <version>5.0.11</version>
+  <version>3.0.8</version>
   <description>Single image rectification and color processing.</description>
 
   <maintainer email="vincent.rabaud@gmail.com">Vincent Rabaud</maintainer>
   <maintainer email="whitleysoftwareservices@gmail.com">Joshua Whitley</maintainer>
   <maintainer email="jacob@openrobotics.org">Jacob Perron</maintainer>
-  <maintainer email="mfergs7@gmail.com">Michael Ferguson</maintainer>
 
   <license>BSD</license>
   <url type="website">https://index.ros.org/p/image_proc/</url>
@@ -20,18 +19,14 @@
 
   <buildtool_depend>ament_cmake_auto</buildtool_depend>
 
-  <depend>camera_calibration_parsers</depend>
   <depend>cv_bridge</depend>
   <depend>image_geometry</depend>
   <depend>image_transport</depend>
-  <depend>geometry_msgs</depend>
   <depend>libopencv-dev</depend>
   <depend>rclcpp</depend>
   <depend>rclcpp_components</depend>
   <depend>rcutils</depend>
   <depend>sensor_msgs</depend>
-  <depend>tf2</depend>
-  <depend>tf2_geometry_msgs</depend>
   <depend>tracetools_image_pipeline</depend>
 
   <test_depend>ament_lint_auto</test_depend>

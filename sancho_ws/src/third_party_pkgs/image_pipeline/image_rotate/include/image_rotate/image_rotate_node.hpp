@@ -82,6 +82,10 @@ private:
   void do_work(
     const sensor_msgs::msg::Image::ConstSharedPtr & msg,
     const std::string input_frame_from_msg);
+  void subscribe();
+  void unsubscribe();
+  void connectCb();
+  void disconnectCb();
   void onInit();
 
   rclcpp::Node::OnSetParametersCallbackHandle::SharedPtr on_set_parameters_callback_handle_;
@@ -93,14 +97,13 @@ private:
   image_rotate::ImageRotateConfig config_;
 
   image_transport::Publisher img_pub_;
-
-  // Subscriber - only one is used at a time - depends on use_camera_info
   image_transport::Subscriber img_sub_;
   image_transport::CameraSubscriber cam_sub_;
 
   geometry_msgs::msg::Vector3Stamped target_vector_;
   geometry_msgs::msg::Vector3Stamped source_vector_;
 
+  int subscriber_count_;
   double angle_;
   tf2::TimePoint prev_stamp_;
 };

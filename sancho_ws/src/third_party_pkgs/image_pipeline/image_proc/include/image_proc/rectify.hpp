@@ -34,9 +34,8 @@
 #define IMAGE_PROC__RECTIFY_HPP_
 
 #include <mutex>
-#include <string>
 
-#include "image_geometry/pinhole_camera_model.hpp"
+#include "image_geometry/pinhole_camera_model.h"
 
 #include <image_transport/image_transport.hpp>
 #include <rclcpp/rclcpp.hpp>
@@ -53,19 +52,21 @@ public:
   explicit RectifyNode(const rclcpp::NodeOptions &);
 
 private:
-  image_transport::CameraSubscriber sub_camera_;
+  image_transport::Subscriber sub_image_;
+  rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr sub_info_;
 
   int queue_size_;
-  int interpolation_;
-  std::string image_topic_;
+  int interpolation;
+  std::mutex connect_mutex_;
   image_transport::Publisher pub_rect_;
 
   // Processing state (note: only safe because we're using single-threaded NodeHandle!)
   image_geometry::PinholeCameraModel model_;
+  sensor_msgs::msg::CameraInfo::SharedPtr cached_info_;
 
-  void imageCb(
-    const sensor_msgs::msg::Image::ConstSharedPtr & image_msg,
-    const sensor_msgs::msg::CameraInfo::ConstSharedPtr & info_msg);
+  void subscribeToCamera(const rmw_qos_profile_t & qos_profile);
+  void infoCb(const sensor_msgs::msg::CameraInfo::ConstSharedPtr & info_msg);
+  void imageCb(const sensor_msgs::msg::Image::ConstSharedPtr & image_msg);
 };
 
 }  // namespace image_proc

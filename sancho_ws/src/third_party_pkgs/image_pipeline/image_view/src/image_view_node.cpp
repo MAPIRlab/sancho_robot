@@ -54,18 +54,17 @@
 #include <utility>
 #include <vector>
 
-#include "cv_bridge/cv_bridge.hpp"
+#include "cv_bridge/cv_bridge.h"
 
 #include "image_view/image_view_node.hpp"
 
+#include <boost/format.hpp>
 #include <opencv2/highgui/highgui.hpp>
 
 #include <rclcpp/rclcpp.hpp>
 #include <image_transport/image_transport.hpp>
 #include <rclcpp_components/register_node_macro.hpp>
 #include <std_msgs/msg/header.hpp>
-
-#include "utils.hpp"
 
 namespace image_view
 {
@@ -105,29 +104,25 @@ cv_bridge::CvImageConstPtr ThreadSafeImage::pop()
 ImageViewNode::ImageViewNode(const rclcpp::NodeOptions & options)
 : rclcpp::Node("image_view_node", options)
 {
-  // TransportHints does not actually declare the parameter
-  this->declare_parameter<std::string>("image_transport", "raw");
-  image_transport::TransportHints hints(this);
-  RCLCPP_INFO(this->get_logger(), "Using transport \"%s\"", hints.getTransport().c_str());
+  auto transport = this->declare_parameter("image_transport", "raw");
+  RCLCPP_INFO(this->get_logger(), "Using transport \"%s\"", transport.c_str());
 
-  // For compressed topics to remap appropriately, we need to pass a
-  // fully expanded and remapped topic name to image_transport
-  auto node_base = this->get_node_base_interface();
-  std::string topic = node_base->resolve_topic_or_service_name("image", false);
+  std::string topic = rclcpp::expand_topic_or_service_name(
+    "image", this->get_name(), this->get_namespace());
 
+  image_transport::TransportHints hints(this, transport);
   pub_ = this->create_publisher<sensor_msgs::msg::Image>("output", 1);
   sub_ = image_transport::create_subscription(
-    this, topic, std::bind(&ImageViewNode::imageCb, this, std::placeholders::_1),
-    hints.getTransport(), rmw_qos_profile_sensor_data);
+    this, topic, std::bind(
+      &ImageViewNode::imageCb, this, std::placeholders::_1), hints.getTransport());
 
   auto topics = this->get_topic_names_and_types();
 
-  if (topics.find(topic) == topics.end()) {
+  if (topics.find(topic) != topics.end()) {
     RCLCPP_WARN(
       this->get_logger(), "Topic 'image' has not been remapped! "
       "Typical command-line usage:\n"
-      "\t$ ros2 run image_view image_view --ros-args -p image:=<image topic> "
-      "[-p image_transport:=<transport>]");
+      "\t$ rosrun image_view image_view image:=<image topic> [transport]");
   }
 
   // Default window name is the resolved topic name
@@ -136,36 +131,13 @@ ImageViewNode::ImageViewNode(const rclcpp::NodeOptions & options)
   autosize_ = this->declare_parameter("autosize", false);
   window_height_ = this->declare_parameter("height", -1);
   window_width_ = this->declare_parameter("width", -1);
-  filename_format_ =
+  std::string format_string =
     this->declare_parameter("filename_format", std::string("frame%04i.jpg"));
+  filename_format_.parse(format_string);
 
-  rcl_interfaces::msg::ParameterDescriptor colormap_paramDescriptor;
-  colormap_paramDescriptor.name = "colormap";
-  colormap_paramDescriptor.type = rcl_interfaces::msg::ParameterType::PARAMETER_INTEGER;
-  colormap_paramDescriptor.description =
-    "ColorMap -1 = NO_COLORMAP, 0 = AUTUMN, 1 = BONE, 2 = JET, 3 = WINTER, 4 = RAINBOW, 5 = OCEAN"
-    "6 = SUMMER, 7 = SPRING, 8 = COOL, 9 = HSV, 10 = PINK, 11 = HOT";
-  colormap_paramDescriptor.set__integer_range(
-    {rcl_interfaces::msg::IntegerRange()
-      .set__from_value(-1)
-      .set__to_value(11)
-      .set__step(1)});
-  colormap_ = this->declare_parameter<int>(
-    colormap_paramDescriptor.name, -1, colormap_paramDescriptor);
-
-  rcl_interfaces::msg::ParameterDescriptor min_image_value_paramDescriptor;
-  min_image_value_paramDescriptor.name = "min_image_value";
-  min_image_value_paramDescriptor.type = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
-  min_image_value_paramDescriptor.description = "Minimum image value for scaling depth/float image";
-  min_image_value_ = this->declare_parameter(
-    min_image_value_paramDescriptor.name, 0, min_image_value_paramDescriptor);
-
-  rcl_interfaces::msg::ParameterDescriptor max_image_value_paramDescriptor;
-  max_image_value_paramDescriptor.name = "max_image_value";
-  max_image_value_paramDescriptor.type = rcl_interfaces::msg::ParameterType::PARAMETER_DOUBLE;
-  max_image_value_paramDescriptor.description = "Minimum image value for scaling depth/float image";
-  max_image_value_ = this->declare_parameter(
-    max_image_value_paramDescriptor.name, 0, max_image_value_paramDescriptor);
+  colormap_ = this->declare_parameter("colormap", -1);
+  min_image_value_ = this->declare_parameter("min_image_value", 0);
+  max_image_value_ = this->declare_parameter("max_image_value", 0);
 
   if (g_gui) {
     window_thread_ = std::thread(&ImageViewNode::windowThread, this);
@@ -214,26 +186,9 @@ void ImageViewNode::imageCb(const sensor_msgs::msg::Image::ConstSharedPtr & msg)
       }
     }
 
-    std::string encoding = msg->encoding.empty() ? "bgr8" : msg->encoding;
-
-    // OpenCV uses BGR colour channel order
-    if (encoding.find("rgb8") != std::string::npos) {
-      encoding = "bgr8";
-    }
-
-    // May want to view raw bayer data
-    if (encoding.find("bayer") != std::string::npos) {
-      encoding = "mono8";
-    }
-
-    // Add a special rule for YUV format
-    if (encoding.find("yuv") != std::string::npos) {
-      encoding = "bgr8";
-    }
-
     queued_image_.set(
       cv_bridge::cvtColorForDisplay(
-        cv_bridge::toCvShare(msg), encoding, options));
+        cv_bridge::toCvShare(msg), "bgr8", options));
   } catch (cv_bridge::Exception & e) {
     RCLCPP_ERROR_EXPRESSION(
       this->get_logger(), (static_cast<int>(this->now().seconds()) % 30 == 0),
@@ -268,7 +223,7 @@ void ImageViewNode::mouseCb(int event, int /* x */, int /* y */, int /* flags */
     return;
   }
 
-  std::string filename = string_format(this_->filename_format_, this_->count_);
+  std::string filename = (this_->filename_format_ % this_->count_).str();
 
   if (cv::imwrite(filename, image->image)) {
     RCLCPP_INFO(this_->get_logger(), "Saved image %s", filename.c_str());

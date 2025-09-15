@@ -62,6 +62,7 @@ def generate_launch_description():
             # Remap subscribers and publishers
             remappings=[
                 ('image', 'image_mono'),
+                ('camera_info', 'camera_info'),
                 ('image_rect', 'image_rect')
             ],
         ),

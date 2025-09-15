@@ -35,9 +35,8 @@
 #include <mutex>
 #include <string>
 
-#include "cv_bridge/cv_bridge.hpp"
+#include "cv_bridge/cv_bridge.h"
 
-#include <image_transport/camera_common.hpp>
 #include <image_transport/image_transport.hpp>
 #include <image_transport/subscriber_filter.hpp>
 #include <rclcpp/rclcpp.hpp>
@@ -51,16 +50,10 @@
 namespace depth_image_proc
 {
 
+
 PointCloudXyziNode::PointCloudXyziNode(const rclcpp::NodeOptions & options)
 : rclcpp::Node("PointCloudXyziNode", options)
 {
-  // TransportHints does not actually declare the parameter
-  this->declare_parameter<std::string>("image_transport", "raw");
-  this->declare_parameter<std::string>("depth_image_transport", "raw");
-
-  // value used for invalid points for pcd conversion
-  invalid_depth_ = this->declare_parameter<double>("invalid_depth", 0.0);
-
   // Read parameters
   int queue_size = this->declare_parameter<int>("queue_size", 5);
 
@@ -78,43 +71,40 @@ PointCloudXyziNode::PointCloudXyziNode(const rclcpp::NodeOptions & options)
       std::placeholders::_2,
       std::placeholders::_3));
 
-  // Create publisher with connect callback
-  rclcpp::PublisherOptions pub_options;
-  pub_options.event_callbacks.matched_callback =
-    [this](rclcpp::MatchedInfo & s)
-    {
-      std::lock_guard<std::mutex> lock(connect_mutex_);
-      if (s.current_count == 0) {
-        sub_depth_.unsubscribe();
-        sub_intensity_.unsubscribe();
-        sub_info_.unsubscribe();
-      } else if (!sub_depth_.getSubscriber()) {
-        // For compressed topics to remap appropriately, we need to pass a
-        // fully expanded and remapped topic name to image_transport
-        auto node_base = this->get_node_base_interface();
-        std::string depth_topic =
-          node_base->resolve_topic_or_service_name("depth/image_rect", false);
-        std::string intensity_topic =
-          node_base->resolve_topic_or_service_name("intensity/image_rect", false);
-        // Allow also remapping camera_info to something different than default
-        std::string intensity_info_topic =
-          node_base->resolve_topic_or_service_name(
-          image_transport::getCameraInfoTopic(intensity_topic), false);
+  // Monitor whether anyone is subscribed to the output
+  // TODO(ros2) Implement when SubscriberStatusCallback is available
+  // ros::SubscriberStatusCallback connect_cb = boost::bind(&PointCloudXyziNode::connectCb, this);
+  connectCb();
+  // Make sure we don't enter connectCb() between advertising and assigning to pub_point_cloud_
+  std::lock_guard<std::mutex> lock(connect_mutex_);
+  // TODO(ros2) Implement when SubscriberStatusCallback is available
+  // pub_point_cloud_ = depth_nh.advertise<PointCloud>("points", 1, connect_cb, connect_cb);
+  pub_point_cloud_ = create_publisher<PointCloud>("points", rclcpp::SensorDataQoS());
+}
 
-        // depth image can use different transport.(e.g. compressedDepth)
-        image_transport::TransportHints depth_hints(this, "raw", "depth_image_transport");
-        sub_depth_.subscribe(this, depth_topic, depth_hints.getTransport());
+// Handles (un)subscribing when clients (un)subscribe
+void PointCloudXyziNode::connectCb()
+{
+  std::lock_guard<std::mutex> lock(connect_mutex_);
+  // TODO(ros2) Implement getNumSubscribers when rcl/rmw support it
+  // if (pub_point_cloud_->getNumSubscribers() == 0)
+  if (0) {
+    sub_depth_.unsubscribe();
+    sub_intensity_.unsubscribe();
+    sub_info_.unsubscribe();
+  } else if (!sub_depth_.getSubscriber()) {
+    // parameter for depth_image_transport hint
+    std::string depth_image_transport_param = "depth_image_transport";
 
-        // intensity uses normal ros transport hints.
-        image_transport::TransportHints hints(this, "raw");
-        sub_intensity_.subscribe(this, intensity_topic, hints.getTransport());
-        sub_info_.subscribe(this, intensity_info_topic);
-      }
-    };
-  // Allow overriding QoS settings (history, depth, reliability)
-  pub_options.qos_overriding_options = rclcpp::QosOverridingOptions::with_default_policies();
-  pub_point_cloud_ = create_publisher<PointCloud>("points", rclcpp::SystemDefaultsQoS(),
-      pub_options);
+    // depth image can use different transport.(e.g. compressedDepth)
+    image_transport::TransportHints depth_hints(this, "raw", depth_image_transport_param);
+    sub_depth_.subscribe(this, "depth/image_rect", depth_hints.getTransport());
+
+    // intensity uses normal ros transport hints.
+    image_transport::TransportHints hints(this, "raw");
+    sub_intensity_.subscribe(this, "intensity/image_rect", hints.getTransport());
+    sub_info_.subscribe(this, "intensity/camera_info");
+  }
 }
 
 void PointCloudXyziNode::imageCb(
@@ -208,9 +198,9 @@ void PointCloudXyziNode::imageCb(
 
   // Convert Depth Image to Pointcloud
   if (depth_msg->encoding == enc::TYPE_16UC1) {
-    convertDepth<uint16_t>(depth_msg, cloud_msg, model_, invalid_depth_);
+    convertDepth<uint16_t>(depth_msg, cloud_msg, model_);
   } else if (depth_msg->encoding == enc::TYPE_32FC1) {
-    convertDepth<float>(depth_msg, cloud_msg, model_, invalid_depth_);
+    convertDepth<float>(depth_msg, cloud_msg, model_);
   } else {
     RCLCPP_ERROR(
       get_logger(), "Depth image has unsupported encoding [%s]", depth_msg->encoding.c_str());

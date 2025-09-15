@@ -2,17 +2,17 @@ name: Basic Build Workflow
 
 on:
   push:
-    branches: [jazzy]
+    branches: [humble]
   pull_request:
     types: [opened, reopened, synchronize]
 
 jobs:
-  build-jazzy:
+  build-humble:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
     container:
-      image: ros:jazzy-ros-core
+      image: ros:humble-ros-core
     steps:
     - name: Checkout repo
       uses: actions/checkout@v2

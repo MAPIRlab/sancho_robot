@@ -52,7 +52,7 @@
 #include <mutex>
 #include <string>
 
-#include "cv_bridge/cv_bridge.hpp"
+#include "cv_bridge/cv_bridge.h"
 #include "message_filters/subscriber.h"
 #include "message_filters/sync_policies/approximate_time.h"
 #include "message_filters/sync_policies/exact_time.h"
@@ -60,6 +60,7 @@
 
 #include "image_view/stereo_view_node.hpp"
 
+#include <boost/format.hpp>
 #include <opencv2/highgui/highgui.hpp>
 
 #include <rclcpp/rclcpp.hpp>
@@ -68,8 +69,6 @@
 #include <sensor_msgs/image_encodings.hpp>
 #include <sensor_msgs/msg/image.hpp>
 #include <stereo_msgs/msg/disparity_image.hpp>
-
-#include "utils.hpp"
 
 namespace image_view
 {
@@ -95,11 +94,11 @@ StereoViewNode::StereoViewNode(const rclcpp::NodeOptions & options)
   bool autosize = this->declare_parameter("autosize", true);
 
   this->declare_parameter<std::string>("filename_format", std::string("frame%04i.jpg"));
-  filename_format_ = this->get_parameter("filename_format").as_string();
+  std::string format_string = this->get_parameter("filename_format").as_string();
+  filename_format_.parse(format_string);
 
-  // TransportHints does not actually declare the parameter
-  this->declare_parameter<std::string>("image_transport", std::string("raw"));
-  image_transport::TransportHints hints(this);
+  this->declare_parameter<std::string>("transport", std::string("raw"));
+  std::string transport = this->get_parameter("transport").as_string();
 
   // Do GUI window setup
   int flags = autosize ? (cv::WINDOW_AUTOSIZE | cv::WINDOW_KEEPRATIO | cv::WINDOW_GUI_EXPANDED) : 0;
@@ -110,26 +109,24 @@ StereoViewNode::StereoViewNode(const rclcpp::NodeOptions & options)
   cv::setMouseCallback("right", &StereoViewNode::mouseCb, this);
   cv::setMouseCallback("disparity", &StereoViewNode::mouseCb, this);
 
-  // For compressed topics to remap appropriately, we need to pass a
-  // fully expanded and remapped topic name to image_transport
-  auto node_base = this->get_node_base_interface();
-  std::string stereo_ns = node_base->resolve_topic_or_service_name("stereo", false);
-  std::string image = node_base->resolve_topic_or_service_name("image", false);
+  // Resolve topic names
+  std::string stereo_ns = rclcpp::expand_topic_or_service_name(
+    "stereo", this->get_name(), this->get_namespace());
 
   std::string left_topic = rclcpp::expand_topic_or_service_name(
     stereo_ns + "/left" + rclcpp::expand_topic_or_service_name(
-      image, this->get_name(), this->get_namespace()),
+      "image", this->get_name(), this->get_namespace()),
     this->get_name(), this->get_namespace());
   std::string right_topic = rclcpp::expand_topic_or_service_name(
     stereo_ns + "/right" + rclcpp::expand_topic_or_service_name(
-      image, this->get_name(), this->get_namespace()),
+      "image", this->get_name(), this->get_namespace()),
     this->get_name(), this->get_namespace());
   std::string disparity_topic = rclcpp::expand_topic_or_service_name(
     stereo_ns + "/disparity", this->get_name(), this->get_namespace());
 
   // Subscribe to three input topics.
-  left_sub_.subscribe(this, left_topic, hints.getTransport());
-  right_sub_.subscribe(this, right_topic, hints.getTransport());
+  left_sub_.subscribe(this, left_topic, transport);
+  right_sub_.subscribe(this, right_topic, transport);
   disparity_sub_.subscribe(this, disparity_topic);
 
   RCLCPP_INFO(
@@ -266,7 +263,7 @@ void StereoViewNode::imageCb(
 void StereoViewNode::saveImage(const char * prefix, const cv::Mat & image)
 {
   if (!image.empty()) {
-    std::string filename = string_format(filename_format_, prefix, save_count_);
+    std::string filename = (filename_format_ % prefix % save_count_).str();
     cv::imwrite(filename, image);
     RCLCPP_INFO(this->get_logger(), "Saved image %s", filename.c_str());
   } else {

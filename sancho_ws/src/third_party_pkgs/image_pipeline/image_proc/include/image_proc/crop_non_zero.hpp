@@ -34,7 +34,6 @@
 #define IMAGE_PROC__CROP_NON_ZERO_HPP_
 
 #include <mutex>
-#include <string>
 
 #include <image_transport/image_transport.hpp>
 #include <rclcpp/rclcpp.hpp>
@@ -49,8 +48,6 @@ public:
   explicit CropNonZeroNode(const rclcpp::NodeOptions &);
 
 private:
-  std::string image_topic_;
-
   // Subscriptions
   image_transport::Subscriber sub_raw_;
 

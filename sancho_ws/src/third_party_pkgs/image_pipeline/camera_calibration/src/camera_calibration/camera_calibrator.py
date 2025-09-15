@@ -86,7 +86,7 @@ class ConsumerThread(threading.Thread):
         self.function = function
 
     def run(self):
-        while rclpy.ok():
+        while True:
             m = self.queue.get()
             self.function(m)
 
@@ -97,24 +97,27 @@ class CalibrationNode(Node):
                  max_chessboard_speed = -1, queue_size = 1):
         super().__init__(name)
 
-        self.set_camera_info_service = self.create_client(sensor_msgs.srv.SetCameraInfo, "camera/set_camera_info")
-        self.set_left_camera_info_service = self.create_client(sensor_msgs.srv.SetCameraInfo, "left_camera/set_camera_info")
-        self.set_right_camera_info_service = self.create_client(sensor_msgs.srv.SetCameraInfo, "right_camera/set_camera_info")
+        self.set_camera_info_service = self.create_client(sensor_msgs.srv.SetCameraInfo,
+                                                          "camera/set_camera_info")
+        self.set_left_camera_info_service = self.create_client(sensor_msgs.srv.SetCameraInfo,
+                                                               "left_camera/set_camera_info")
+        self.set_right_camera_info_service = self.create_client(sensor_msgs.srv.SetCameraInfo,
+                                                                "right_camera/set_camera_info")
 
         if service_check:
-            available = False
             # assume any non-default service names have been set.  Wait for the service to become ready
             for cli in [self.set_camera_info_service, self.set_left_camera_info_service, self.set_right_camera_info_service]:
+                #remapped = rclpy.remap_name(svcname)
+                #if remapped != svcname:
+                #fullservicename = "%s/set_camera_info" % remapped
                 print("Waiting for service", cli.srv_name, "...")
                 # check all services so they are ready.
-                if cli.wait_for_service(timeout_sec=1):
-                    available = True
+                try:
+                    cli.wait_for_service(timeout_sec=5)
                     print("OK")
-                else:
-                    print(f"Service {cli.srv_name} not found.")
-
-            if not available:
-                raise RuntimeError("no camera service available")
+                except Exception as e:
+                    print("Service not found: %s".format(e))
+                    rclpy.shutdown()
 
         self._boards = boards
         self._calib_flags = flags
@@ -165,7 +168,7 @@ class CalibrationNode(Node):
                                         max_chessboard_speed = self._max_chessboard_speed)
             else:
                 self.c = MonoCalibrator(self._boards, self._calib_flags, self._fisheye_calib_flags, self._pattern,
-                                        checkerboard_flags=self._checkerboard_flags,
+                                        checkerboard_flags=self.checkerboard_flags,
                                         max_chessboard_speed = self._max_chessboard_speed)
 
         # This should just call the MonoCalibrator
@@ -259,9 +262,10 @@ class OpenCVCalibrationNode(CalibrationNode):
 
     def spin(self):
         sth = SpinThread(self)
+        sth.setDaemon(True)
         sth.start()
 
-        while rclpy.ok():
+        while True:
             if self.queue_display.qsize() > 0:
                 self.image = self.queue_display.get()
                 cv2.imshow("display", self.image)
@@ -269,7 +273,7 @@ class OpenCVCalibrationNode(CalibrationNode):
                 time.sleep(0.1)
             k = cv2.waitKey(6) & 0xFF
             if k in [27, ord('q')]:
-                return
+                rclpy.shutdown()
             elif k == ord('s') and self.image is not None:
                 self.screendump(self.image)
 
@@ -292,8 +296,7 @@ class OpenCVCalibrationNode(CalibrationNode):
             if self.c.goodenough:
                 if 180 <= y < 280:
                     print("**** Calibrating ****")
-                    # Perform calibration in another thread to prevent UI blocking
-                    threading.Thread(target=self.c.do_calibration, name="Calibration").start()
+                    self.c.do_calibration()
                     self.buttons(self._last_display)
                     self.queue_display.put(self._last_display)
             if self.c.calibrated:
@@ -308,6 +311,9 @@ class OpenCVCalibrationNode(CalibrationNode):
             print("Cannot change camera model until the first image has been received")
             return
 
+        self.c.set_cammodel( CAMERA_MODEL.PINHOLE if model_select_val < 0.5 else CAMERA_MODEL.FISHEYE)
+
+    def on_model_change(self, model_select_val):
         self.c.set_cammodel( CAMERA_MODEL.PINHOLE if model_select_val < 0.5 else CAMERA_MODEL.FISHEYE)
 
     def on_scale(self, scalevalue):

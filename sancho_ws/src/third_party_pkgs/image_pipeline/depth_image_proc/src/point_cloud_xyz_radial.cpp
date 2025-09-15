@@ -33,13 +33,11 @@
 #include <functional>
 #include <memory>
 #include <mutex>
-#include <string>
 
-#include "image_geometry/pinhole_camera_model.hpp"
+#include "image_geometry/pinhole_camera_model.h"
 
 #include <depth_image_proc/point_cloud_xyz_radial.hpp>
 #include <rclcpp/rclcpp.hpp>
-#include <image_proc/utils.hpp>
 #include <image_transport/image_transport.hpp>
 #include <sensor_msgs/image_encodings.hpp>
 #include <depth_image_proc/depth_traits.hpp>
@@ -48,49 +46,47 @@
 namespace depth_image_proc
 {
 
+
 PointCloudXyzRadialNode::PointCloudXyzRadialNode(const rclcpp::NodeOptions & options)
 : rclcpp::Node("PointCloudXyzRadialNode", options)
 {
-  // TransportHints does not actually declare the parameter
-  this->declare_parameter<std::string>("depth_image_transport", "raw");
-
   // Read parameters
   queue_size_ = this->declare_parameter<int>("queue_size", 5);
 
-  // Setup lazy subscriber using publisher connection callback
-  rclcpp::PublisherOptions pub_options;
-  pub_options.event_callbacks.matched_callback =
-    [this](rclcpp::MatchedInfo & s)
-    {
-      std::lock_guard<std::mutex> lock(connect_mutex_);
-      if (s.current_count == 0) {
-        sub_depth_.shutdown();
-      } else if (!sub_depth_) {
-        // For compressed topics to remap appropriately, we need to pass a
-        // fully expanded and remapped topic name to image_transport
-        auto node_base = this->get_node_base_interface();
-        std::string topic = node_base->resolve_topic_or_service_name("depth/image_raw", false);
-        // Get transport hints
-        image_transport::TransportHints depth_hints(this, "raw", "depth_image_transport");
-        // Create subscriber with QoS matched to subscribed topic publisher
-        auto qos_profile = image_proc::getTopicQosProfile(this, topic);
-        qos_profile.depth = queue_size_;
-        // Create subscriber
-        sub_depth_ = image_transport::create_camera_subscription(
-          this,
-          topic,
-          std::bind(
-            &PointCloudXyzRadialNode::depthCb, this, std::placeholders::_1,
-            std::placeholders::_2),
-          depth_hints.getTransport(),
-          qos_profile);
-      }
-    };
-
-  // Allow overriding QoS settings (history, depth, reliability)
-  pub_options.qos_overriding_options = rclcpp::QosOverridingOptions::with_default_policies();
+  // Monitor whether anyone is subscribed to the output
+  // TODO(ros2) Implement when SubscriberStatusCallback is available
+  // ros::SubscriberStatusCallback connect_cb =
+  //   boost::bind(&PointCloudXyzRadialNode::connectCb, this);
+  connectCb();
+  // Make sure we don't enter connectCb() between advertising and assigning to pub_point_cloud_
+  std::lock_guard<std::mutex> lock(connect_mutex_);
+  // TODO(ros2) Implement when SubscriberStatusCallback is available
+  // pub_point_cloud_ = nh.advertise<PointCloud>("points", 1, connect_cb, connect_cb);
   pub_point_cloud_ = create_publisher<sensor_msgs::msg::PointCloud2>(
-    "points", rclcpp::SystemDefaultsQoS(), pub_options);
+    "points", rclcpp::SensorDataQoS());
+}
+
+// Handles (un)subscribing when clients (un)subscribe
+void PointCloudXyzRadialNode::connectCb()
+{
+  std::lock_guard<std::mutex> lock(connect_mutex_);
+  // TODO(ros2) Implement getNumSubscribers when rcl/rmw support it
+  // if (pub_point_cloud_.getNumSubscribers() == 0)
+  if (0) {
+    sub_depth_.shutdown();
+  } else if (!sub_depth_) {
+    auto custom_qos = rmw_qos_profile_system_default;
+    custom_qos.depth = queue_size_;
+
+    sub_depth_ = image_transport::create_camera_subscription(
+      this,
+      "image_raw",
+      std::bind(
+        &PointCloudXyzRadialNode::depthCb, this, std::placeholders::_1,
+        std::placeholders::_2),
+      "raw",
+      custom_qos);
+  }
 }
 
 void PointCloudXyzRadialNode::depthCb(

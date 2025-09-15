@@ -32,13 +32,11 @@
 
 #include <functional>
 #include <mutex>
-#include <string>
 
-#include "cv_bridge/cv_bridge.hpp"
+#include "cv_bridge/cv_bridge.h"
 #include "depth_image_proc/visibility.h"
 
 #include <rclcpp/rclcpp.hpp>
-#include <image_proc/utils.hpp>
 #include <image_transport/image_transport.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 
@@ -60,6 +58,8 @@ private:
   std::mutex connect_mutex_;
   image_transport::Publisher pub_depth_;
 
+  void connectCb();
+
   void depthCb(const sensor_msgs::msg::Image::ConstSharedPtr & raw_msg);
 
   double distance_;
@@ -70,45 +70,35 @@ private:
 CropForemostNode::CropForemostNode(const rclcpp::NodeOptions & options)
 : Node("CropForemostNode", options)
 {
-  // TransportHints does not actually declare the parameter
-  this->declare_parameter<std::string>("image_transport", "raw");
-
   distance_ = this->declare_parameter("distance", 0.0);
 
+  // Monitor whether anyone is subscribed to the output
+  // TODO(ros2) Implement when SubscriberStatusCallback is available
+  // image_transport::SubscriberStatusCallback connect_cb =
+  //   std::bind(&CropForemostNode::connectCb, this);
+  connectCb();
+  // Make sure we don't enter connectCb() between advertising and assigning to pub_depth_
+  std::lock_guard<std::mutex> lock(connect_mutex_);
+  // TODO(ros2) Implement when SubscriberStatusCallback is available
+  // pub_depth_ = it_->advertise("image", 1, connect_cb, connect_cb);
+  pub_depth_ = image_transport::create_publisher(this, "image");
+}
 
-  // Setup lazy subscriber using publisher connection callback
-  rclcpp::PublisherOptions pub_options;
-  pub_options.event_callbacks.matched_callback =
-    [this](rclcpp::MatchedInfo &)
-    {
-      std::lock_guard<std::mutex> lock(connect_mutex_);
-      if (pub_depth_.getNumSubscribers() == 0) {
-        sub_raw_.shutdown();
-      } else if (!sub_raw_) {
-        // For compressed topics to remap appropriately, we need to pass a
-        // fully expanded and remapped topic name to image_transport
-        auto node_base = this->get_node_base_interface();
-        std::string topic = node_base->resolve_topic_or_service_name("image_raw", false);
-        // Get transport hints
-        image_transport::TransportHints hints(this);
-        // Create publisher with same QoS as subscribed topic publisher
-        auto qos_profile = image_proc::getTopicQosProfile(this, topic);
-        sub_raw_ = image_transport::create_subscription(
-          this, topic,
-          std::bind(&CropForemostNode::depthCb, this, std::placeholders::_1),
-          hints.getTransport(),
-          qos_profile);
-      }
-    };
-  // For compressed topics to remap appropriately, we need to pass a
-  // fully expanded and remapped topic name to image_transport
-  auto node_base = this->get_node_base_interface();
-  std::string topic = node_base->resolve_topic_or_service_name("image", false);
-
-  // Create publisher - allow overriding QoS settings (history, depth, reliability)
-  pub_options.qos_overriding_options = rclcpp::QosOverridingOptions::with_default_policies();
-  pub_depth_ = image_transport::create_publisher(this, topic, rmw_qos_profile_default,
-    pub_options);
+// Handles (un)subscribing when clients (un)subscribe
+void CropForemostNode::connectCb()
+{
+  std::lock_guard<std::mutex> lock(connect_mutex_);
+  // TODO(ros2) Implement getNumSubscribers when rcl/rmw support it
+  // if (pub_depth_.getNumSubscribers() == 0)
+  if (0) {
+    sub_raw_.shutdown();
+  } else if (!sub_raw_) {
+    image_transport::TransportHints hints(this, "raw");
+    sub_raw_ = image_transport::create_subscription(
+      this, "image_raw",
+      std::bind(&CropForemostNode::depthCb, this, std::placeholders::_1),
+      hints.getTransport());
+  }
 }
 
 void CropForemostNode::depthCb(const sensor_msgs::msg::Image::ConstSharedPtr & raw_msg)

@@ -86,33 +86,30 @@ rclcpp_components_register_node(crop_non_zero
   EXECUTABLE crop_non_zero_node
 )
 
-# track_marker component and node
-ament_auto_add_library(track_marker SHARED
-  src/track_marker.cpp
+# image_proc example node
+ament_auto_add_executable(image_proc_exe
+  src/image_proc.cpp
 )
-target_compile_definitions(track_marker
-  PRIVATE "COMPOSITION_BUILDING_DLL"
+target_link_libraries(image_proc_exe
+  debayer
+  rectify
+  ament_index_cpp::ament_index_cpp
 )
-rclcpp_components_register_node(track_marker
-  PLUGIN "image_proc::TrackMarkerNode"
-  EXECUTABLE track_marker_node
-)
+set_target_properties(image_proc_exe PROPERTIES OUTPUT_NAME image_proc)
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   target_link_libraries(image_proc "stdc++fs")
 endif()
 
+install(TARGETS image_proc_exe
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
+)
+
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   ament_lint_auto_find_test_dependencies()
-
-  add_definitions(-D_SRC_RESOURCES_DIR_PATH="${CMAKE_CURRENT_SOURCE_DIR}/test/resources")
-
-  find_package(ament_cmake_gtest)
-  ament_auto_add_gtest(test_rectify test/test_rectify.cpp)
-
-  find_package(ament_cmake_gtest)
-  ament_auto_add_gtest(rostest test/rostest.cpp)
 endif()
 
 ament_auto_package(INSTALL_TO_SHARE launch)

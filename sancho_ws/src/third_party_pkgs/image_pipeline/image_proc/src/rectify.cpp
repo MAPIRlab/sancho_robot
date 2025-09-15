@@ -32,9 +32,8 @@
 
 #include <functional>
 #include <mutex>
-#include <string>
 
-#include "cv_bridge/cv_bridge.hpp"
+#include "cv_bridge/cv_bridge.h"
 #include "tracetools_image_pipeline/tracetools.h"
 
 #include <image_proc/rectify.hpp>
@@ -52,79 +51,96 @@ namespace image_proc
 RectifyNode::RectifyNode(const rclcpp::NodeOptions & options)
 : rclcpp::Node("RectifyNode", options)
 {
-  // TransportHints does not actually declare the parameter
-  this->declare_parameter<std::string>("image_transport", "raw");
-
-  // For compressed topics to remap appropriately, we need to pass a
-  // fully expanded and remapped topic name to image_transport
-  auto node_base = this->get_node_base_interface();
-  image_topic_ = node_base->resolve_topic_or_service_name("image", false);
-
+  auto qos_profile = getTopicQosProfile(this, "image");
   queue_size_ = this->declare_parameter("queue_size", 5);
-  interpolation_ = this->declare_parameter("interpolation", 1);
-
-  // Setup lazy subscriber using publisher connection callback
-  rclcpp::PublisherOptions pub_options;
-  pub_options.event_callbacks.matched_callback =
-    [this](rclcpp::MatchedInfo &)
-    {
-      if (pub_rect_.getNumSubscribers() == 0) {
-        sub_camera_.shutdown();
-      } else if (!sub_camera_) {
-        // Create subscriber with QoS matched to subscribed topic publisher
-        auto qos_profile = getTopicQosProfile(this, image_topic_);
-        image_transport::TransportHints hints(this);
-        sub_camera_ = image_transport::create_camera_subscription(
-          this, image_topic_, std::bind(
-            &RectifyNode::imageCb,
-            this, std::placeholders::_1, std::placeholders::_2), hints.getTransport(), qos_profile);
-      }
-    };
-
-  // Create publisher - allow overriding QoS settings (history, depth, reliability)
-  pub_options.qos_overriding_options = rclcpp::QosOverridingOptions::with_default_policies();
-  pub_rect_ = image_transport::create_publisher(this, "image_rect", rmw_qos_profile_default,
-      pub_options);
+  interpolation = this->declare_parameter("interpolation", 1);
+  pub_rect_ = image_transport::create_publisher(this, "image_rect");
+  subscribeToCamera(qos_profile);
 }
 
-void RectifyNode::imageCb(
-  const sensor_msgs::msg::Image::ConstSharedPtr & image_msg,
-  const sensor_msgs::msg::CameraInfo::ConstSharedPtr & info_msg)
+// Handles (un)subscribing when clients (un)subscribe
+void RectifyNode::subscribeToCamera(const rmw_qos_profile_t & qos_profile)
+{
+  std::lock_guard<std::mutex> lock(connect_mutex_);
+
+  /*
+  *  SubscriberStatusCallback not yet implemented
+  *
+  if (pub_rect_.getNumSubscribers() == 0)
+    sub_camera_.shutdown();
+  else if (!sub_camera_)
+  {
+  */
+  // Subscribe image without requiring synchronized CameraInfo
+  sub_image_ = image_transport::create_subscription(
+    this, "image",
+    std::bind(&RectifyNode::imageCb, this, std::placeholders::_1),
+    "raw", qos_profile);
+
+  // Subscribe camera info with SensorDataQoS and cache the first message
+  auto info_qos = rclcpp::SensorDataQoS();
+  sub_info_ = this->create_subscription<sensor_msgs::msg::CameraInfo>(
+    "camera_info", info_qos,
+    std::bind(&RectifyNode::infoCb, this, std::placeholders::_1));
+  // }
+}
+
+void RectifyNode::infoCb(const sensor_msgs::msg::CameraInfo::ConstSharedPtr & info_msg)
+{
+  // Cache only the first CameraInfo to avoid timestamp sync waits
+  if (!cached_info_) {
+    cached_info_ = std::make_shared<sensor_msgs::msg::CameraInfo>(*info_msg);
+    model_.fromCameraInfo(cached_info_);
+    RCLCPP_INFO(this->get_logger(), "CameraInfo cacheado: %ux%u", cached_info_->width, cached_info_->height);
+  }
+}
+
+void RectifyNode::imageCb(const sensor_msgs::msg::Image::ConstSharedPtr & image_msg)
 {
   TRACEPOINT(
     image_proc_rectify_init,
     static_cast<const void *>(this),
     static_cast<const void *>(&(*image_msg)),
-    static_cast<const void *>(&(*info_msg)));
+    nullptr);
 
   if (pub_rect_.getNumSubscribers() < 1) {
     TRACEPOINT(
       image_proc_rectify_fini,
       static_cast<const void *>(this),
       static_cast<const void *>(&(*image_msg)),
-      static_cast<const void *>(&(*info_msg)));
+      nullptr);
 
     return;
   }
 
-  // Verify camera is actually calibrated
-  if (info_msg->k[0] == 0.0) {
-    RCLCPP_ERROR(
-      this->get_logger(), "Rectified topic '%s' requested but camera publishing '%s' "
-      "is uncalibrated", pub_rect_.getTopic().c_str(), sub_camera_.getInfoTopic().c_str());
+  // Require cached CameraInfo and verify calibration
+  if (!cached_info_) {
+    RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 3000, "Esperando CameraInfo inicial...");
     TRACEPOINT(
       image_proc_rectify_fini,
       static_cast<const void *>(this),
       static_cast<const void *>(&(*image_msg)),
-      static_cast<const void *>(&(*info_msg)));
+      nullptr);
+    return;
+  }
+
+  if (cached_info_->k[0] == 0.0) {
+    RCLCPP_ERROR(
+      this->get_logger(), "Rectified topic '%s' requested but camera publishing '%s' "
+      "is uncalibrated", pub_rect_.getTopic().c_str(), "camera_info");
+    TRACEPOINT(
+      image_proc_rectify_fini,
+      static_cast<const void *>(this),
+      static_cast<const void *>(&(*image_msg)),
+      nullptr);
     return;
   }
 
   // If zero distortion, just pass the message along
   bool zero_distortion = true;
 
-  for (size_t i = 0; i < info_msg->d.size(); ++i) {
-    if (info_msg->d[i] != 0.0) {
+  for (size_t i = 0; i < cached_info_->d.size(); ++i) {
+    if (cached_info_->d[i] != 0.0) {
       zero_distortion = false;
       break;
     }
@@ -137,19 +153,18 @@ void RectifyNode::imageCb(
       image_proc_rectify_fini,
       static_cast<const void *>(this),
       static_cast<const void *>(&(*image_msg)),
-      static_cast<const void *>(&(*info_msg)));
+      nullptr);
     return;
   }
 
-  // Update the camera model
-  model_.fromCameraInfo(info_msg);
+  // Camera model already set from cached_info_
 
   // Create cv::Mat views onto both buffers
   const cv::Mat image = cv_bridge::toCvShare(image_msg)->image;
   cv::Mat rect;
 
   // Rectify and publish
-  model_.rectifyImage(image, rect, interpolation_);
+  model_.rectifyImage(image, rect, interpolation);
 
   // Allocate new rectified image message
   sensor_msgs::msg::Image::SharedPtr rect_msg =
@@ -160,7 +175,7 @@ void RectifyNode::imageCb(
     image_proc_rectify_fini,
     static_cast<const void *>(this),
     static_cast<const void *>(&(*image_msg)),
-    static_cast<const void *>(&(*info_msg)));
+    nullptr);
 }
 
 }  // namespace image_proc

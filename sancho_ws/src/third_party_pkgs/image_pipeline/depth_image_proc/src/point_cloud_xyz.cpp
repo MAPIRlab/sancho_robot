@@ -33,14 +33,12 @@
 #include <functional>
 #include <memory>
 #include <mutex>
-#include <string>
 
 #include "depth_image_proc/visibility.h"
-#include "image_geometry/pinhole_camera_model.hpp"
+#include "image_geometry/pinhole_camera_model.h"
 
 #include <depth_image_proc/point_cloud_xyz.hpp>
 #include <rclcpp/rclcpp.hpp>
-#include <image_proc/utils.hpp>
 #include <image_transport/image_transport.hpp>
 #include <sensor_msgs/image_encodings.hpp>
 #include <depth_image_proc/conversions.hpp>
@@ -53,58 +51,47 @@ namespace depth_image_proc
 PointCloudXyzNode::PointCloudXyzNode(const rclcpp::NodeOptions & options)
 : Node("PointCloudXyzNode", options)
 {
-  // TransportHints does not actually declare the parameter
-  this->declare_parameter<std::string>("depth_image_transport", "raw");
-
   // Read parameters
   queue_size_ = this->declare_parameter<int>("queue_size", 5);
 
-  // values used for invalid points for pcd conversion
-  invalid_depth_ = this->declare_parameter<double>("invalid_depth", 0.0);
+  // Monitor whether anyone is subscribed to the output
+  // TODO(ros2) Implement when SubscriberStatusCallback is available
+  // ros::SubscriberStatusCallback connect_cb = boost::bind(&PointCloudXyzNode::connectCb, this);
+  connectCb();
 
-  // Create publisher with connect callback
-  rclcpp::PublisherOptions pub_options;
-  pub_options.event_callbacks.matched_callback =
-    [this](rclcpp::MatchedInfo & s)
-    {
-      std::lock_guard<std::mutex> lock(connect_mutex_);
-      if (s.current_count == 0) {
-        sub_depth_.shutdown();
-      } else if (!sub_depth_) {
-        // For compressed topics to remap appropriately, we need to pass a
-        // fully expanded and remapped topic name to image_transport
-        auto node_base = this->get_node_base_interface();
-        std::string topic = node_base->resolve_topic_or_service_name("image_rect", false);
+  // Make sure we don't enter connectCb() between advertising and assigning to pub_point_cloud_
+  std::lock_guard<std::mutex> lock(connect_mutex_);
+  // TODO(ros2) Implement when SubscriberStatusCallback is available
+  // pub_point_cloud_ = nh.advertise<PointCloud>("points", 1, connect_cb, connect_cb);
+  pub_point_cloud_ = create_publisher<PointCloud2>("points", rclcpp::SensorDataQoS());
+}
 
-        // Get transport hints
-        image_transport::TransportHints depth_hints(this, "raw", "depth_image_transport");
+// Handles (un)subscribing when clients (un)subscribe
+void PointCloudXyzNode::connectCb()
+{
+  std::lock_guard<std::mutex> lock(connect_mutex_);
+  // TODO(ros2) Implement getNumSubscribers when rcl/rmw support it
+  // if (pub_point_cloud_->getNumSubscribers() == 0)
+  if (0) {
+    sub_depth_.shutdown();
+  } else if (!sub_depth_) {
+    auto custom_qos = rmw_qos_profile_system_default;
+    custom_qos.depth = queue_size_;
 
-        // Create subscriber with QoS matched to subscribed topic publisher
-        auto qos_profile = image_proc::getTopicQosProfile(this, topic);
-        qos_profile.depth = queue_size_;
-
-        sub_depth_ = image_transport::create_camera_subscription(
-          this,
-          topic,
-          std::bind(
-            &PointCloudXyzNode::depthCb, this, std::placeholders::_1,
-            std::placeholders::_2),
-          depth_hints.getTransport(),
-          qos_profile);
-      }
-    };
-
-  // Allow overriding QoS settings (history, depth, reliability)
-  pub_options.qos_overriding_options = rclcpp::QosOverridingOptions::with_default_policies();
-  pub_point_cloud_ =
-    create_publisher<PointCloud2>("points", rclcpp::SystemDefaultsQoS(), pub_options);
+    sub_depth_ = image_transport::create_camera_subscription(
+      this,
+      "image_rect",
+      std::bind(&PointCloudXyzNode::depthCb, this, std::placeholders::_1, std::placeholders::_2),
+      "raw",
+      custom_qos);
+  }
 }
 
 void PointCloudXyzNode::depthCb(
   const Image::ConstSharedPtr & depth_msg,
   const CameraInfo::ConstSharedPtr & info_msg)
 {
-  const PointCloud2::SharedPtr cloud_msg = std::make_shared<PointCloud2>();
+  auto cloud_msg = std::make_shared<PointCloud2>();
   cloud_msg->header = depth_msg->header;
   cloud_msg->height = depth_msg->height;
   cloud_msg->width = depth_msg->width;
@@ -119,9 +106,9 @@ void PointCloudXyzNode::depthCb(
 
   // Convert Depth Image to Pointcloud
   if (depth_msg->encoding == enc::TYPE_16UC1 || depth_msg->encoding == enc::MONO16) {
-    convertDepth<uint16_t>(depth_msg, cloud_msg, model_, invalid_depth_);
+    convertDepth<uint16_t>(depth_msg, cloud_msg, model_);
   } else if (depth_msg->encoding == enc::TYPE_32FC1) {
-    convertDepth<float>(depth_msg, cloud_msg, model_, invalid_depth_);
+    convertDepth<float>(depth_msg, cloud_msg, model_);
   } else {
     RCLCPP_ERROR(
       get_logger(), "Depth image has unsupported encoding [%s]", depth_msg->encoding.c_str());

@@ -76,13 +76,7 @@ def generate_test_description():
             output='screen',
             parameters=[{
                 'use_color': True,
-                'qos_overrides': {
-                    '/left/image_rect_color': {
-                        'subscription': {
-                            'reliability': 'reliable'
-                        }
-                    }
-                },
+                'use_system_default_qos': True
             }],
         ),
         # PointCloudNode (color disabled)
@@ -93,13 +87,7 @@ def generate_test_description():
             output='screen',
             parameters=[{
                 'use_color': False,
-                'qos_overrides': {
-                    '/left/image_rect_color': {
-                        'subscription': {
-                            'reliability': 'reliable'
-                        }
-                    }
-                },
+                'use_system_default_qos': True
             }],
             remappings=[
                 ('/points2', '/xyz/points2'),

@@ -34,15 +34,13 @@
 #include <memory>
 #include <string>
 
-#include "image_geometry/stereo_camera_model.hpp"
+#include "image_geometry/stereo_camera_model.h"
 #include "message_filters/subscriber.h"
 #include "message_filters/synchronizer.h"
 #include "message_filters/sync_policies/approximate_time.h"
-#include "message_filters/sync_policies/approximate_epsilon_time.h"
 #include "message_filters/sync_policies/exact_time.h"
 #include "rcutils/logging_macros.h"
 
-#include <image_transport/camera_common.hpp>
 #include <image_transport/image_transport.hpp>
 #include <image_transport/subscriber_filter.hpp>
 #include <rclcpp/rclcpp.hpp>
@@ -75,17 +73,10 @@ private:
     sensor_msgs::msg::CameraInfo,
     sensor_msgs::msg::CameraInfo,
     stereo_msgs::msg::DisparityImage>;
-  using ApproximateEpsilonPolicy = message_filters::sync_policies::ApproximateEpsilonTime<
-    sensor_msgs::msg::Image,
-    sensor_msgs::msg::CameraInfo,
-    sensor_msgs::msg::CameraInfo,
-    stereo_msgs::msg::DisparityImage>;
   using ExactSync = message_filters::Synchronizer<ExactPolicy>;
   using ApproximateSync = message_filters::Synchronizer<ApproximatePolicy>;
-  using ApproximateEpsilonSync = message_filters::Synchronizer<ApproximateEpsilonPolicy>;
   std::shared_ptr<ExactSync> exact_sync_;
   std::shared_ptr<ApproximateSync> approximate_sync_;
-  std::shared_ptr<ApproximateEpsilonSync> approximate_epsilon_sync_;
 
   // Publications
   std::shared_ptr<rclcpp::Publisher<sensor_msgs::msg::PointCloud2>> pub_points2_;
@@ -93,6 +84,8 @@ private:
   // Processing state (note: only safe because we're single-threaded!)
   image_geometry::StereoCameraModel model_;
   cv::Mat_<cv::Vec3f> points_mat_;  // scratch buffer
+
+  void connectCb();
 
   void imageCb(
     const sensor_msgs::msg::Image::ConstSharedPtr & l_image_msg,
@@ -106,13 +99,10 @@ PointCloudNode::PointCloudNode(const rclcpp::NodeOptions & options)
 {
   using namespace std::placeholders;
 
-  // TransportHints does not actually declare the parameter
-  this->declare_parameter<std::string>("image_transport", "raw");
-
   // Declare/read parameters
   int queue_size = this->declare_parameter("queue_size", 5);
   bool approx = this->declare_parameter("approximate_sync", false);
-  double approx_sync_epsilon = this->declare_parameter("approximate_sync_tolerance_seconds", 0.0);
+  this->declare_parameter("use_system_default_qos", false);
   rcl_interfaces::msg::ParameterDescriptor descriptor;
   // TODO(ivanpauno): Confirm if using point cloud padding in `sensor_msgs::msg::PointCloud2`
   // can improve performance in some cases or not.
@@ -125,24 +115,13 @@ PointCloudNode::PointCloudNode(const rclcpp::NodeOptions & options)
 
   // Synchronize callbacks
   if (approx) {
-    if (0.0 == approx_sync_epsilon) {
-      approximate_sync_.reset(
-        new ApproximateSync(
-          ApproximatePolicy(queue_size),
-          sub_l_image_, sub_l_info_,
-          sub_r_info_, sub_disparity_));
-      approximate_sync_->registerCallback(
-        std::bind(&PointCloudNode::imageCb, this, _1, _2, _3, _4));
-    } else {
-      approximate_epsilon_sync_.reset(
-        new ApproximateEpsilonSync(
-          ApproximateEpsilonPolicy(
-            queue_size, rclcpp::Duration::from_seconds(approx_sync_epsilon)),
-          sub_l_image_, sub_l_info_,
-          sub_r_info_, sub_disparity_));
-      approximate_epsilon_sync_->registerCallback(
-        std::bind(&PointCloudNode::imageCb, this, _1, _2, _3, _4));
-    }
+    approximate_sync_.reset(
+      new ApproximateSync(
+        ApproximatePolicy(queue_size),
+        sub_l_image_, sub_l_info_,
+        sub_r_info_, sub_disparity_));
+    approximate_sync_->registerCallback(
+      std::bind(&PointCloudNode::imageCb, this, _1, _2, _3, _4));
   } else {
     exact_sync_.reset(
       new ExactSync(
@@ -153,50 +132,34 @@ PointCloudNode::PointCloudNode(const rclcpp::NodeOptions & options)
       std::bind(&PointCloudNode::imageCb, this, _1, _2, _3, _4));
   }
 
-  // Publisher options to allow reconfigurable qos settings and connect callback
+  // Update the publisher options to allow reconfigurable qos settings.
   rclcpp::PublisherOptions pub_opts;
   pub_opts.qos_overriding_options = rclcpp::QosOverridingOptions::with_default_policies();
-  pub_opts.event_callbacks.matched_callback =
-    [this](rclcpp::MatchedInfo & s)
-    {
-      if (s.current_count == 0) {
-        sub_l_image_.unsubscribe();
-        sub_l_info_.unsubscribe();
-        sub_r_info_.unsubscribe();
-        sub_disparity_.unsubscribe();
-      } else if (!sub_l_image_.getSubscriber()) {
-        // For compressed topics to remap appropriately, we need to pass a
-        // fully expanded and remapped topic name to image_transport
-        auto node_base = this->get_node_base_interface();
-        std::string left_topic =
-          node_base->resolve_topic_or_service_name("left/image_rect_color", false);
-        std::string right_topic =
-          node_base->resolve_topic_or_service_name("right/camera_info", false);
-        std::string disparity_topic =
-          node_base->resolve_topic_or_service_name("disparity", false);
-        // Allow also remapping camera_info to something different than default
-        std::string left_info_topic =
-          node_base->resolve_topic_or_service_name(
-          image_transport::getCameraInfoTopic(left_topic), false);
-
-        // REP-2003 specifies that subscriber should be SensorDataQoS
-        const auto sensor_data_qos = rclcpp::SensorDataQoS().get_rmw_qos_profile();
-
-        // Support image transport for compression
-        image_transport::TransportHints hints(this);
-
-        // Allow overriding QoS settings (history, depth, reliability)
-        auto sub_opts = rclcpp::SubscriptionOptions();
-        sub_opts.qos_overriding_options = rclcpp::QosOverridingOptions::with_default_policies();
-
-        sub_l_image_.subscribe(
-          this, left_topic, hints.getTransport(), sensor_data_qos, sub_opts);
-        sub_l_info_.subscribe(this, left_info_topic, sensor_data_qos, sub_opts);
-        sub_r_info_.subscribe(this, right_topic, sensor_data_qos, sub_opts);
-        sub_disparity_.subscribe(this, disparity_topic, sensor_data_qos, sub_opts);
-      }
-    };
   pub_points2_ = create_publisher<sensor_msgs::msg::PointCloud2>("points2", 1, pub_opts);
+
+  // TODO(jacobperron): Replace this with a graph event.
+  //                    Only subscribe if there's a subscription listening to our publisher.
+  connectCb();
+}
+
+// Handles (un)subscribing when clients (un)subscribe
+void PointCloudNode::connectCb()
+{
+  // TODO(jacobperron): Add unsubscribe logic when we use graph events
+  image_transport::TransportHints hints(this, "raw");
+  const bool use_system_default_qos = this->get_parameter("use_system_default_qos").as_bool();
+  rclcpp::QoS image_sub_qos = rclcpp::SensorDataQoS();
+  if (use_system_default_qos) {
+    image_sub_qos = rclcpp::SystemDefaultsQoS();
+  }
+  const auto image_sub_rmw_qos = image_sub_qos.get_rmw_qos_profile();
+  auto sub_opts = rclcpp::SubscriptionOptions();
+  sub_opts.qos_overriding_options = rclcpp::QosOverridingOptions::with_default_policies();
+  sub_l_image_.subscribe(
+    this, "left/image_rect_color", hints.getTransport(), image_sub_rmw_qos, sub_opts);
+  sub_l_info_.subscribe(this, "left/camera_info", image_sub_rmw_qos, sub_opts);
+  sub_r_info_.subscribe(this, "right/camera_info", image_sub_rmw_qos, sub_opts);
+  sub_disparity_.subscribe(this, "disparity", image_sub_rmw_qos, sub_opts);
 }
 
 inline bool isValidPoint(const cv::Vec3f & pt)

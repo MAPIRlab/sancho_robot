@@ -38,7 +38,7 @@
 #include <vector>
 
 #include "depth_image_proc/visibility.h"
-#include "image_geometry/pinhole_camera_model.hpp"
+#include "image_geometry/pinhole_camera_model.h"
 
 #include <image_transport/image_transport.hpp>
 #include <opencv2/core/mat.hpp>
@@ -72,6 +72,8 @@ private:
   uint32_t height_;
 
   cv::Mat transform_;
+
+  void connectCb();
 
   void depthCb(
     const sensor_msgs::msg::Image::ConstSharedPtr & depth_msg,
