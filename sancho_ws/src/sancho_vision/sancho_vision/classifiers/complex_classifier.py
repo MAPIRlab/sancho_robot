@@ -30,7 +30,7 @@ class ComplexClassifier:
                 was the closest to the given vector.
         '''
 
-        closest_faceprint = {}
+        closest_faceprint = { "id": "", "name": "" }
         closest_distance = 0.0
         position = 0
         for faceprint in self.db.get_all():

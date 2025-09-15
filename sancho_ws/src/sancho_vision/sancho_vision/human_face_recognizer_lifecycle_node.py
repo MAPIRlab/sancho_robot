@@ -144,11 +144,9 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
                 pos = pos,
                 face_updated = face_updated
             )
-
+            
             msg_out.recognitions.append(recog)
 
-        self.get_logger().info("No se ha reconocido a nadie" if len(msg_out.recognitions) == 0 else 
-            f"Se han reconocido {len(msg_out.recognitions)} personas: " + ", ".join([f"({r.classified_id})" for r in msg_out.recognitions]))
         self.get_logger().info(f"Hay {len(self.classifier.db.get_all_ids())} personas en la base de datos")
 
         self.pub_recog.publish(msg_out)
@@ -172,7 +170,7 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
         return response
 
     def recognize(self, frame, detections):
-        if isinstance(frame, Image):
+        if isinstance(frame, Image): # Normaliza el frame si viene como sensor_msgs/Image
             frame = self.bridge.imgmsg_to_cv2(frame, "bgr8")
 
         for det in detections:
@@ -183,16 +181,20 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
             features = self.encoder.encode_face(face_aligned)
             faceprint, distance, pos = self.classifier.classify_face(features)
 
-            if self.learn_without_name and (not faceprint or distance < 0.75): # Cambiar 
-                face = self.bridge.cv2_to_base64(face_aligned)
-                _, faceprint = self.classifier.add_class("", features, face, confidence)
-                distance = 1.0
-
-            face_updated = False
-            if confidence >= 1.0 and distance >= 0.9:
-                face_updated = self.classifier.save_face(faceprint["id"], face_aligned, 1)
+            face_updated = False # Ver si quitar esto de face_updated que no se para que es necesario
+            if confidence >= 1.0 and distance >= 0.90:
+                self.classifier.refine_class(faceprint["id"], features, pos)
+                face_updated = self.classifier.save_face(faceprint["id"], face_aligned, confidence)
                 if face_updated:
                     self.send_faceprint_event(FaceprintEvent.UPDATE, faceprint["id"], FaceprintEvent.ORIGIN_ROS)
+
+            if self.learn_without_name and confidence >= 1.0 and distance < 0.75: # Ir ajustando el valor de distance 
+                face = self.bridge.cv2_to_base64(face_aligned)
+                distance = 1.0
+
+                _, faceprint = self.classifier.add_class("", features, face, confidence)
+
+            self.get_logger().info(f"{faceprint['id'] or faceprint['name'] or 'Not classified'} -> Distance: {distance:.4f} | Confidence: {confidence:.4f}")
 
             yield face_aligned, features, faceprint, distance, pos, face_updated
 

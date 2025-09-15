@@ -9,6 +9,7 @@ from rclpy.executors import MultiThreadedExecutor
 
 from sensor_msgs.msg import Image
 from std_msgs.msg import String, Empty
+from std_srvs.srv import Empty as EmptySrv
 from hri_msgs.srv import Training, TriggerUserInteraction
 from hri_msgs.msg import Log, FaceNameResponse, FaceQuestionResponse
 from sancho_msgs.msg import FaceRecognitionArray
@@ -56,6 +57,7 @@ class HumanFaceManagerLifecycleNode(LifecycleNode):
 
         self.training_client = None
         self.gui_client = None
+        self.clear_no_name_client = None
 
         self.cb_group = ReentrantCallbackGroup()
 
@@ -89,6 +91,10 @@ class HumanFaceManagerLifecycleNode(LifecycleNode):
         while not self.gui_client.wait_for_service(timeout_sec=1.0):
             self.get_logger().info('GUI service not available, waiting again...')
 
+        self.clear_no_name_client = self.create_client(EmptySrv, "recognition/clear_no_name", callback_group=self.cb_group)
+        while not self.clear_no_name_client.wait_for_service(timeout_sec=1.0):
+            self.get_logger().info("Clear no name service not available, waiting again...")
+
         return super().on_configure(state)
 
     def on_activate(self, state) -> TransitionCallbackReturn:
@@ -105,6 +111,13 @@ class HumanFaceManagerLifecycleNode(LifecycleNode):
 
         self.face_timeout_response = False
         self.spin_timer = self.create_timer(1.0 / self.processing_rate, self.human_face_manager.spin, callback_group=self.cb_group)
+
+        try:
+            clear_future = self.clear_no_name_client.call_async(EmptySrv.Request())
+            clear_future.add_done_callback(lambda: self.get_logger().info("Clear no name completado correctamente."))
+            self.get_logger().info("Clear no name enviado.")
+        except Exception as e:
+            self.get_logger().error(f"Error al llamar al servicio clear no name: {e}")
 
         return super().on_activate(state)
 
@@ -204,7 +217,7 @@ class HumanFaceManager:
                 classified_name = None
                 classified_id = None
 
-                if score >= 1 and self.ask_unknowns: # Si la imagen es buena, pregunta por el nombre, para que no coja una imagen mala
+                if score >= 1.0 and self.ask_unknowns: # Si la imagen es buena, pregunta por el nombre, para que no coja una imagen mala
                     if not self.gui_request_sent_info: # Si no hay ninguna cosa enviada
                         face_aligned_base64 = self.node.bridge.cv2_to_base64(face_aligned)
                         if self.gui_request("get_name", json.dumps({"image": face_aligned_base64})):
@@ -214,7 +227,7 @@ class HumanFaceManager:
                             self.node.get_logger().info("Error al enviar una petición de nombre a la GUI")
 
             elif distance < self.MIDDLE_BOUND: # Cree que es alguien, pide confirmacion
-                if score >= 1 and self.ask_unknowns: # Pero solo si la foto es buena
+                if score >= 1.0 and self.ask_unknowns: # Pero solo si la foto es buena
                     if not self.gui_request_sent_info:
                         face_aligned_base64 = self.node.bridge.cv2_to_base64(face_aligned)
                         if self.gui_request("ask_if_name", json.dumps({"image": face_aligned_base64, "name": classified_name})):
@@ -227,18 +240,9 @@ class HumanFaceManager:
                 self.people.process_detection(classified_id, score, distance)
             else: # Reconoce perfectamente
                 if self.people.get_last_seen(classified_id) > 60:
-                    self.read_text("Bienvenido de vuelta " + classified_name)
+                    self.read_text("Bienvenido de vuelta " + classified_name) # Movido lo de promediar al reconocedor
 
                 self.people.process_detection(classified_id, score, distance)
-
-                output, message = self.training_request(String(data="refine_class"), String(data=json.dumps({
-                    "class_id": classified_id,
-                    "features": features,
-                    "position": pos
-                }))) # Refinamos la clase
-
-                if output < 0:
-                    self.node.get_logger().info(f">> ERROR: Al refinar una clase: {message}")
 
             mark_face(frame, [det.corner.x, det.corner.y, det.width, det.height], distance, self.MIDDLE_BOUND, self.UPPER_BOUND, classified=classified_name, 
                       drawRectangle=self.draw_rectangle, score=score, showDistance=self.show_distance, showScore=self.show_score) # TODO: mover a recognizer
