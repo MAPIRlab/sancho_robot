@@ -4,7 +4,10 @@ from queue import Queue
 import rclpy
 from rclpy.lifecycle import LifecycleNode, TransitionCallbackReturn
 from rclpy.qos import QoSProfile
+from rclpy.callback_groups import ReentrantCallbackGroup
+from rclpy.executors import MultiThreadedExecutor
 
+from sensor_msgs.msg import Image
 from std_msgs.msg import String, Empty
 from hri_msgs.srv import Training, TriggerUserInteraction
 from hri_msgs.msg import Log, FaceNameResponse, FaceQuestionResponse
@@ -19,7 +22,7 @@ from .hri_bridge import HRIBridge
 class HumanFaceManagerLifecycleNode(LifecycleNode):
     def __init__(self):
         super().__init__("human_face_manager")
-
+        
         self.human_face_manager = HumanFaceManager(self)
 
         self.declare_parameters(namespace="", parameters=[
@@ -54,6 +57,8 @@ class HumanFaceManagerLifecycleNode(LifecycleNode):
         self.training_client = None
         self.gui_client = None
 
+        self.cb_group = ReentrantCallbackGroup()
+
     def on_configure(self, state) -> TransitionCallbackReturn:
         self.get_logger().info("Configurando nodo manejador de rostros...")
 
@@ -72,15 +77,15 @@ class HumanFaceManagerLifecycleNode(LifecycleNode):
         qos10 = QoSProfile(depth=10)
         qos1 = QoSProfile(depth=1)
         self.pub_log = self.create_lifecycle_publisher(Log, self.logs_topic, qos10)
-        self.pub_recognition = self.create_lifecycle_publisher(String, self.camera_recognition_topic, qos1)
+        self.pub_recognition = self.create_lifecycle_publisher(Image, self.camera_recognition_topic, qos1)
         self.pub_people = self.create_lifecycle_publisher(String, self.people_topic, qos1)
         self.pub_input_tts = self.create_lifecycle_publisher(String, self.input_tts_topic, qos10)
 
-        self.training_client = self.create_client(Training, "recognition/training")
+        self.training_client = self.create_client(Training, "recognition/training", callback_group=self.cb_group)
         while not self.training_client.wait_for_service(timeout_sec=1.0):
             self.get_logger().info('Training service not available, waiting again...')
 
-        self.gui_client = self.create_client(TriggerUserInteraction, "gui/request")
+        self.gui_client = self.create_client(TriggerUserInteraction, "gui/request", callback_group=self.cb_group)
         while not self.gui_client.wait_for_service(timeout_sec=1.0):
             self.get_logger().info('GUI service not available, waiting again...')
 
@@ -89,13 +94,17 @@ class HumanFaceManagerLifecycleNode(LifecycleNode):
     def on_activate(self, state) -> TransitionCallbackReturn:
         qos10 = QoSProfile(depth=10)
         qos1 = QoSProfile(depth=1)
-        self.sub_face_name = self.create_subscription(FaceNameResponse, self.gui_face_name_response_topic, self.face_name_response_callback, qos10)
-        self.sub_face_question = self.create_subscription(FaceQuestionResponse, self.gui_face_question_response_topic, self.face_question_response_callback, qos10)
-        self.sub_face_timeout = self.create_subscription(Empty, self.gui_face_timeout_response_topic, self.face_timeout_response_callback, qos10)
-        self.sub_recognitions = self.create_subscription(FaceRecognitionArray, self.face_recognitions_topic, self.recognitions_callback, qos1)
+        self.sub_face_name = self.create_subscription(FaceNameResponse, 
+            self.gui_face_name_response_topic, self.face_name_response_callback, qos10, callback_group=self.cb_group)
+        self.sub_face_question = self.create_subscription(FaceQuestionResponse, 
+            self.gui_face_question_response_topic, self.face_question_response_callback, qos10, callback_group=self.cb_group)
+        self.sub_face_timeout = self.create_subscription(Empty, 
+            self.gui_face_timeout_response_topic, self.face_timeout_response_callback, qos10, callback_group=self.cb_group)
+        self.sub_recognitions = self.create_subscription(FaceRecognitionArray, 
+            self.face_recognitions_topic, self.recognitions_callback, qos1, callback_group=self.cb_group)
 
         self.face_timeout_response = False
-        self.spin_timer = self.create_timer(1.0 / self.processing_rate, self.human_face_manager.spin)
+        self.spin_timer = self.create_timer(1.0 / self.processing_rate, self.human_face_manager.spin, callback_group=self.cb_group)
 
         return super().on_activate(state)
 
@@ -314,15 +323,6 @@ class HumanFaceManager:
 
         return result.accepted
 
-    def get_actual_people_service(self, request, response):
-        actual_people_time = self.people.get_all_last_seen()
-        response.text = json.dumps(actual_people_time)
-        return response
-
-    def get_last_frame_service(self, request, response):
-        response.text = self.node.bridge.cv2_to_base64(self.last_frame, quality=100)
-        return response
-
     def read_text(self, text, asking_mode=""):
         self.node.get_logger().info(f"[SANCHO] {text}")
         self.node.pub_input_tts.publish(String(data=json.dumps({
@@ -344,8 +344,14 @@ class HumanFaceManager:
 
 def main(args=None):
     rclpy.init(args=args)
+    node = HumanFaceManagerLifecycleNode()
 
-    lifecycle_node = HumanFaceManagerLifecycleNode()
+    executor = MultiThreadedExecutor(num_threads=4)
+    executor.add_node(node)
+    try:
+        executor.spin()
+    finally:
+        executor.shutdown()
+        node.destroy_node()
+        rclpy.shutdown()
 
-    rclpy.spin(lifecycle_node)
-    rclpy.shutdown()
