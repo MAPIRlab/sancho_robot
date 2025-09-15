@@ -37,6 +37,18 @@ class SanchoAINode(Node):
             self.get_logger().info("Confirm Name Sancho prPromptompt")
             return self.confirm_name_message(response, request.text)
         
+        elif request.asking_mode == "no_one_known":
+            self.get_logger().info("No One Known Sancho Prompt")
+            return self.no_one_known_message(response, request.text)
+        
+        elif request.asking_mode == "some_known":
+            self.get_logger().info("Some Known Sancho Prompt")
+            return self.some_known_message(response, request.text)
+        
+        elif request.asking_mode == "all_known":
+            self.get_logger().info("All Known Sancho Prompt")
+            return self.all_known_message(response, request.text)
+
         else:
             self.get_logger().error(f"Sancho prompt with unknown asking mode: {request.asking_mode}")
 
@@ -60,16 +72,22 @@ class SanchoAINode(Node):
         return response
 
     def get_name_message(self, response, text):
-        value, provider, model = self.asking_ai.get_name(text)
-
-        response.value_json = json.dumps(value)
-        response.provider = provider
-        response.model = model
-
-        return response
-
+        return self._asking_message(response, text, self.asking_ai.get_name)
+    
     def confirm_name_message(self, response, text):
-        value, provider, model = self.asking_ai.confirm_name(text)
+        return self._asking_message(response, text, self.asking_ai.confirm_name)
+    
+    def no_one_known_message(self, response, text):
+        return self._asking_message(response, text, self.asking_ai.no_one_known)
+    
+    def some_known_message(self, response, text):
+        return self._asking_message(response, text, self.asking_ai.some_known)
+    
+    def all_known_message(self, response, text):
+        return self._asking_message(response, text, self.asking_ai.all_known)  
+    
+    def _asking_message(self, response, text, asking_method):
+        value, provider, model = asking_method(text)
 
         response.value_json = json.dumps(value)
         response.provider = provider
