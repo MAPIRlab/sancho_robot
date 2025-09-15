@@ -64,7 +64,7 @@ class HumanFaceDetectorLifecycleNode(LifecycleNode):
         self.sub_camera = self.create_subscription(Image, self.image_topic, self.image_callback, qos)
 
         self.latest_img = None
-        self.spin_timer = self.create_timer(1.0 / self.processing_rate, self.do_detection)
+        self.spin_timer = self.create_timer(1.0 / self.processing_rate, self.spin)
 
         return super().on_activate(state)
 
@@ -84,7 +84,7 @@ class HumanFaceDetectorLifecycleNode(LifecycleNode):
     def image_callback(self, msg: Image):
         self.latest_img = msg
 
-    def do_detection(self):
+    def spin(self):
         if self.latest_img is None:
             return
 

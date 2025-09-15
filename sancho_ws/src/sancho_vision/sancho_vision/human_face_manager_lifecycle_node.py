@@ -2,11 +2,12 @@ import json
 from queue import Queue
 
 import rclpy
-from rclpy.lifecycle import LifecycleNode
+from rclpy.lifecycle import LifecycleNode, TransitionCallbackReturn
+from rclpy.qos import QoSProfile
+
 from std_msgs.msg import String, Empty
 from hri_msgs.srv import Training, TriggerUserInteraction
 from hri_msgs.msg import Log, FaceNameResponse, FaceQuestionResponse
-from rumi_msgs.msg import SessionMessage
 from sancho_msgs.msg import FaceRecognitionArray
 
 from sancho_web_assistant.database.system_database import CONSTANTS
@@ -16,47 +17,123 @@ from .hri_bridge import HRIBridge
 
 
 class HumanFaceManagerLifecycleNode(LifecycleNode):
-
     def __init__(self):
-        super().__init__('human_face_manager')
+        super().__init__("human_face_manager")
+
+        self.human_face_manager = HumanFaceManager(self)
+
+        self.declare_parameters(namespace="", parameters=[
+            ("face_recognitions_topic", "/face_recognitions"),
+            ("gui_face_name_response_topic", "gui/face_name_response"),
+            ("gui_face_question_response_topic", "gui/face_question_response"),
+            ("gui_face_timeout_response_topic", "gui/face_timeout_response"),
+            ("logs_topic", "logs/add"),
+            ("camera_recognition_topic", "camera/color/recognition"),
+            ("people_topic", "logic/info/actual_people"),
+            ("input_tts_topic", "input_tts"),
+            ("processing_rate", 10.0),
+            ("service_wait_attempts", 10),
+            ("service_wait_timeout_sec", 0.5),
+        ])
+
+        self.bridge = HRIBridge()
 
         self.face_recognitions_queue = Queue()
         self.face_name_queue = Queue()
         self.face_question_queue = Queue()
-        self.face_timeout_response = False
 
-        self.face_name_response_sub = self.create_subscription(FaceNameResponse, 'gui/face_name_response', self.face_name_response_callback, 10)
-        self.face_question_response_sub = self.create_subscription(FaceQuestionResponse, 'gui/face_question_response', self.face_question_response_callback, 10)
-        self.face_timeout_response_sub = self.create_subscription(Empty, 'gui/face_timeout_response', self.face_timeout_response_callback, 10)
-        self.subscription_recognitions = self.create_subscription(FaceRecognitionArray, '/face_recognitions', self.recognitions_callback, 1)
+        self.sub_face_name = None
+        self.sub_face_question = None
+        self.sub_face_timeout = None
+        self.sub_recognitions = None
+        self.pub_log = None
+        self.pub_recognition = None
+        self.pub_people = None
+        self.pub_input_tts = None
 
-        self.publisher_log = self.create_publisher(Log, 'logs/add', 10)
-        self.publisher_session = self.create_publisher(SessionMessage, 'rumi/sessions/process', 10)
-        self.publisher_recognition = self.create_publisher(String, 'camera/color/recognition', 1)
-        self.publisher_people = self.create_publisher(String, 'logic/info/actual_people', 1)
-        self.input_tts = self.create_publisher(String, 'input_tts', 10)
+        self.training_client = None
+        self.gui_client = None
 
-        self.training_client = self.create_client(Training, 'recognition/training')
+    def on_configure(self, state) -> TransitionCallbackReturn:
+        self.get_logger().info("Configurando nodo manejador de rostros...")
+
+        self.face_recognitions_topic = self.get_parameter("face_recognitions_topic").value
+        self.gui_face_name_response_topic = self.get_parameter("gui_face_name_response_topic").value
+        self.gui_face_question_response_topic = self.get_parameter("gui_face_question_response_topic").value
+        self.gui_face_timeout_response_topic = self.get_parameter("gui_face_timeout_response_topic").value
+        self.logs_topic = self.get_parameter("logs_topic").value
+        self.camera_recognition_topic = self.get_parameter("camera_recognition_topic").value
+        self.people_topic = self.get_parameter("people_topic").value
+        self.input_tts_topic = self.get_parameter("input_tts_topic").value
+        self.processing_rate = float(self.get_parameter("processing_rate").value)
+        self.service_wait_attempts = int(self.get_parameter("service_wait_attempts").value)
+        self.service_wait_timeout_sec = float(self.get_parameter("service_wait_timeout_sec").value)
+
+        qos10 = QoSProfile(depth=10)
+        qos1 = QoSProfile(depth=1)
+        self.pub_log = self.create_lifecycle_publisher(Log, self.logs_topic, qos10)
+        self.pub_recognition = self.create_lifecycle_publisher(String, self.camera_recognition_topic, qos1)
+        self.pub_people = self.create_lifecycle_publisher(String, self.people_topic, qos1)
+        self.pub_input_tts = self.create_lifecycle_publisher(String, self.input_tts_topic, qos10)
+
+        self.training_client = self.create_client(Training, "recognition/training")
         while not self.training_client.wait_for_service(timeout_sec=1.0):
             self.get_logger().info('Training service not available, waiting again...')
 
-        self.gui_client = self.create_client(TriggerUserInteraction, 'gui/request')
+        self.gui_client = self.create_client(TriggerUserInteraction, "gui/request")
         while not self.gui_client.wait_for_service(timeout_sec=1.0):
             self.get_logger().info('GUI service not available, waiting again...')
 
-        self.br = HRIBridge()
-        self.get_logger().info("HRI Logic Node initialized successfully (refactored)")
+        return super().on_configure(state)
 
-    def recognitions_callback(self, msg):
+    def on_activate(self, state) -> TransitionCallbackReturn:
+        qos10 = QoSProfile(depth=10)
+        qos1 = QoSProfile(depth=1)
+        self.sub_face_name = self.create_subscription(FaceNameResponse, self.gui_face_name_response_topic, self.face_name_response_callback, qos10)
+        self.sub_face_question = self.create_subscription(FaceQuestionResponse, self.gui_face_question_response_topic, self.face_question_response_callback, qos10)
+        self.sub_face_timeout = self.create_subscription(Empty, self.gui_face_timeout_response_topic, self.face_timeout_response_callback, qos10)
+        self.sub_recognitions = self.create_subscription(FaceRecognitionArray, self.face_recognitions_topic, self.recognitions_callback, qos1)
+
+        self.face_timeout_response = False
+        self.spin_timer = self.create_timer(1.0 / self.processing_rate, self.human_face_manager.spin)
+
+        return super().on_activate(state)
+
+    def on_deactivate(self, state) -> TransitionCallbackReturn:
+        self.get_logger().info("Desactivando nodo manejador de rostros...")
+
+        if self.spin_timer:
+            self.spin_timer.cancel()
+            self.spin_timer = None
+
+        if self.sub_face_name:
+            self.destroy_subscription(self.sub_face_name)
+            self.sub_face_name = None
+
+        if self.sub_face_question:
+            self.destroy_subscription(self.sub_face_question)
+            self.sub_face_question = None
+
+        if self.sub_face_timeout:
+            self.destroy_subscription(self.sub_face_timeout)
+            self.sub_face_timeout = None
+
+        if self.sub_recognitions:
+            self.destroy_subscription(self.sub_recognitions)
+            self.sub_recognitions = None
+
+        return super().on_deactivate(state)
+
+    def recognitions_callback(self, msg: FaceRecognitionArray):
         self.face_recognitions_queue.put(msg)
 
-    def face_name_response_callback(self, msg):
+    def face_name_response_callback(self, msg: FaceNameResponse):
         self.face_name_queue.put(msg.name)
 
-    def face_question_response_callback(self, msg):
+    def face_question_response_callback(self, msg: FaceQuestionResponse):
         self.face_question_queue.put(msg.answer)
 
-    def face_timeout_response_callback(self, _):
+    def face_timeout_response_callback(self, _: Empty):
         self.face_timeout_response = True
 
 
@@ -66,7 +143,7 @@ class HumanFaceManager:
     MIDDLE_BOUND = 0.80
     UPPER_BOUND = 0.90
 
-    def __init__(self, ask_unknowns=True, draw_rectangle=True, show_distance=True, show_score=True):
+    def __init__(self, node: HumanFaceManagerLifecycleNode, ask_unknowns=True, draw_rectangle=True, show_distance=True, show_score=True):
         self.ask_unknowns = ask_unknowns
         self.draw_rectangle = draw_rectangle
         self.show_distance = show_distance
@@ -75,31 +152,28 @@ class HumanFaceManager:
         self.last_frame = None
         self.gui_request_sent_info = None
 
-        self.node = HumanFaceManagerLifecycleNode()
+        self.node = node
         self.people = PeopleManager(self.node)
 
     def spin(self):
-        while rclpy.ok():
-            if not self.node.face_recognitions_queue.empty():
-                recognition_msg = self.node.face_recognitions_queue.get()
-                self.process_recognitions(recognition_msg)
+        if not self.node.face_recognitions_queue.empty():
+            recognition_msg = self.node.face_recognitions_queue.get()
+            self.process_recognitions(recognition_msg)
 
-            if not self.node.face_name_queue.empty():
-                name = self.node.face_name_queue.get()
-                self.process_face_name_response(name)
+        if not self.node.face_name_queue.empty():
+            name = self.node.face_name_queue.get()
+            self.process_face_name_response(name)
 
-            if not self.node.face_question_queue.empty():
-                answer = self.node.face_question_queue.get()
-                self.process_face_question_response(answer)
-            
-            if self.node.face_timeout_response:
-                self.node.face_timeout_response = False
-                self.gui_request_sent_info = None
-
-            rclpy.spin_once(self.node)
+        if not self.node.face_question_queue.empty():
+            answer = self.node.face_question_queue.get()
+            self.process_face_question_response(answer)
+        
+        if self.node.face_timeout_response:
+            self.node.face_timeout_response = False
+            self.gui_request_sent_info = None
 
     def process_recognitions(self, msg):
-        frame = self.node.br.imgmsg_to_cv2(msg.image, "bgr8")
+        frame = self.node.bridge.imgmsg_to_cv2(msg.image, "bgr8")
         self.last_frame = frame
 
         for det, recog in zip(msg.detections, msg.recognitions):
@@ -110,7 +184,7 @@ class HumanFaceManager:
             pos = recog.pos
             score = det.confidence
             face_updated = recog.face_updated
-            face_aligned = self.node.br.imgmsg_to_cv2(recog.face_aligned, "bgr8")
+            face_aligned = self.node.bridge.imgmsg_to_cv2(recog.face_aligned, "bgr8")
 
             if face_updated:
                 log_message = f"Se ha actualizado la imagen de la cara con id {classified_id}"
@@ -123,7 +197,7 @@ class HumanFaceManager:
 
                 if score >= 1 and self.ask_unknowns: # Si la imagen es buena, pregunta por el nombre, para que no coja una imagen mala
                     if not self.gui_request_sent_info: # Si no hay ninguna cosa enviada
-                        face_aligned_base64 = self.node.br.cv2_to_base64(face_aligned)
+                        face_aligned_base64 = self.node.bridge.cv2_to_base64(face_aligned)
                         if self.gui_request("get_name", json.dumps({"image": face_aligned_base64})):
                             self.gui_request_sent_info = [classified_id, classified_name, face_aligned_base64, features, score, distance]
                             self.read_text("¿Cual es tu nombre?", asking_mode="get_name")
@@ -133,7 +207,7 @@ class HumanFaceManager:
             elif distance < self.MIDDLE_BOUND: # Cree que es alguien, pide confirmacion
                 if score >= 1 and self.ask_unknowns: # Pero solo si la foto es buena
                     if not self.gui_request_sent_info:
-                        face_aligned_base64 = self.node.br.cv2_to_base64(face_aligned)
+                        face_aligned_base64 = self.node.bridge.cv2_to_base64(face_aligned)
                         if self.gui_request("ask_if_name", json.dumps({"image": face_aligned_base64, "name": classified_name})):
                             self.gui_request_sent_info = [classified_id, classified_name, face_aligned_base64, features, score, distance]
                             self.read_text(f"Creo que eres {classified_name}, ¿es cierto?", asking_mode="confirm_name")
@@ -163,8 +237,8 @@ class HumanFaceManager:
         actual_people_time = self.people.get_all_last_seen()
         actual_people_json = json.dumps(actual_people_time)
 
-        self.node.publisher_people.publish(String(data=actual_people_json))
-        self.node.publisher_recognition.publish(self.node.br.cv2_to_imgmsg(frame, "bgr8"))
+        self.node.pub_people.publish(String(data=actual_people_json))
+        self.node.pub_recognition.publish(self.node.bridge.cv2_to_imgmsg(frame, "bgr8"))
 
     def process_face_name_response(self, name):
         [_, _, face_aligned_base64, features, score, _] = self.gui_request_sent_info
@@ -246,18 +320,18 @@ class HumanFaceManager:
         return response
 
     def get_last_frame_service(self, request, response):
-        response.text = self.node.br.cv2_to_base64(self.last_frame, quality=100)
+        response.text = self.node.bridge.cv2_to_base64(self.last_frame, quality=100)
         return response
 
     def read_text(self, text, asking_mode=""):
         self.node.get_logger().info(f"[SANCHO] {text}")
-        self.node.input_tts.publish(String(data=json.dumps({
+        self.node.pub_input_tts.publish(String(data=json.dumps({
             "text": text,
             "asking_mode": asking_mode
         })))
 
     def create_log(self, action, faceprint_id, message="", metadata_json=""):
-        self.node.publisher_log.publish(Log(
+        self.node.pub_log.publish(Log(
             level=CONSTANTS.LEVEL.INFO,
             origin=CONSTANTS.ORIGIN.ROS,
             actor="logic_node",

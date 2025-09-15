@@ -98,7 +98,7 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
 
         self.last_detections = None
         self.save_db_timer = self.create_timer(10.0, lambda: self.classifier.db.save())
-        self.spin_timer = self.create_timer(1.0 / self.processing_rate, self.do_recognition)
+        self.spin_timer = self.create_timer(1.0 / self.processing_rate, self.spin)
 
         return super().on_activate(state)
 
@@ -122,7 +122,7 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
     def detections_callback(self, msg: FaceDetectionArray):
         self.last_detections = msg
     
-    def do_recognition(self):
+    def spin(self):
         if self.last_detections is None:
             return
         
