@@ -31,7 +31,7 @@ class ComplexClassifier:
         '''
 
         closest_faceprint = {}
-        closest_distance = 0
+        closest_distance = 0.0
         position = 0
         for faceprint in self.db.get_all():
             feature_list = faceprint["features"]

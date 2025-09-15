@@ -6,6 +6,8 @@ from launch.actions import DeclareLaunchArgument, GroupAction
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import LifecycleNode, Node
 
+from sancho_web_assistant.apis import API_LIST
+
 
 def generate_launch_description():
     prefix_cmd = LaunchConfiguration('prefix')
@@ -64,6 +66,18 @@ def generate_launch_description():
             'face_recognizer_node_name',
             default_value='face_recognizer',
             description='Nombre del nodo de seguimiento (face_recognizer)'
+        ),
+
+        Node(
+            package='sancho_web_assistant',
+            executable='api_rest',
+            name='api_rest',
+            parameters=[{
+                '[' + API_LIST.FACEPRINTS + ']'
+            }],
+            output='screen',
+            prefix="xterm -hold -e",
+            emulate_tty=True,
         ),
 
         # --------------------

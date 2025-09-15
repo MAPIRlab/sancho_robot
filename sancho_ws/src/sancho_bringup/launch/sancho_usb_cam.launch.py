@@ -37,7 +37,7 @@ def generate_launch_description():
                 ('image_rect', '/sancho_camera/image_rect')
             ],
             parameters=[{
-                    'queue_size': 20,           # da margen a la emparejadora
+                    'queue_size': 2000,           # da margen a la emparejadora
                 }],
         )
     return LaunchDescription([

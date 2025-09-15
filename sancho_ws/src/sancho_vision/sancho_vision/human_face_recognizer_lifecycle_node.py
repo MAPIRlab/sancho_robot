@@ -183,9 +183,10 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
             features = self.encoder.encode_face(face_aligned)
             faceprint, distance, pos = self.classifier.classify_face(features)
 
-            if self.learn_without_name and (not faceprint or distance < 0.75):
+            if self.learn_without_name and (not faceprint or distance < 0.75): # Cambiar 
                 face = self.bridge.cv2_to_base64(face_aligned)
                 _, faceprint = self.classifier.add_class("", features, face, confidence)
+                distance = 1.0
 
             face_updated = False
             if confidence >= 1.0 and distance >= 0.9:

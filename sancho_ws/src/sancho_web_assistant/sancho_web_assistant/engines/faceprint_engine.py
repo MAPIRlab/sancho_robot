@@ -1,6 +1,6 @@
 from hri_msgs.srv import Detection, Recognition, Training, GetString
 
-from hri_vision.hri_bridge import HRIBridge
+from sancho_vision.hri_bridge import HRIBridge
 
 from .service_engine import ServiceEngine
 
