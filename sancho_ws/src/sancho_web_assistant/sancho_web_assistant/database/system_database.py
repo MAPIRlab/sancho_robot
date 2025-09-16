@@ -19,6 +19,7 @@ class CONSTANTS:
         ADD_CLASS = "add_class"
         RENAME_CLASS = "rename_class"
         DELETE_CLASS = "delete_class"
+        DELETE_ALL = "delete_all"
         ADD_FEATURES = "add_features"
         UPDATE_FACE = "update_face"
 

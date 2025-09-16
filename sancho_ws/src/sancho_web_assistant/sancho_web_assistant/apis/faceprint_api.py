@@ -124,6 +124,16 @@ class FaceprintAPI:
 
         log_message = f"Se ha eliminado la clase con id {id} desde la web"
         metadata_json = json.dumps({ "faceprint_id": id })
-        self.engine.create_log(CONSTANTS.ACTION.DELETE_CLASS, id)
+        self.engine.create_log(CONSTANTS.ACTION.DELETE_CLASS, id, log_message, metadata_json)
 
         return JSONResponse(content=f"Faceprint con id {id} eliminado correctamente.")
+    
+    def delete_all_faceprints(self) -> APIResponse:
+        result, message = self.engine.training_request(String(data="delete_all"), String(data=json.dumps({})))
+        if result <= 0:
+            return HTTPException(detail=message)
+        
+        log_message = "Se ha eliminado la base de datos de rostros desde la web"
+        self.engine.create_log(CONSTANTS.ACTION.DELETE_ALL, "all", log_message)
+
+        return JSONResponse(content="Se ha eliminado la base de datos de registros faciales correctamente")

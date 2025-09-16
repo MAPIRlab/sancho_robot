@@ -1,7 +1,7 @@
 from typing import Optional, List
 from fastapi import APIRouter, HTTPException, Query, Request, Path
 
-from .faceprint_model import Faceprint, FaceprintCreate, FaceprintUpdate, FaceprintDeleteResponse
+from .faceprint_model import Faceprint, FaceprintCreate, FaceprintUpdate, FaceprintDeleteResponse, FaceprintDeleteAllResponse
 from .api_utils import APIUtils
 from ..apis import FaceprintAPI
 
@@ -106,6 +106,22 @@ async def delete_faceprint(
 
         return response.to_fastapi()
     
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.delete("/", tags=["Faceprints CRUD endpoints"], response_model=FaceprintDeleteAllResponse)
+async def delete_all_faceprints(
+    request: Request
+):
+    APIUtils.check_accept_json(request)
+
+    try:
+        response = faceprint_api.delete_all_faceprints()
+
+        return response.to_fastapi()
+
     except HTTPException as e:
         raise e
     except Exception as e:

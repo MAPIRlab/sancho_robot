@@ -18,3 +18,6 @@ class FaceprintUpdate(BaseModel):
 
 class FaceprintDeleteResponse(BaseModel):
     details: str = "El registro facial se ha borrado correctamente."
+
+class FaceprintDeleteAllResponse(BaseModel):
+    details: str = "La base de datos de registros faciales ha sido borrada correctamente."

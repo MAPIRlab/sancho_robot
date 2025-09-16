@@ -128,6 +128,9 @@ class SORT3D:
         for i, tr in enumerate(self.tracks):
             if i in assigned_tr or not tr.miss():
                 survivors.append(tr)
+            else:
+            # Logging when a track is lost
+                print(f"[SORT3D] Track lost: id={tr.id}, person_id={tr.person_id}, last_pos={tr.pos}")
         self.tracks = survivors
         # Create new for unassigned detections
         for j, (det_pos, pid) in enumerate(detections):
@@ -202,8 +205,8 @@ class FaceClusterServiceNode(Node):
             if det.height <= 0:
                 continue
             Z = self.k / det.height
-            if not (0.3 <= Z <= 6.0): 
-                continue
+            # if not (0.3 <= Z <= 6.0): 
+            #     continue
             u, v = det.corner.x - det.width/2, det.corner.y + det.height/2  # center point
             X = (u - self.intrinsics['cx']) * Z / self.intrinsics['fx']
             Y = (v - self.intrinsics['cy']) * Z / self.intrinsics['fy']
