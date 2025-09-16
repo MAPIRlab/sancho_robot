@@ -43,7 +43,9 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
 
         self.recognition_srv = None
         self.training_srv = None
+        self.clear_no_name_srv = None
         self.get_faceprint_srv = None
+        self.set_learn_without_name_srv = None
 
     def on_configure(self, state) -> TransitionCallbackReturn:
         self.get_logger().info("Configurando nodo de reconocimiento...")
@@ -78,7 +80,8 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
             "add_features": self.classifier.add_features,
             "add_class": self.classifier.add_class,
             "rename_class": self.classifier.rename_class,
-            "delete_class": self.classifier.delete_class
+            "delete_class": self.classifier.delete_class,
+            "delete_all": self.classifier.delete_all
         }
 
         self.faceprint_event_map = {
@@ -86,6 +89,7 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
             "delete_class": FaceprintEvent.DELETE,
             "rename_class": FaceprintEvent.UPDATE,
             "add_features": FaceprintEvent.UPDATE,
+            "delete_all": FaceprintEvent.DELETE_ALL
         }
 
         return super().on_configure(state)
@@ -182,7 +186,7 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
             faceprint, distance, pos = self.classifier.classify_face(features)
 
             face_updated = False # Ver si quitar esto de face_updated que no se para que es necesario
-            if confidence >= 1.0 and distance >= 0.90:
+            if confidence >= 1.0 and distance >= 0.90: # Poner los thresholds en un archivo bien definido o algo asi
                 self.classifier.refine_class(faceprint["id"], features, pos)
                 face_updated = self.classifier.save_face(faceprint["id"], face_aligned, confidence)
                 if face_updated:
@@ -194,7 +198,7 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
 
                 _, faceprint = self.classifier.add_class("", features, face, confidence)
 
-            self.get_logger().info(f"{faceprint['id'] or faceprint['name'] or 'Not classified'} -> Distance: {distance:.4f} | Confidence: {confidence:.4f}")
+            self.get_logger().info(f"{faceprint['name'] or faceprint['id'] or 'Not classified'} -> Distance: {distance:.4f} | Confidence: {confidence:.4f}")
 
             yield face_aligned, features, faceprint, distance, pos, face_updated
 

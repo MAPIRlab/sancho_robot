@@ -141,6 +141,16 @@ class ComplexClassifier:
         self.db.save()
         return result, message
     
+    def delete_all(self):
+        '''Resets database to its original state'''
+
+        self.db.reset()
+    
+        result = 1
+        message = "La base de datos ha sido restablecida a por defecto"
+
+        return result, message
+    
     def clear_no_name(self):
         '''Removes all classes without name'''
 

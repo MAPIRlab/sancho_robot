@@ -9,6 +9,8 @@ from std_srvs.srv import Empty as ComputeCluster  # Placeholder, replace with ac
 from visualization_msgs.msg import Marker, MarkerArray
 import tf2_ros
 import tf2_geometry_msgs
+from rclpy.duration import Duration
+
 import numpy as np
 from sklearn.cluster import DBSCAN
 from scipy.optimize import linear_sum_assignment
@@ -190,26 +192,31 @@ class FaceClusterServiceNode(Node):
         for det, recog in zip(msg.detections, msg.recognitions):
             det = cast(FaceDetection, det)
             recog = cast(FaceRecognition, recog)
-            
+
             if det.height <= 0:
                 continue
             # Use recognition info if available
-            pid = int(recog.classified_id) if recog.classified_id and recog.distance < 0.6 else 0
-                        
+            pid = int(recog.classified_id) if recog.classified_id and recog.distance > 0.5 else 0
+
             # Calculate 3D position from detection
+            if det.height <= 0:
+                continue
             Z = self.k / det.height
-            u, v = det.corner.x + det.width/2, det.corner.y + det.height/2  # center point
+            if not (0.3 <= Z <= 6.0): 
+                continue
+            u, v = det.corner.x - det.width/2, det.corner.y + det.height/2  # center point
             X = (u - self.intrinsics['cx']) * Z / self.intrinsics['fx']
             Y = (v - self.intrinsics['cy']) * Z / self.intrinsics['fy']
             pt_cam = PointStamped()
             pt_cam.header.stamp = msg.header.stamp
             pt_cam.header.frame_id = self.camera_frame
             pt_cam.point.x, pt_cam.point.y, pt_cam.point.z = X, Y, Z
+
             try:
                 pt_head = self.tf_buffer.transform(pt_cam, self.head_frame, timeout=rclpy.duration.Duration(seconds=0.1))
                 p = pt_head.point
                 detections.append(([p.x, p.y, p.z], pid))
-                
+
                 # Log recognized faces
                 if pid > 0:
                     self.get_logger().info(f"Face detected: ID={pid}, Distance={recog.distance:.3f}")
@@ -220,12 +227,29 @@ class FaceClusterServiceNode(Node):
         # Publish tracks
         ma = MarkerArray()
         for tr in self.tracker.tracks:
-            m = Marker(header=Header(frame_id=self.head_frame, stamp=msg.header.stamp), type=Marker.SPHERE, action=Marker.ADD)
+            # Sphere marker
+            m = Marker(header=Header(frame_id=self.head_frame, stamp=msg.header.stamp), ns='face_sphere', type=Marker.SPHERE, action=Marker.ADD)
+            m.lifetime = Duration(seconds=(0.1)).to_msg()
             m.id = tr.id
             m.pose.position.x, m.pose.position.y, m.pose.position.z = tr.pos.tolist()
-            m.scale.x = m.scale.y = m.scale.z = 0.1
+            m.pose.position.z = float(1.0)
+            m.scale.x = m.scale.y = m.scale.z = 0.5
             m.color.a = 1.0; m.color.r = 0.0; m.color.g = 1.0; m.color.b = 0.0
             ma.markers.append(m)
+
+            # Text marker above the sphere showing the track id
+            text_m = Marker(header=Header(frame_id=self.head_frame, stamp=msg.header.stamp), ns='face_text', type=Marker.TEXT_VIEW_FACING, action=Marker.ADD)
+            text_m.lifetime = Duration(seconds=(0.1)).to_msg()
+            text_m.id = tr.id
+            text_m.pose.position.x = tr.pos[0]
+            text_m.pose.position.y = tr.pos[1]
+            # place text slightly above the sphere
+            text_m.pose.position.z = m.pose.position.z + 0.3
+            # Text uses scale.z for height
+            text_m.scale.z = 0.2
+            text_m.color.a = 1.0; text_m.color.r = 1.0; text_m.color.g = 1.0; text_m.color.b = 1.0
+            text_m.text = str(f"ID:{tr.person_id}")
+            ma.markers.append(text_m)
         self.marker_pub.publish(ma)
 
     def compute_cluster_cb(self, request, response):
