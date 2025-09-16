@@ -124,32 +124,32 @@ const NewFaceprintModal = ({ handleClose, isOpen, doAddFaceprint }) => {
                 </div>
             )}
 
-                <div className="mb-3 text-center" style={{display: usingCamera ? "block" : "none"}}>
-                    <div style={{ position: "relative", width: "100%", paddingTop: "56.25%" }}>
-                        <video
-                            ref={videoRef}
-                            muted
-                            playsInline
-                            autoPlay
-                            style={{
-                                position: "absolute",
-                                top: 0,
-                                left: 0,
-                                width: "100%",
-                                height: "100%",
-                                objectFit: "contain",
-                                borderRadius: "8px",
-                                backgroundColor: "#000"
-                            }}
-                        />
-                    </div>
-                    <button className="btn btn-secondary mt-2 me-2" onClick={stopCamera}>
-                        Volver
-                    </button>
-                    <button className="btn btn-primary mt-2" onClick={handleTakePhoto}>
-                        Tomar foto
-                    </button>
+            <div className="mb-3 text-center" style={{ display: usingCamera ? "block" : "none" }}>
+                <div style={{ position: "relative", width: "100%", paddingTop: "56.25%" }}>
+                    <video
+                        ref={videoRef}
+                        muted
+                        playsInline
+                        autoPlay
+                        style={{
+                            position: "absolute",
+                            top: 0,
+                            left: 0,
+                            width: "100%",
+                            height: "100%",
+                            objectFit: "contain",
+                            borderRadius: "8px",
+                            backgroundColor: "#000"
+                        }}
+                    />
                 </div>
+                <button className="btn btn-secondary mt-2 me-2" onClick={stopCamera}>
+                    Volver
+                </button>
+                <button className="btn btn-primary mt-2" onClick={handleTakePhoto}>
+                    Tomar foto
+                </button>
+            </div>
 
             {selectedImage ? (
                 <div className="d-flex flex-column align-items-center">

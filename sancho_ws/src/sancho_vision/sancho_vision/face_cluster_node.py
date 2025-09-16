@@ -227,6 +227,7 @@ class FaceClusterServiceNode(Node):
                 self.get_logger().warning(f"Transform failed: {str(e)}")
                 continue
         self.tracker.update(detections)
+        self.get_logger().info(f"{self.tracker.tracks}")
         # Publish tracks
         ma = MarkerArray()
         for tr in self.tracker.tracks:

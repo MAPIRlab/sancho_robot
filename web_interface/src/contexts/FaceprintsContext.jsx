@@ -22,6 +22,7 @@ export const FaceprintsProvider = ({ children }) => {
     const addFaceprint = (fc) => setFaceprints((prev) => [...prev, fc]);
     const updateFaceprint = (id, fc) => setFaceprints((prev) => prev.map((item) => (item.id === id ? fc : item)));
     const deleteFaceprint = (id) => setFaceprints((prev) => prev.filter((item) => item.id !== id));
+    const deleteAllFaceprints = () => setFaceprints([]);
 
     const fetchFaceprintsData = async () => {
         setLoadingFaceprints(true);
@@ -118,6 +119,18 @@ export const FaceprintsProvider = ({ children }) => {
         return response;
     };
 
+    const doDeleteAllFaceprints = async () => {
+        const response = await withLoading(() => faceprints.deleteAll());
+        if (isResponseOk(response)) {
+            deleteAllFaceprints();
+            showToast("Base de datos eliminada", "Se ha eliminado toda la base de datos satisfactoriamente")
+        } else {
+            showToast("Error", response.data.detail, "red");
+        }
+
+        return response;
+    }
+
     return (
         <FaceprintsContext.Provider
             value={{
@@ -126,6 +139,7 @@ export const FaceprintsProvider = ({ children }) => {
                 doAddFaceprint,
                 doUpdateFaceprint,
                 doDeleteFaceprint,
+                doDeleteAllFaceprints,
 
                 fetchFaceprintsData,
 

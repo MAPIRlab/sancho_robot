@@ -63,7 +63,10 @@ export const APIProvider = ({ children }) => {
         ...extraEndpoints,
     });
 
-    const faceprintsAPI = createEndpointMethods("faceprints");
+    const faceprintsAPI = createEndpointMethods("faceprints", {
+        deleteAll: (version = "v1") =>
+            apiMethods.delete(`${BASE_URL}/api/${version}/faceprints`, getAuthorizationHeader())
+    });
     const sessionsAPI = createEndpointMethods("sessions", {
         getSummary: (version = "v1") =>
             apiMethods.get(`${BASE_URL}/api/${version}/sessions/summary`, getAuthorizationHeader()),
