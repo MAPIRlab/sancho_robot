@@ -123,7 +123,7 @@ export const FaceprintsProvider = ({ children }) => {
         const response = await withLoading(() => faceprints.deleteAll());
         if (isResponseOk(response)) {
             deleteAllFaceprints();
-            showToast("Base de datos eliminada", "Se ha eliminado toda la base de datos satisfactoriamente")
+            showToast("Base de datos eliminada", "Se ha eliminado toda la base de datos satisfactoriamente", "green")
         } else {
             showToast("Error", response.data.detail, "red");
         }
