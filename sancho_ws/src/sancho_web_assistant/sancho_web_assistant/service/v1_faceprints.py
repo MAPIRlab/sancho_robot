@@ -111,7 +111,7 @@ async def delete_faceprint(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.delete("/", tags=["Faceprints CRUD endpoints"], response_model=FaceprintDeleteAllResponse)
+@router.delete("", tags=["Faceprints CRUD endpoints"], response_model=FaceprintDeleteAllResponse)
 async def delete_all_faceprints(
     request: Request
 ):

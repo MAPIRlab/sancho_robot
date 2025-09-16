@@ -151,8 +151,6 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
             
             msg_out.recognitions.append(recog)
 
-        self.get_logger().info(f"Hay {len(self.classifier.db.get_all_ids())} personas en la base de datos")
-
         self.pub_recog.publish(msg_out)
 
     def recognition_service(self, request, response):
