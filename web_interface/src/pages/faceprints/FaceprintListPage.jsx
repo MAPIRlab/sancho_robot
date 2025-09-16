@@ -37,7 +37,6 @@ const FaceprintListPage = () => {
                         <h2 className="fw-bold mb-1">Galería de rostros</h2>
                         <p className="text-muted mb-0">Gestiona los rostros aprendidos por el sistema.</p>
                     </div>
-
                     <div>
                         <button className="btn btn-primary me-2" onClick={() => setIsOpenFaceModal(true)}>
                             <i className="bi bi-person-plus me-0 me-lg-2" /> <span className="d-none d-lg-inline">Nuevo</span>
