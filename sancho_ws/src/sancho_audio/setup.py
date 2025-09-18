@@ -32,7 +32,8 @@ setup(
             'assistant=sancho_audio.assistant_node:main',
             'audio=sancho_audio.audio_node:main',
             'microphone=sancho_audio.microphone_node:main',
-            'audio_doa_lifecycle=sancho_audio.audio_doa_lifecycle_node:main'
+            'audio_doa_lifecycle=sancho_audio.audio_doa_lifecycle_node:main',
+            'audio_doa_overlay=sancho_audio.audio_doa_overlay_node:main'
         ],
     },
 )
