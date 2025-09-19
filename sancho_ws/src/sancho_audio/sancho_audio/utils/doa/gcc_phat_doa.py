@@ -5,7 +5,7 @@ from .doa_method import DOAMethod
 class GCCPHATDOA(DOAMethod):
     """DOA por GCC-PHAT para dos micrófonos (izq, der)"""
 
-    def __init__(self, mic_distance_m=0.1225, min_peak_ratio=6.0):
+    def __init__(self, mic_distance_m, min_peak_ratio):
         self.mic_distance_m = mic_distance_m
         self.min_peak_ratio = min_peak_ratio
 

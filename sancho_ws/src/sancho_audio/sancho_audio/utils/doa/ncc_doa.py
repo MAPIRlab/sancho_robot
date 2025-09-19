@@ -6,7 +6,7 @@ from .doa_method import DOAMethod
 class NCCDOA(DOAMethod):
     """DOA por NCC para dos micrófonos (izq, der)"""
 
-    def __init__(self, mic_distance_m=0.1225):
+    def __init__(self, mic_distance_m):
         self.mic_distance_m = mic_distance_m
 
     def calc_doa(self, left_mic, right_mic, sample_rate, smooth_sigma=1.0, threshold_samples=10, stride=2, min_ncc=0.5):
