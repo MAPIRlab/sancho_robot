@@ -9,16 +9,14 @@ class NCCDOA(DOAMethod):
     def __init__(self, mic_distance_m=0.1225):
         self.mic_distance_m = mic_distance_m
 
-    def calc_doa(self, left_mic, right_mic, sample_rate, smooth_sigma=1.0, threshold_samples=10, stride=2, min_ncc= 0.1):
+    def calc_doa(self, left_mic, right_mic, sample_rate, smooth_sigma=1.0, threshold_samples=10, stride=2, min_ncc=0.5):
         """Devuelve el ángulo en grados en [-90, 90]. Si no hay voz o algo raro, devuelve NaN"""
 
         if left_mic is None or right_mic is None or sample_rate is None:
-            print("mics none")
             return float("nan")
         
         n = min(len(left_mic), len(right_mic))
         if n < 16:
-            print("16", n)
             return float("nan")
 
         left_f = np.asarray(left_mic[:n], dtype=float)
@@ -29,31 +27,24 @@ class NCCDOA(DOAMethod):
 
         _, max_ncc, best_displacement = self.determine_audio_location(left_f, right_f, sample_rate,
             smooth_sigma=0.0, threshold_samples=threshold_samples, stride=stride, min_ncc=min_ncc)
-
-        print(max_ncc)
+ 
         if max_ncc < min_ncc:
-            print("ncc baito")
+            print("max_ncc:", max_ncc, "< min_ncc:", min_ncc)
             return float("nan")
 
-        time_variation = -best_displacement / sample_rate # seconds
-        sin_degree = ((343.2 * time_variation) / self.mic_distance_m)
-        print("sin_degree", sin_degree)
-        sin_degree = 1 if sin_degree > 1 else (-1 if sin_degree < -1 else sin_degree)
-        # lo de arriba funciona, es lo antiguio, lo de abajo lo de chatgpt, no va
-        #tdoa_s = -best_displacement / sample_rate
-        #x = (sample_rate * tdoa_s) / self.mic_distance_m  # sin(theta)
+        time_variation = best_displacement / sample_rate # seconds
+        x = ((343.2 * time_variation) / self.mic_distance_m)
+        x = 1 if x > 1 else (-1 if x < -1 else x)
 
         if abs(x) > 1.05: # Comprobación estricta de validez física
-            print("sin", x, sample_rate, best_displacement, self.mic_distance_m)
             return float("nan")
+        
         x = np.clip(x, -1.0, 1.0)
-        print("x", x)
-        print("arcsin", np.arcsin(x))
         angle_deg = np.degrees(np.arcsin(x))
-        print("angle", angle_deg)
+
         return angle_deg
 
-    def determine_audio_location(self, microphone_left, microphone_right, sample_rate, smooth_sigma=1.0, threshold_samples=10, stride=2, min_ncc=0.1):
+    def determine_audio_location(self, microphone_left, microphone_right, sample_rate, smooth_sigma=1.0, threshold_samples=10, stride=2, min_ncc=0.5):
         """Calcula la localización del sonido a partir de dos microfonos"""
 
         left_f = np.asarray(microphone_left, dtype=float)

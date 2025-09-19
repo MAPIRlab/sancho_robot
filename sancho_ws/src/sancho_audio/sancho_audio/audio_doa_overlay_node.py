@@ -49,8 +49,7 @@ class DOAOverlayNode(Node):
         self.get_logger().info("Audio DOA Overlay Node initializated succesfully")
 
     def on_doa(self, msg: Float32):
-        if not math.isnan(msg.data):
-            self.last_doa = float(msg.data)
+        self.last_doa = float(msg.data)
 
     def on_image(self, msg: Image):
         frame = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")

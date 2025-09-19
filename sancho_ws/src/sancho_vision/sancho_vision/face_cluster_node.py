@@ -72,7 +72,7 @@ class Track3D:
         return self.kf.x[:3].reshape((3,))
 
 class SORT3D:
-    def __init__(self, max_misses=60, dist_threshold=0.5, dt=0.1, identity_penalty=1.0):
+    def __init__(self, max_misses=60, dist_threshold=2.5, dt=0.1, identity_penalty=1.0):
         self.tracks = []
         self.next_id = 1
         self.max_misses = max_misses
@@ -85,20 +85,24 @@ class SORT3D:
         # Predict all tracks
         for tr in self.tracks:
             tr.predict()
-        # First assign by known person_id
+        # First assign by known person_id (choose nearest track with same pid)
         assigned_det = set()
         assigned_tr = set()
         for j, (det_pos, pid) in enumerate(detections):
             if pid > 0:
+                best_i = None
+                best_dist = float('inf')
                 for i, tr in enumerate(self.tracks):
                     if tr.person_id == pid:
-                        dist = euclidean(tr.pos, det_pos)
-                        if dist < self.dist_threshold:
-                            tr.update(det_pos, pid)
-                            assigned_tr.add(i)
-                            assigned_det.add(j)
-                        break
-        # Prepare unmatched for Hungarian
+                        d = euclidean(tr.pos, det_pos)
+                        if d < best_dist:
+                            best_dist = d
+                            best_i = i
+                if best_i is not None and best_dist < self.dist_threshold:
+                    self.tracks[best_i].update(det_pos, pid)
+                    assigned_tr.add(best_i)
+                    assigned_det.add(j)
+                # Prepare unmatched for Hungarian
         unmatched_tracks = [i for i in range(len(self.tracks)) if i not in assigned_tr]
         unmatched_dets = [j for j in range(len(detections)) if j not in assigned_det]
         N = len(unmatched_tracks)
@@ -189,8 +193,9 @@ class FaceClusterServiceNode(Node):
         self.destroy_subscription(self.info_sub)
 
     def face_cb(self, msg: FaceRecognitionArray):
-        if self.intrinsics is None:
+        if self.intrinsics is None or len(msg.recognitions) == 0:
             return
+        self.get_logger().info(f"\n----------- Han llegado unas {len(msg.recognitions)} caras ------------------------\n")
         detections = []  # list of (pos, person_id)
         for det, recog in zip(msg.detections, msg.recognitions):
             det = cast(FaceDetection, det)
@@ -199,15 +204,15 @@ class FaceClusterServiceNode(Node):
             if det.height <= 0:
                 continue
             # Use recognition info if available
-            pid = int(recog.classified_id) if recog.classified_id and recog.distance > 0.5 else 0
-
+            pid = int(recog.classified_id) if recog.classified_id and recog.distance > 0.5 else -1
+            
             # Calculate 3D position from detection
             if det.height <= 0:
                 continue
             Z = self.k / det.height
             # if not (0.3 <= Z <= 6.0): 
             #     continue
-            u, v = det.corner.x - det.width/2, det.corner.y + det.height/2  # center point
+            u, v = det.corner.x - det.width/2, det.corner.y - det.height/2  # center point
             X = (u - self.intrinsics['cx']) * Z / self.intrinsics['fx']
             Y = (v - self.intrinsics['cy']) * Z / self.intrinsics['fy']
             pt_cam = PointStamped()
@@ -222,12 +227,13 @@ class FaceClusterServiceNode(Node):
 
                 # Log recognized faces
                 if pid > 0:
-                    self.get_logger().info(f"Face detected: ID={pid}, Distance={recog.distance:.3f}")
+                    self.get_logger().info(f"Face detected: ID={pid}, Distance={recog.distance:.3f} position : {round(X,2) ,round(Y, 2),round(Z, 2)}")
             except Exception as e:
                 self.get_logger().warning(f"Transform failed: {str(e)}")
                 continue
+        self.get_logger().info(f"\n-------Actualizando tracks -----------------------------\n")
         self.tracker.update(detections)
-        self.get_logger().info(f"{self.tracker.tracks}")
+        self.get_logger().info(f"Lista de (track_id, person_id) en los tracks: {[(tr.id, tr.person_id) for tr in self.tracker.tracks]}")
         # Publish tracks
         ma = MarkerArray()
         for tr in self.tracker.tracks:
@@ -236,14 +242,14 @@ class FaceClusterServiceNode(Node):
             m.lifetime = Duration(seconds=(0.1)).to_msg()
             m.id = tr.id
             m.pose.position.x, m.pose.position.y, m.pose.position.z = tr.pos.tolist()
-            m.pose.position.z = float(1.0)
+            m.pose.position.z = float(1.0) #Debug
             m.scale.x = m.scale.y = m.scale.z = 0.5
             m.color.a = 1.0; m.color.r = 0.0; m.color.g = 1.0; m.color.b = 0.0
             ma.markers.append(m)
 
             # Text marker above the sphere showing the track id
             text_m = Marker(header=Header(frame_id=self.head_frame, stamp=msg.header.stamp), ns='face_text', type=Marker.TEXT_VIEW_FACING, action=Marker.ADD)
-            text_m.lifetime = Duration(seconds=(0.1)).to_msg()
+            text_m.lifetime = Duration(seconds=(2)).to_msg()
             text_m.id = tr.id
             text_m.pose.position.x = tr.pos[0]
             text_m.pose.position.y = tr.pos[1]
@@ -252,7 +258,7 @@ class FaceClusterServiceNode(Node):
             # Text uses scale.z for height
             text_m.scale.z = 0.2
             text_m.color.a = 1.0; text_m.color.r = 1.0; text_m.color.g = 1.0; text_m.color.b = 1.0
-            text_m.text = str(f"ID:{tr.person_id}")
+            text_m.text = f"trk:{tr.id} pid:{tr.person_id if tr.person_id>0 else 'unk'}"
             ma.markers.append(text_m)
         self.marker_pub.publish(ma)
 

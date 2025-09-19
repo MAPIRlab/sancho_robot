@@ -133,8 +133,8 @@ class AudioDOALifecycleNode(LifecycleNode):
                 return
 
             # Selección del método
-            angle_deg = self.doa_methods[self.doa_method].calc_doa(Lw, Rw, fs)
-            self.get_logger().info(f"angulo: {angle_deg}")
+            angle_deg = self.doa_methods[self.doa_method].calc_doa(L, R, fs) # NO ESTOY USANDO NADA DE LO DE ARRIBA
+            self.get_logger().info(f"Angulo: {angle_deg}")
             self.pub_angle.publish(Float32(data=float(angle_deg)))
 
         except Exception as e:
