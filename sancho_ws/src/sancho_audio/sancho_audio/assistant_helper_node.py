@@ -37,9 +37,9 @@ class AssistantHelperNode(Node):
         self.assistant_helper = assistant_helper
 
         self.face_mode_pub = self.create_publisher(String, "face/mode", 10)
-        self.assistant_text_pub = self.create_publisher(String, 'hri_audio/assistant_helper/transcription', 10)
-        self.micro_sub = self.create_subscription(ChunkMono, 'hri_audio/microphone/mono', self.microphone_callback, 10)
-        self.mode_sub = self.create_subscription(String, 'hri_audio/assistant_helper/mode', self.mode_callback, 10)
+        self.assistant_text_pub = self.create_publisher(String, 'sancho_audio/assistant_helper/transcription', 10)
+        self.micro_sub = self.create_subscription(ChunkMono, 'sancho_audio/microphone/mono', self.microphone_callback, 10)
+        self.mode_sub = self.create_subscription(String, 'sancho_audio/assistant_helper/mode', self.mode_callback, 10)
 
         self.stt_client = self.create_client(STT, 'speech_tools/stt')
         while not self.stt_client.wait_for_service(timeout_sec=1.0):
