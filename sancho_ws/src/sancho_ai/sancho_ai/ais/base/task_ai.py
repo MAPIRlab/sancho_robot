@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-class AskingAI:
+class TaskAI(ABC):
 
     @abstractmethod
     def get_name(self, message: str):

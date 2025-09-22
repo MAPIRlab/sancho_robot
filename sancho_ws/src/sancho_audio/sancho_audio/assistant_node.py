@@ -3,13 +3,16 @@ import rclpy
 import sounddevice as sd
 from rclpy.node import Node
 
+from enum import Enum
 from queue import Queue
 
 from std_msgs.msg import String, Bool
 from hri_msgs.srv import SanchoPrompt, TriggerUserInteraction
+from sancho_msgs.msg import InputTTS, QuestionTTS
 from speech_msgs.srv import TTS
 
 from sancho_audio.assistant_helper_node import HELPER_STATE
+from sancho_ai.sancho_ai_node import MODE
 from sancho_ai.prompts.commands import COMMANDS
 
 
@@ -18,6 +21,11 @@ def try_json_loads(text):
         return json.loads(text)
     except Exception:
         return None
+
+class QUESTION(int, Enum):
+    NO_QUESTION = 0
+    GET_NAME = 1
+    CONFIRM_NAME = 2
 
 
 class AssistantNode(Node):
@@ -31,7 +39,8 @@ class AssistantNode(Node):
         self.confirm_name_pub = self.create_publisher(Bool, "gui/confirm_name", 10)
 
         self.text_sub = self.create_subscription(String, 'sancho_audio/assistant_helper/transcription', self.text_callback, 10)
-        self.tts_sub = self.create_subscription(String, 'input_tts', self.tts_callback, 10)
+        self.tts_sub = self.create_subscription(InputTTS, 'input_tts', self.tts_callback, 10)
+        self.tts_sub = self.create_subscription(QuestionTTS, 'question_tts', self.question_callback, 10)
 
         self.sancho_prompt_client = self.create_client(SanchoPrompt, "sancho_ai/prompt")
         while not self.sancho_prompt_client.wait_for_service(timeout_sec=1.0):
@@ -47,6 +56,9 @@ class AssistantNode(Node):
         
         self.queue = Queue(maxsize=1)
         self.tts_queue = Queue(maxsize=1)
+        self.question_queue = Queue()
+
+        self.question_id = QUESTION.NO_QUESTION
 
         self.get_logger().info("Assistant Node initializated succesfully.")
 
@@ -56,7 +68,10 @@ class AssistantNode(Node):
 
     def tts_callback(self, msg):
         if self.tts_queue.qsize() < 1:
-            self.tts_queue.put(msg.data)
+            self.tts_queue.put([msg.text, msg.emotion])
+
+    def question_callback(self, msg):
+        self.question_queue.put([msg.question_id, json.loads(msg.args_json)])
 
 
 class Assistant:
@@ -67,58 +82,48 @@ class Assistant:
     def spin(self):
         while rclpy.ok():
             if not self.node.queue.empty():
-                user_dict = json.loads(self.node.queue.get())
-                user_text = user_dict["text"]
-                asking_mode = user_dict.get("asking_mode", "")
-                for i in range(10):
-                    self.node.get_logger().info(f"MODO AL ASSISTANT: {asking_mode}")
+                text = self.node.queue.get()
                 self.node.face_mode_pub.publish(String(data="thinking"))
 
-                if not asking_mode: # Si es un mensaje normal
-                    ai_response, emotion, data, intent = self.sancho_prompt_request(user_text)
+                if self.question_id == QUESTION.NO_QUESTION: # Si es un mensaje normal
+                    ai_response, emotion, data, intent = self.sancho_prompt_request(text)
                     self.node.get_logger().info(f"✅✅✅ Respuesta recibida '{ai_response}'")
 
                     if intent == COMMANDS.TAKE_PICTURE:
                         data_json = json.dumps(data)
                         self.gui_request("show_photo", data_json) # Show photo
 
-                    self.play_tts(ai_response, emotion)
+                    self.play_tts(ai_response, emotion=emotion)
 
-                elif asking_mode == "get_name": # Si es la respuesta cual es tu nombre
-                    name_said, name = self.sancho_get_name_request(user_text)
+                elif self.question_id == QUESTION.GET_NAME: # Si es la respuesta cual es tu nombre
+                    name_said, name = self.sancho_get_name_request(text)
                     if name_said:
                         self.node.name_answer_pub.publish(String(data=name))
-                        self.node.helper_mode_pub.publish(String(data=json.dumps({
-                            "helper_state": HELPER_STATE.NAME.value,
-                            "asking_mode": ""
-                        })))
+                        self.node.helper_mode_pub.publish(String(data=HELPER_STATE.NAME.value))
                         self.node.face_mode_pub.publish(String(data="idle"))
                     else:
-                        self.play_tts("¿Podrías repetirlo? No he reconocido que hayas dicho ningún nombre.", "sad", asking_mode=asking_mode)
+                        self.play_tts("¿Podrías repetirlo? No he reconocido que hayas dicho ningún nombre.", "sad", keep_asking=True)
 
-                elif asking_mode == "confirm_name": # Si es la respuesta a confirmar nombre
-                    answer_said, answer = self.sancho_confirm_name_request(user_text)
+                elif self.question_id == QUESTION.CONFIRM_NAME: # Si es la respuesta a confirmar nombre
+                    answer_said, answer = self.sancho_confirm_name_request(text)
                     if answer_said:
                         self.node.confirm_name_pub.publish(Bool(data=answer))
-                        self.node.helper_mode_pub.publish(String(data=json.dumps({
-                            "helper_state": HELPER_STATE.NAME.value,
-                            "asking_mode": ""
-                        })))
+                        self.node.helper_mode_pub.publish(String(data=HELPER_STATE.NAME.value))
                         self.node.face_mode_pub.publish(String(data="idle"))
                     else:
-                        self.play_tts("No te he entendido bien. ¿Podrías repetirlo?", "sad", asking_mode=asking_mode)
+                        self.play_tts("No te he entendido bien. ¿Podrías repetirlo?", "sad", keep_asking=True)
 
             if not self.node.tts_queue.empty():
-                tts_text = self.node.tts_queue.get()
+                [text, emotion] = self.node.tts_queue.get()
 
-                tts_dict = try_json_loads(tts_text)
-                if tts_dict:
-                    tts_text = tts_dict["text"]
-                    asking_mode = tts_dict["asking_mode"]
-                else:
-                    asking_mode = ""
+                self.play_tts(text, emotion=emotion)
 
-                self.play_tts(tts_text, "neutral", asking_mode=asking_mode)
+            if not self.node.question_queue.empty():
+                [self.question_id, args] = self.node.question_queue.get()
+
+                text = self.create_question_text(self.question_id, args)
+
+                self.play_tts(text, emotion="neutral", keep_asking=True)
 
             rclpy.spin_once(self.node)
 
@@ -142,7 +147,7 @@ class Assistant:
     def sancho_get_name_request(self, text):
         sancho_prompt_request = SanchoPrompt.Request()
         sancho_prompt_request.text = text
-        sancho_prompt_request.asking_mode = "get_name"
+        sancho_prompt_request.mode = MODE.GET_NAME
 
         future_sancho_prompt = self.node.sancho_prompt_client.call_async(sancho_prompt_request)
         rclpy.spin_until_future_complete(self.node, future_sancho_prompt)
@@ -158,7 +163,7 @@ class Assistant:
     def sancho_confirm_name_request(self, text):
         sancho_prompt_request = SanchoPrompt.Request()
         sancho_prompt_request.text = text
-        sancho_prompt_request.asking_mode = "confirm_name"
+        sancho_prompt_request.mode = MODE.CONFIRM_NAME
 
         future_sancho_prompt = self.node.sancho_prompt_client.call_async(sancho_prompt_request)
         rclpy.spin_until_future_complete(self.node, future_sancho_prompt)
@@ -192,27 +197,33 @@ class Assistant:
 
         return result.accepted
 
-    def play_tts(self, text, emotion, asking_mode="", wait=True):
+    def play_tts(self, text, emotion="neutral", keep_asking=False, wait=True):
         self.node.face_mode_pub.publish(String(data="speaking")) # Mouth speaking
+        self.node.face_mode_pub.publish(String(data=emotion.lower())) # Mouth color
         self.node.helper_mode_pub.publish(String(data=json.dumps({ "helper_state": HELPER_STATE.SPEAKING.value }))) # Speaking mode
-        if emotion:
-            self.node.face_mode_pub.publish(String(data=emotion.lower())) # Mouth color
-
+        
         audio, sample_rate = self.tts_request(text)
+        
+        sd.play(audio, samplerate=sample_rate)
         self.node.get_logger().info(f"✅✅✅ Reproduciendo por audio: {text}")
 
-        sd.play(audio, samplerate=sample_rate)
         if wait:
             sd.wait()
 
-        face_mode = "listening" if asking_mode else "idle"
-        helper_mode = HELPER_STATE.ASKING if asking_mode else HELPER_STATE.NAME 
+        face_mode = "listening" if keep_asking else "idle"
+        helper_mode = HELPER_STATE.ASKING if keep_asking else HELPER_STATE.NAME 
+        self.question_id = self.question_id if keep_asking else QUESTION.NO_QUESTION
         
         self.node.face_mode_pub.publish(String(data=face_mode)) # Mouth mode
-        self.node.helper_mode_pub.publish(String(data=json.dumps({
-            "helper_state": helper_mode.value,
-            **({"asking_mode": asking_mode} if asking_mode else {})
-        }))) # Helper mode
+        self.node.helper_mode_pub.publish(String(data=helper_mode.value)) # Helper mode
+
+    def create_question_text(self, question_id, args): # Hacer con templates mejor por variedad y demas. LLM meteria mas delay
+        if question_id == QUESTION.GET_NAME:
+            return "¿Cual es tu nombre?"
+        elif question_id == QUESTION.CONFIRM_NAME:
+            return f"Creo que eres {args['name']}, ¿es cierto?"
+        else:
+            raise ValueError(f"Question id {question_id} is not valid.")
 
 
 def main(args=None):

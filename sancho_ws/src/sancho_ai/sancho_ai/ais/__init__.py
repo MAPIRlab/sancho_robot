@@ -6,4 +6,4 @@ from .llm_classifier_templates_ai import LLMClassifierTemplatesAI
 from .llm_classifier_generator_ai import LLMClassifierGeneratorAI
 from .embedding_classifier_templates_ai import EmbeddingClassifierTemplatesAI
 
-from .llm_asking_ai import LLMAskingAI
+from .llm_task_ai import LLMTaskAI

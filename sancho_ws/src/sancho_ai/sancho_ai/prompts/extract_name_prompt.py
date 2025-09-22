@@ -53,7 +53,7 @@ Now process this input:
 Output:
 """
 
-class AskingNamePrompt(Prompt):
+class ExtractNamePrompt(Prompt):
     def __init__(self, user_input: str):
         self.user_input = user_input.strip()
 

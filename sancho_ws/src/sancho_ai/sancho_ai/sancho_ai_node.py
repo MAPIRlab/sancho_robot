@@ -1,11 +1,22 @@
 import json
 import rclpy
 from rclpy.node import Node
+from enum import Enum
 
 from hri_msgs.srv import SanchoPrompt
 
 from .log_manager import LogManager
-from .ais import create_sancho_ai, AIType, LLMAskingAI
+from .ais import create_sancho_ai, AIType, LLMTaskAI
+
+class MODE(int, Enum):
+    NORMAL = 0
+
+    GET_NAME = 1
+    CONFIRM_NAME = 2
+
+    NO_ONE_KNOWN = 3
+    SOME_KNOWN = 4
+    ALL_KNOWN = 5
 
 
 class SanchoAINode(Node):
@@ -15,7 +26,7 @@ class SanchoAINode(Node):
 
         self.type = type
         self.sancho_ai = create_sancho_ai(self.type)
-        self.asking_ai = LLMAskingAI()
+        self.task_ai = LLMTaskAI()
 
         self.prompt_serv = self.create_service(SanchoPrompt, "sancho_ai/prompt", self.prompt_service)
 
@@ -25,32 +36,32 @@ class SanchoAINode(Node):
         self.get_logger().info("SanchoAI Node initializated successfully")
 
     def prompt_service(self, request, response):
-        if not request.asking_mode:
+        if request.mode == MODE.NORMAL:
             self.get_logger().info("Normal Sancho Prompt")
             return self.normal_message(response, request.chat_id, request.text)
         
-        elif request.asking_mode == "get_name":
+        elif request.mode == MODE.GET_NAME:
             self.get_logger().info("Get Name Sancho Prompt")
             return self.get_name_message(response, request.text)
         
-        elif request.asking_mode == "confirm_name":
-            self.get_logger().info("Confirm Name Sancho prPromptompt")
+        elif request.mode == MODE.CONFIRM_NAME:
+            self.get_logger().info("Confirm Name Sancho Prompt")
             return self.confirm_name_message(response, request.text)
         
-        elif request.asking_mode == "no_one_known":
+        elif request.mode == MODE.NO_ONE_KNOWN:
             self.get_logger().info("No One Known Sancho Prompt")
             return self.no_one_known_message(response, request.text)
         
-        elif request.asking_mode == "some_known":
+        elif request.mode == MODE.SOME_KNOWN:
             self.get_logger().info("Some Known Sancho Prompt")
             return self.some_known_message(response, request.text)
         
-        elif request.asking_mode == "all_known":
+        elif request.mode == MODE.ALL_KNOWN:
             self.get_logger().info("All Known Sancho Prompt")
             return self.all_known_message(response, request.text)
 
         else:
-            self.get_logger().error(f"Sancho prompt with unknown asking mode: {request.asking_mode}")
+            self.get_logger().error(f"Sancho prompt with unknown task mode: {request.mode}")
 
     def normal_message(self, response, chat_id, text):
         chat_history = self.chats.get(chat_id, [])
@@ -72,22 +83,22 @@ class SanchoAINode(Node):
         return response
 
     def get_name_message(self, response, text):
-        return self._asking_message(response, text, self.asking_ai.get_name)
+        return self._task_message(response, text, self.task_ai.get_name)
     
     def confirm_name_message(self, response, text):
-        return self._asking_message(response, text, self.asking_ai.confirm_name)
+        return self._task_message(response, text, self.task_ai.confirm_name)
     
     def no_one_known_message(self, response, text):
-        return self._asking_message(response, text, self.asking_ai.no_one_known)
+        return self._task_message(response, text, self.task_ai.no_one_known)
     
     def some_known_message(self, response, text):
-        return self._asking_message(response, text, self.asking_ai.some_known)
+        return self._task_message(response, text, self.task_ai.some_known)
     
     def all_known_message(self, response, text):
-        return self._asking_message(response, text, self.asking_ai.all_known)  
+        return self._task_message(response, text, self.task_ai.all_known)  
     
-    def _asking_message(self, response, text, asking_method):
-        value, provider, model = asking_method(text)
+    def _task_message(self, response, text, task_method):
+        value, provider, model = task_method(text)
 
         response.value_json = json.dumps(value)
         response.provider = provider

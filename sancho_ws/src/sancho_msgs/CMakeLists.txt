@@ -27,9 +27,13 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/FaceRecognitionArray.msg"
   "msg/BoolStamped.msg"
   "msg/VADSegment.msg"
+  "msg/InputTTS.msg"
+  "msg/QuestionTTS.msg"
   "srv/SetHome.srv"
   "srv/GetNoiseFloor.srv"
   "srv/SocialState.srv"
+  "srv/GetCentralFaceCluster.srv"
+  "srv/AskUser.srv"
   "action/PlayAudio.action"
   DEPENDENCIES sensor_msgs std_msgs geometry_msgs
   )

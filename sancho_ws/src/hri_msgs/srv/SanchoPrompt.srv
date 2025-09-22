@@ -1,6 +1,7 @@
 string chat_id
 string text
-string asking_mode
+string args_json
+string mode
 ---
 string value_json
 string method
