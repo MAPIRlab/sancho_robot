@@ -135,7 +135,7 @@ class AudioDOALifecycleNode(LifecycleNode):
             # Selección del método
             angle_deg = self.doa_methods[self.doa_method].calc_doa(L, R, fs) # NO ESTOY USANDO NADA DE LO DE ARRIBA
             self.get_logger().info(f"Angulo: {angle_deg}")
-            self.pub_angle.publish(Float32(data=float(angle_deg)))
+            self.pub_angle.publish(Float32(data=float(angle_deg))) # Habria que poner el timestamp de cuando se recibio el chunk
 
         except Exception as e:
             self.get_logger().warn(f"Processing angle error: {e}")

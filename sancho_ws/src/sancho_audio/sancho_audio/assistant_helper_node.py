@@ -1,5 +1,5 @@
+import math
 import time
-import json
 import numpy as np
 from queue import Queue
 from enum import Enum
@@ -7,9 +7,9 @@ from enum import Enum
 import rclpy
 from rclpy.node import Node
 
-from std_msgs.msg import String
+from std_msgs.msg import String, Float32
 from hri_msgs.msg import ChunkMono
-from sancho_msgs.msg import QuestionTTS
+from sancho_msgs.msg import QuestionTTS, FaceRecognitionArray, UserTranscription
 from sancho_msgs.srv import AskUser
 from speech_msgs.srv import STT
 
@@ -38,11 +38,17 @@ class AssistantHelperNode(Node):
 
         self.assistant_helper = assistant_helper
 
+        self.face_recog_list = []
+        self.audio_doa_list = []
+
         self.face_mode_pub = self.create_publisher(String, "face/mode", 10)
-        self.assistant_text_pub = self.create_publisher(String, 'sancho_audio/assistant_helper/transcription', 10)
+        self.assistant_text_pub = self.create_publisher(UserTranscription, 'sancho_audio/assistant_helper/transcription', 10)
         self.question_tts_pub = self.create_publisher(QuestionTTS, 'question_tts', 10)
+
         self.micro_sub = self.create_subscription(ChunkMono, 'sancho_audio/microphone/mono', self.microphone_callback, 10)
         self.mode_sub = self.create_subscription(String, 'sancho_audio/assistant_helper/mode', self.mode_callback, 10)
+        self.face_recog_sub = self.create_subscription(FaceRecognitionArray, 'face_recognitions', self.face_recog_callback, 10)
+        self.audio_doa_sub = self.create_subscription(Float32, 'sancho_audio/doa', self.audio_doa_callback, 10)
 
         self.stt_client = self.create_client(STT, 'speech_tools/stt')
         while not self.stt_client.wait_for_service(timeout_sec=1.0):
@@ -71,6 +77,14 @@ class AssistantHelperNode(Node):
             self.get_logger().info(f"Helper state changed to: {self.assistant_helper.helper_state.name}")
         else:
             self.get_logger().info(f"Invalid helper state mode: {new_helper_state}")
+
+    def face_recog_callback(self, msg):
+        if self.assistant_helper.audio_state != AUDIO_STATE.NO_AUDIO:
+            self.face_recog_list.append(msg) # Timestamp en header
+
+    def audio_doa_callback(self, msg):
+        if self.assistant_helper.audio_state != AUDIO_STATE.NO_AUDIO:
+            self.face_recog_list.append(msg) # Habria que poner el timestamp de cuando se recibio el chunk
 
     def ask_user_service(self, request, response):
         self.question_queue.put([request.question_id, request.args_json])
@@ -198,12 +212,63 @@ class AssistantHelper:
                 play(ACTIVATION_SOUND)
                 self.node.get_logger().info(f"✅✅✅ '{self.name.upper()}' DETECTED AGAIN")
             else: # Enviar transcripción al nodo assistant
-                self.node.assistant_text_pub.publish(String(data=rec))
-                self.transcription_sent = True
-                
+                id, name = self.determine_user(self.node.face_recog_list, self.node.audio_doa_list)
+                self.node.assistant_text_pub.publish(UserTranscription(text=rec, id=id, name=name))
+
                 self.node.get_logger().info(f"✅✅✅ Text transcribed ({len(audio) / self.sample_rate}s): {rec}")
+
+                self.transcription_sent = True
+                self.node.face_recog_list = []
+                self.node.audio_doa_list = []                
         else:
             self.node.get_logger().info("Transcription result is empty.")
+
+    def determine_user(self, face_recog_list, audio_doa_list): # Hacer trackeando la evolucion en el tiempo y todo eso, de momento esta a lo simple
+        id, name = "", "" # Refactorizar con chatgpt
+
+        if len(face_recog_list) <= 0:
+            return id, name
+        
+        last_face_recog = face_recog_list[-1]
+        recognitions = last_face_recog.recognitions
+        detections = last_face_recog.detections
+
+        if len(recognitions) <= 0:
+            return id, name
+        
+        if len(recognitions) == 1:
+            return recognitions[0].id, recognitions[0].name
+    
+        if len(audio_doa_list) <= 0:
+            return id, name
+
+        last_audio_doa = audio_doa_list[-1]
+        angle = last_audio_doa.data
+
+        if angle == float("nan"):
+            return id, name
+
+        closest_recog, closest_diff = None, float('inf')
+        for i in range(len(recognitions)):
+            recognition = recognitions[i]
+            detection = detections[i]
+
+            detection_center_x = detection.corner.x + (detection.width / 2)
+            angle_x = self.calc_x_from_azimut(angle_x)
+
+            diff = abs(detection_center_x - angle_x)
+            if diff < closest_diff:
+                closest_diff = diff
+                closest_recog = recognition
+        
+        if not closest_recog:
+            return id, name
+        
+        return closest_recog.classified_id, closest_recog.classified_name
+        
+    def calc_x_from_azimut(self, azimut_deg,  yaw_off=0.0, cx=939.37064, fx=1075.42921):
+        theta = max(-89.9, min(89.9, float(azimut_deg) + yaw_off))
+        return int(round(cx + fx * math.tan(math.radians(theta))))
 
     def stt_request(self, audio, sample_rate):
         stt_request = STT.Request()
