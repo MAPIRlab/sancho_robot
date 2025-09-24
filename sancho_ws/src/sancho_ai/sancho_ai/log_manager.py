@@ -1,11 +1,10 @@
 from rclpy.node import Node
-from typing import Optional
 
 class LogManager:
-    _node: Optional[Node] = None
+    _node: Node | None = None
 
     @classmethod
-    def set_node(cls, node: Node):
+    def init(cls, node: Node):
         cls._node = node
 
     @classmethod

@@ -6,7 +6,7 @@ from llm_msgs.srv import Prompt
 
 
 class LLMEngine(ServiceEngine):
-    def __init__(self, node):
+    def __init__(self, node = None):
         super().__init__(node)
 
         load_dotenv()

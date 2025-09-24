@@ -1,7 +1,6 @@
 import json
-from typing import Any
-
 from rclpy.node import Node
+from typing import Any
 
 from .base import TaskAI
 from ..engines import LLMEngine
@@ -10,53 +9,71 @@ from ..log_manager import LogManager
 
 
 class LLMTaskAI(TaskAI):
-    def __init__(self, node: Node | None = None, provider: str | None = None, model: str | None = None):
-        self.llm_engine = LLMEngine(node if node else LLMEngine.create_client_node())
-        self.provider = provider
-        self.model = model
 
-    def get_name(self, message: str) -> tuple[dict[str, Any], str, str]:
-        return self._execute(ExtractNamePrompt(message), required=["name_said", "name"], default={"name_said": False, "name": ""})
+    _llm_engine: LLMEngine | None = None
+    _provider: str | None = None
+    _model: str | None = None
 
-    def confirm_name(self, message: str) -> tuple[dict[str, Any], str, str]:
-        return self._execute(ConfirmNamePrompt(message), required=["answer_said", "answer"], default={"answer_said": False, "answer": ""})
+    @classmethod
+    def init(cls, node: Node | None = None, provider: str | None = None, model: str | None = None):
+        cls._llm_engine = LLMEngine(node)
+        cls._provider = provider
+        cls._model = model
 
-    def no_one_known(self, message: str) -> tuple[dict[str, Any], str, str]:
-        return self._execute(NoOneKnownPrompt(message), required=["response"], default={"response": ""})
+    @classmethod
+    def get_name(cls, message: str) -> tuple[dict[str, Any], str, str]:
+        return cls._execute(ExtractNamePrompt(message), required=["name_said", "name"], default={"name_said": False, "name": ""})
 
-    def some_known(self, message: str) -> tuple[dict[str, Any], str, str]:
-        return self._execute(SomeKnownPrompt(message), required=["response"], default={"response": ""})
+    @classmethod
+    def confirm_name(cls, message: str) -> tuple[dict[str, Any], str, str]:
+        return cls._execute(ConfirmNamePrompt(message), required=["answer_said", "answer"], default={"answer_said": False, "answer": ""})
 
-    def all_known(self, message: str) -> tuple[dict[str, Any], str, str]:
-        return self._execute(AllKnownPrompt(message), required=["response"], default={"response": ""})
+    @classmethod
+    def no_one_known(cls, message: str) -> tuple[dict[str, Any], str, str]:
+        return cls._execute(NoOneKnownPrompt(message), required=["response"], default={"response": ""})
 
-    def _execute(self, prompt_obj: Prompt, required_keys: list[str], default_payload: dict[str, Any]) -> tuple[dict[str, Any], str, str]:
+    @classmethod
+    def some_known(cls, message: str) -> tuple[dict[str, Any], str, str]:
+        return cls._execute(SomeKnownPrompt(message), required=["response"], default={"response": ""})
+
+    @classmethod
+    def all_known(cls, message: str) -> tuple[dict[str, Any], str, str]:
+        return cls._execute(AllKnownPrompt(message), required=["response"], default={"response": ""})
+
+    @classmethod
+    def _execute(cls, prompt_obj: Prompt, required: list[str], default: dict[str, Any]) -> tuple[dict[str, Any], str, str]:
         prompt_name = prompt_obj.__class__.__name__
-        response, provider_used, model_used, log_message, success = self.llm_engine.prompt_request(
+        response, provider_used, model_used, log_message, success = cls._engine().prompt_request(
             prompt_system=prompt_obj.get_prompt_system(),
             user_input=prompt_obj.get_user_prompt(),
             parameters_json=prompt_obj.get_parameters(),
-            **{"provider": self.provider, "model": self.model} if (self.provider and self.model) else {}
+            **{"provider": cls._provider, "model": cls._model} if (cls._provider and cls._model) else {}
         )
 
         if not success:
             LogManager.error(f"There was a problem with {prompt_name}: {log_message}")
-            return default_payload, provider_used, model_used
+            return default, provider_used, model_used
         
         LogManager.info(f"LLM Response for {prompt_name}:\n{response}")
         raw_json = Prompt.extract_json_from_code_block(prompt_obj, response)
         if not raw_json:
             LogManager.error(f"No JSON format found for {prompt_name}.")
-            return default_payload, provider_used, model_used
+            return default, provider_used, model_used
         
         try:
             value = json.loads(raw_json)
         except Exception as e:
             LogManager.error(f"Error loading JSON for {prompt_name}: {e}")
-            return default_payload, provider_used, model_used
+            return default, provider_used, model_used
         
-        if all(k in value for k in required_keys):
+        if all(k in value for k in required):
             return value, provider_used, model_used
         
-        LogManager.error(f"Missing required fields in JSON for {prompt_name}: expected {required_keys}, got {list(value.keys())}")
-        return default_payload, provider_used, model_used
+        LogManager.error(f"Missing required fields in JSON for {prompt_name}: expected {required}, got {list(value.keys())}")
+        return default, provider_used, model_used
+
+    @classmethod
+    def _engine(cls) -> LLMEngine:
+        if cls._llm_engine is None:
+            cls._llm_engine = LLMEngine()
+        return cls._llm_engine

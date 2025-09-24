@@ -10,8 +10,8 @@ from abc import ABC
 
 class ServiceEngine(ABC):
     
-    def __init__(self, node: Node):
-        self.node = node
+    def __init__(self, node: Node | None = None):
+        self.node = node if node else self.create_client_node()
 
     def create_client(self, srv_type, srv_name, wait=True):
         client = self.node.create_client(srv_type, srv_name)
