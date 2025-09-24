@@ -12,9 +12,11 @@ from std_msgs.msg import String, Empty
 from std_srvs.srv import Empty as EmptySrv
 from hri_msgs.srv import Training, TriggerUserInteraction
 from hri_msgs.msg import Log, FaceNameResponse, FaceQuestionResponse
-from sancho_msgs.msg import FaceRecognitionArray
+from sancho_msgs.msg import FaceRecognitionArray, InputTTS
+from sancho_msgs.srv import AskUser
 
 from sancho_web_assistant.database.system_database import CONSTANTS
+from sancho_audio.assistant_node import QUESTION
 from .database.people_manager import PeopleManager
 from .api.gui_utils import mark_face
 from .hri_bridge import HRIBridge
@@ -81,8 +83,9 @@ class HumanFaceManagerLifecycleNode(LifecycleNode):
         self.pub_log = self.create_lifecycle_publisher(Log, self.logs_topic, qos10)
         self.pub_recognition = self.create_lifecycle_publisher(Image, self.camera_recognition_topic, qos1)
         self.pub_people = self.create_lifecycle_publisher(String, self.people_topic, qos1)
-        self.pub_input_tts = self.create_lifecycle_publisher(String, self.input_tts_topic, qos10)
+        self.pub_input_tts = self.create_lifecycle_publisher(InputTTS, self.input_tts_topic, qos10)
 
+        self.ask_user_client = self.create_client(AskUser, 'sancho_audio/ask_user', callback_group=self.cb_group)
         self.training_client = self.create_client(Training, "recognition/training", callback_group=self.cb_group)
         while not self.training_client.wait_for_service(timeout_sec=1.0):
             self.get_logger().info('Training service not available, waiting again...')
@@ -165,6 +168,8 @@ class HumanFaceManager:
     MIDDLE_BOUND = 0.80
     UPPER_BOUND = 0.90
 
+    DETECTOR_BOUND = 1.0
+
     def __init__(self, node: HumanFaceManagerLifecycleNode, ask_unknowns=True, draw_rectangle=True, show_distance=True, show_score=True):
         self.ask_unknowns = ask_unknowns
         self.draw_rectangle = draw_rectangle
@@ -217,22 +222,22 @@ class HumanFaceManager:
                 classified_name = None
                 classified_id = None
 
-                if score >= 1.0 and self.ask_unknowns: # Si la imagen es buena, pregunta por el nombre, para que no coja una imagen mala
+                if score >= self.DETECTOR_BOUND and self.ask_unknowns: # Si la imagen es buena, pregunta por el nombre, para que no coja una imagen mala
                     if not self.gui_request_sent_info: # Si no hay ninguna cosa enviada
                         face_aligned_base64 = self.node.bridge.cv2_to_base64(face_aligned)
                         if self.gui_request("get_name", json.dumps({"image": face_aligned_base64})):
                             self.gui_request_sent_info = [classified_id, classified_name, face_aligned_base64, features, score, distance]
-                            self.read_text("¿Cual es tu nombre?", asking_mode="get_name")
+                            self.ask_user(QUESTION.GET_NAME)
                         else:
                             self.node.get_logger().info("Error al enviar una petición de nombre a la GUI")
 
             elif distance < self.MIDDLE_BOUND: # Cree que es alguien, pide confirmacion
-                if score >= 1.0 and self.ask_unknowns: # Pero solo si la foto es buena
+                if score >= self.DETECTOR_BOUND and self.ask_unknowns: # Pero solo si la foto es buena
                     if not self.gui_request_sent_info:
                         face_aligned_base64 = self.node.bridge.cv2_to_base64(face_aligned)
                         if self.gui_request("ask_if_name", json.dumps({"image": face_aligned_base64, "name": classified_name})):
                             self.gui_request_sent_info = [classified_id, classified_name, face_aligned_base64, features, score, distance]
-                            self.read_text(f"Creo que eres {classified_name}, ¿es cierto?", asking_mode="confirm_name")
+                            self.ask_user(QUESTION.CONFIRM_NAME, args_json=json.dumps({"name": classified_name}))
                         else:
                             self.node.get_logger().info("Error al enviar una petición de preguntar nombre a la GUI")
 
@@ -240,7 +245,7 @@ class HumanFaceManager:
                 self.people.process_detection(classified_id, score, distance)
             else: # Reconoce perfectamente
                 if self.people.get_last_seen(classified_id) > 60:
-                    self.read_text("Bienvenido de vuelta " + classified_name) # Movido lo de promediar al reconocedor
+                    self.read_text("Bienvenido de vuelta " + classified_name, "happy") # Movido lo de promediar al reconocedor
 
                 self.people.process_detection(classified_id, score, distance)
 
@@ -271,7 +276,7 @@ class HumanFaceManager:
             self.node.get_logger().info(f"Nueva clase con id {classified_id}")
             self.people.process_detection(classified_id, score, distance)
 
-            self.read_text("Bienvenido " + name + ", no te conocía")
+            self.read_text("Bienvenido " + name + ", no te conocía", "happy")
 
             log_message = f"Se ha creado una nueva clase con id {classified_id}"
             metadata_json = json.dumps({"faceprint_id": classified_id, "name": name, "face_score": score})
@@ -293,7 +298,7 @@ class HumanFaceManager:
             self.node.get_logger().info(message)
 
             if output >= 0:
-                self.read_text("Gracias " + classified_name + ", me gusta confirmar que estoy reconociendo bien")
+                self.read_text("Gracias " + classified_name + ", me gusta confirmar que estoy reconociendo bien", "happy")
 
                 log_message = f"Se ha añadido un nuevo vector de características independiente a la clase {classified_id}"
                 metadata_json = json.dumps({"faceprint_id": classified_id})
@@ -303,7 +308,7 @@ class HumanFaceManager:
         else:
             if self.gui_request("get_name", json.dumps({"image": face_aligned_base64})):
                 self.gui_request_sent_info = [classified_id, classified_name, face_aligned_base64, features, score, distance]
-                self.read_text("Entonces, ¿Cual es tu nombre?", asking_mode="get_name")
+                self.ask_user(QUESTION.GET_NAME)
 
     def training_request(self, cmd_type_msg, args_msg):
         training_request = Training.Request()
@@ -327,12 +332,23 @@ class HumanFaceManager:
 
         return result.accepted
 
-    def read_text(self, text, asking_mode=""):
+    def ask_user(self, question_id, args_json=""):
+        if not self.node.ask_user_client.service_is_ready():
+            return False
+        
+        req = AskUser.Request()
+        req.question_id = question_id
+        req.args_json = args_json
+
+        future = self.node.ask_user_client.call_async(req)
+        rclpy.spin_until_future_complete(self.node, future)
+        result = future.result()
+
+        return result.accepted
+
+    def read_text(self, text, emotion="neutral"):
         self.node.get_logger().info(f"[SANCHO] {text}")
-        self.node.pub_input_tts.publish(String(data=json.dumps({
-            "text": text,
-            "asking_mode": asking_mode
-        })))
+        self.node.pub_input_tts.publish(InputTTS(text=text, emotion=emotion))
 
     def create_log(self, action, faceprint_id, message="", metadata_json=""):
         self.node.pub_log.publish(Log(

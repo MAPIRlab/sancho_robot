@@ -224,47 +224,43 @@ class AssistantHelper:
             self.node.get_logger().info("Transcription result is empty.")
 
     def determine_user(self, face_recog_list, audio_doa_list): # Hacer trackeando la evolucion en el tiempo y todo eso, de momento esta a lo simple
-        id, name = "", "" # Refactorizar con chatgpt
-
+        """Version simple que solo mira el ultmo, no tiene en cuenta que el hablante puede estar fuera de pantalla..."""
+        
+        DEFAULT = ("", "")
         if len(face_recog_list) <= 0:
-            return id, name
+            return DEFAULT
         
         last_face_recog = face_recog_list[-1]
         recognitions = last_face_recog.recognitions
         detections = last_face_recog.detections
 
         if len(recognitions) <= 0:
-            return id, name
+            return DEFAULT
         
         if len(recognitions) == 1:
-            return recognitions[0].id, recognitions[0].name
+            return recognitions[0].classified_id, recognitions[0].classified_name
     
-        if len(audio_doa_list) <= 0:
-            return id, name
+        if not audio_doa_list:
+            return DEFAULT
 
         last_audio_doa = audio_doa_list[-1]
         angle = last_audio_doa.data
 
-        if angle == float("nan"):
-            return id, name
-
-        closest_recog, closest_diff = None, float('inf')
-        for i in range(len(recognitions)):
-            recognition = recognitions[i]
-            detection = detections[i]
-
-            detection_center_x = detection.corner.x + (detection.width / 2)
-            angle_x = self.calc_x_from_azimut(angle_x)
-
-            diff = abs(detection_center_x - angle_x)
-            if diff < closest_diff:
-                closest_diff = diff
-                closest_recog = recognition
+        if angle is None or angle == float("nan"):
+            return DEFAULT
         
-        if not closest_recog:
-            return id, name
+        angle_x = self.calc_x_from_azimut(angle)
         
-        return closest_recog.classified_id, closest_recog.classified_name
+        best_recog, best_diff = None, float('inf')
+        for recog, det in zip(recognitions, detections):
+            det_center_x = det.corner.x + (det.width / 2)
+           
+            diff = abs(det_center_x - angle_x)
+            if diff < best_diff:
+                best_diff = diff
+                best_recog = recog
+        
+        return best_recog.classified_id, best_recog.classified_name if best_recog else DEFAULT
         
     def calc_x_from_azimut(self, azimut_deg,  yaw_off=0.0, cx=939.37064, fx=1075.42921):
         theta = max(-89.9, min(89.9, float(azimut_deg) + yaw_off))

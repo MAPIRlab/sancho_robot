@@ -38,7 +38,12 @@ class SanchoAINode(Node):
     def prompt_service(self, request, response):
         if request.mode == MODE.NORMAL:
             self.get_logger().info("Normal Sancho Prompt")
-            return self.normal_message(response, request.chat_id, request.text)
+
+            args = json.loads(request.args_json)
+            user_id = args["user_id"]
+            user_name = args["user_name"]
+
+            return self.normal_message(response, request.chat_id, request.text, user_id, user_name)
         
         elif request.mode == MODE.GET_NAME:
             self.get_logger().info("Get Name Sancho Prompt")
@@ -63,7 +68,7 @@ class SanchoAINode(Node):
         else:
             self.get_logger().error(f"Sancho prompt with unknown task mode: {request.mode}")
 
-    def normal_message(self, response, chat_id, text):
+    def normal_message(self, response, chat_id, text, user_id, user_name):
         chat_history = self.chats.get(chat_id, [])
 
         value, intent, arguments, provider, model = self.sancho_ai.on_message(text, chat_history)

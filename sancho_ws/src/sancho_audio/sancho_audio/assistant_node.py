@@ -8,7 +8,7 @@ from queue import Queue
 
 from std_msgs.msg import String, Bool
 from hri_msgs.srv import SanchoPrompt, TriggerUserInteraction
-from sancho_msgs.msg import InputTTS, QuestionTTS
+from sancho_msgs.msg import InputTTS, QuestionTTS, UserTranscription
 from speech_msgs.srv import TTS
 
 from sancho_audio.assistant_helper_node import HELPER_STATE
@@ -38,7 +38,7 @@ class AssistantNode(Node):
         self.name_answer_pub = self.create_publisher(String, "gui/name_answer", 10)
         self.confirm_name_pub = self.create_publisher(Bool, "gui/confirm_name", 10)
 
-        self.text_sub = self.create_subscription(String, 'sancho_audio/assistant_helper/transcription', self.text_callback, 10)
+        self.text_sub = self.create_subscription(UserTranscription, 'sancho_audio/assistant_helper/transcription', self.text_callback, 10)
         self.tts_sub = self.create_subscription(InputTTS, 'input_tts', self.tts_callback, 10)
         self.tts_sub = self.create_subscription(QuestionTTS, 'question_tts', self.question_callback, 10)
 
@@ -64,7 +64,7 @@ class AssistantNode(Node):
 
     def text_callback(self, msg):
         if self.queue.qsize() < 1:
-            self.queue.put(msg.data)
+            self.queue.put([msg.text, msg.id, msg.name])
 
     def tts_callback(self, msg):
         if self.tts_queue.qsize() < 1:
@@ -82,36 +82,9 @@ class Assistant:
     def spin(self):
         while rclpy.ok():
             if not self.node.queue.empty():
-                text = self.node.queue.get()
-                self.node.face_mode_pub.publish(String(data="thinking"))
+                [text, user_id, user_name] = self.node.queue.get()
 
-                if self.question_id == QUESTION.NO_QUESTION: # Si es un mensaje normal
-                    ai_response, emotion, data, intent = self.sancho_prompt_request(text)
-                    self.node.get_logger().info(f"✅✅✅ Respuesta recibida '{ai_response}'")
-
-                    if intent == COMMANDS.TAKE_PICTURE:
-                        data_json = json.dumps(data)
-                        self.gui_request("show_photo", data_json) # Show photo
-
-                    self.play_tts(ai_response, emotion=emotion)
-
-                elif self.question_id == QUESTION.GET_NAME: # Si es la respuesta cual es tu nombre
-                    name_said, name = self.sancho_get_name_request(text)
-                    if name_said:
-                        self.node.name_answer_pub.publish(String(data=name))
-                        self.node.helper_mode_pub.publish(String(data=HELPER_STATE.NAME.value))
-                        self.node.face_mode_pub.publish(String(data="idle"))
-                    else:
-                        self.play_tts("¿Podrías repetirlo? No he reconocido que hayas dicho ningún nombre.", "sad", keep_asking=True)
-
-                elif self.question_id == QUESTION.CONFIRM_NAME: # Si es la respuesta a confirmar nombre
-                    answer_said, answer = self.sancho_confirm_name_request(text)
-                    if answer_said:
-                        self.node.confirm_name_pub.publish(Bool(data=answer))
-                        self.node.helper_mode_pub.publish(String(data=HELPER_STATE.NAME.value))
-                        self.node.face_mode_pub.publish(String(data="idle"))
-                    else:
-                        self.play_tts("No te he entendido bien. ¿Podrías repetirlo?", "sad", keep_asking=True)
+                self.process_user_transcription(text, user_id, user_name)
 
             if not self.node.tts_queue.empty():
                 [text, emotion] = self.node.tts_queue.get()
@@ -122,15 +95,48 @@ class Assistant:
                 [self.question_id, args] = self.node.question_queue.get()
 
                 text = self.create_question_text(self.question_id, args)
-
                 self.play_tts(text, emotion="neutral", keep_asking=True)
 
             rclpy.spin_once(self.node)
 
-    def sancho_prompt_request(self, text):
+    def process_user_transcription(self, text, user_id, user_name):
+        self.node.get_logger().info(f"Usuario {user_name or 'desconocido'}: {text}")
+        self.node.face_mode_pub.publish(String(data="thinking"))
+
+        if self.question_id == QUESTION.NO_QUESTION: # Si es un mensaje normal
+            ai_response, emotion, data, intent = self.sancho_prompt_request(text, user_id, user_name)
+            self.node.get_logger().info(f"✅✅✅ Respuesta recibida '{ai_response}'")
+
+            if intent == COMMANDS.TAKE_PICTURE:
+                data_json = json.dumps(data)
+                self.gui_request("show_photo", data_json) # Show photo
+
+            self.play_tts(ai_response, emotion=emotion)
+
+        elif self.question_id == QUESTION.GET_NAME: # Si es la respuesta cual es tu nombre
+            name_said, name = self.sancho_get_name_request(text)
+            if name_said:
+                self.node.name_answer_pub.publish(String(data=name))
+                self.node.helper_mode_pub.publish(String(data=HELPER_STATE.NAME.value))
+                self.node.face_mode_pub.publish(String(data="idle"))
+            else:
+                self.play_tts("¿Podrías repetirlo? No he reconocido que hayas dicho ningún nombre.", "sad", keep_asking=True)
+
+        elif self.question_id == QUESTION.CONFIRM_NAME: # Si es la respuesta a confirmar nombre
+            answer_said, answer = self.sancho_confirm_name_request(text)
+            if answer_said:
+                self.node.confirm_name_pub.publish(Bool(data=answer))
+                self.node.helper_mode_pub.publish(String(data=HELPER_STATE.NAME.value))
+                self.node.face_mode_pub.publish(String(data="idle"))
+            else:
+                self.play_tts("No te he entendido bien. ¿Podrías repetirlo?", "sad", keep_asking=True)
+
+    def sancho_prompt_request(self, text, id, name):
         sancho_prompt_request = SanchoPrompt.Request()
-        sancho_prompt_request.chat_id = "0"
+        sancho_prompt_request.chat_id = "0" # Dejarlo vacio y que con un servicio se pueda cambiar y decidir dinamicamente cuando iniciar nuevo chat
         sancho_prompt_request.text = text
+        sancho_prompt_request.args_json = json.dumps({ "user_id": id, "user_name": name })
+        sancho_prompt_request.mode = MODE.NORMAL
 
         future_sancho_prompt = self.node.sancho_prompt_client.call_async(sancho_prompt_request)
         rclpy.spin_until_future_complete(self.node, future_sancho_prompt)
