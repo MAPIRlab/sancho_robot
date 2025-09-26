@@ -70,15 +70,25 @@ class SanchoAINode(Node):
             return response
 
     def normal_message(self, response, chat_id, text, user_id, user_name):
-        chat_history = self.chats.get(chat_id, [])
-        value, intent, arguments, provider, model = self.sancho_ai.on_message(text, chat_history)
+        user_id = user_id or "Unknown"
+        user_name = user_name or "Usuario"
 
-        chat_history.append({"role": "user", "content": text})
-        chat_history.append({"role": "assistant", "content": json.dumps({"response": value["text"], "emotion": value["emotion"]})})
+        chat_history = self.chats.get(chat_id, [])
+        user_memory = self.memory_manager.get_memory(user_id)
+        value, intent, arguments, provider, model = self.sancho_ai.on_message(text, chat_history, user_id, user_name, user_memory)
+
+        chat_history.append({"role": "user", "content": text, "id": user_id, "name": user_name})
+
+        # Antes guardaba esto asi porque el LLM repetia mejor le hecho de poner response y emotion asi en JSON, si no fallaba mas
+        # Lo comento de momento y si resulta que vuelve a fallar mas pues vuelvo a ese formato y ya veo como lo hago
+        #chat_history.append({"role": "assistant", "content": json.dumps({"response": value["text"], "emotion": value["emotion"]})})
+        
+        chat_history.append({"role": "assistant", "content": value["text"]})
+
         self.chats[chat_id] = chat_history[-20:] # últimos 10 turnos (20 mensajes)
 
         response.value_json = json.dumps(value)
-        response.method = self.type
+        response.method = self.ai_type
         response.intent = intent
         response.args_json = json.dumps(arguments)
         response.provider = provider

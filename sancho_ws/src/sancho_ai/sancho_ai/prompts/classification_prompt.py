@@ -73,7 +73,7 @@ class ClassificationPrompt(Prompt):
 
     def _format_history(self):
         lines = []
-        for msg in self.chat_history[-6:]:
+        for msg in self.chat_history:
             role = msg.get("role", "user").lower()
             content = msg.get("content", "").replace('\n', ' ')
             lines.append(f'{role}: {content}')

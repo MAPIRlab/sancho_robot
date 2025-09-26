@@ -8,3 +8,6 @@ class MemoryManager:
 
     def update_memory(self, user_id, chat_history): # Chat history includes last user prompt and assistant answer
         pass
+
+    def get_memory(self, faceprint_id):
+        return self.db.get_memory(faceprint_id)

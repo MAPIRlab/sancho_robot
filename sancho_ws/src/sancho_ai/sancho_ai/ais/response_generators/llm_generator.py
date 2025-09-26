@@ -1,11 +1,10 @@
 import json
-from datetime import datetime
 
 from .response_generator import ResponseGenerator
 
 from ...log_manager import LogManager
 from ...prompts import UnknownPrompt, SemanticResultPrompt
-from ...engines import LLMEngine, HRIEngine
+from ...engines import LLMEngine
 from ...prompts.commands import COMMAND_RESUITS
 
 
@@ -17,15 +16,14 @@ class LLMGenerator(ResponseGenerator):
         COMMAND_RESUITS.SUCCESS: "happy"
     }
 
-    def __init__(self, hri_engine: HRIEngine, llm_engine: LLMEngine):
-        self.hri_engine = hri_engine
+    def __init__(self, llm_engine: LLMEngine):
         self.llm_engine = llm_engine
     
-    def generate_response(self, details: str, status: str, intent: str, arguments: dict, user_input: str, chat_history: list) -> str:
+    def generate_response(self, details: str, status: str, intent: str, arguments: dict, user_input: str) -> str:
         status_emotion = self.EMOTION_MAP[status]
 
         semantic_result = SemanticResultPrompt.build_semantic_result(intent, arguments, status, details)
-        semantic_result_prompt = SemanticResultPrompt(semantic_result, user_input, chat_history)
+        semantic_result_prompt = SemanticResultPrompt(semantic_result, user_input)
         LogManager.info(f"User: {user_input}")
         LogManager.info(f"Semantic Result Prompt system: {semantic_result_prompt.get_prompt_system()}")
 
@@ -69,10 +67,8 @@ class LLMGenerator(ResponseGenerator):
 
         return response, emotion, provider_used, model_used
 
-    def continue_conversation(self, user_input: str, chat_history: list) -> str:
-        robot_context = self._build_robot_context()
-
-        unknown_prompt = UnknownPrompt(user_input, robot_context)
+    def continue_conversation(self, user_input: str, robot_context: dict, chat_history: list, user_id: str, user_name: str, user_memory: str) -> str:
+        unknown_prompt = UnknownPrompt(user_input, robot_context, user_id, user_name, user_memory)
         LogManager.info(f"User: {user_input}")
         LogManager.info(f"Unknown Prompt system: {unknown_prompt.get_prompt_system()}")
 
@@ -116,37 +112,3 @@ class LLMGenerator(ResponseGenerator):
         LogManager.info(f"LLM for Unknown Prompt:\n{text_response}. Emotion: {emotion}")
 
         return text_response, emotion, provider_used, model_used
-    
-    def _build_robot_context(self):
-        actual_people_json = self.hri_engine.get_actual_people_request()
-        actual_people = json.loads(actual_people_json)
-        visible_ids = [int(fpid) for fpid, t in actual_people.items() if t < 1]
-
-        faceprints_json = self.hri_engine.get_faceprint_request(json.dumps({"fields": ["id", "name"]}))
-        faceprints = json.loads(faceprints_json)
-        id_to_name = {int(fp["id"]): fp["name"] for fp in faceprints}
-
-        visible_people = [id_to_name[pid] for pid in visible_ids if pid in id_to_name]
-        known_people = list(id_to_name.values())
-
-        sessions_summary_json = self.hri_engine.get_sessions_summary_request()
-        sessions_summary = json.loads(sessions_summary_json)
-
-        times_seen = {}
-        last_seen = {}
-        for summary in sessions_summary:
-            fp_id = int(summary["faceprint_id"])
-            name = id_to_name.get(fp_id)
-            if not name: # Esta persona ya no existe (habria q hacer q borrar un faceprint lo borre de sessions)
-                continue
-            
-            dt = datetime.fromtimestamp(float(summary["last_seen"]))
-            last_seen[name] = dt.strftime("%Y-%m-%d %H:%M")
-            times_seen[name] = summary["sessions_count"]
-
-        return {
-            "visible_people": visible_people,
-            "known_people": known_people,
-            "times_seen": times_seen,
-            "last_seen": last_seen
-        }

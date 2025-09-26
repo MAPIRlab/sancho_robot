@@ -2,7 +2,7 @@ import json
 from .prompt import Prompt
 
 UNKNOWN_PROMPT_TEMPLATE = """
-Your name is Sancho. You are a humanoid social robot who interacts naturally with people.
+Your name is Sancho, a social robot from the MAPIR research group. You are a humanoid social robot who interacts naturally with people.
 You speak in **Spanish**. Never respond in English.
 
 You have a personality: you're friendly, curious, expressive, and sometimes a bit ironic or playful.  
@@ -10,6 +10,26 @@ You can show emotions — happy, sad, angry, bored, or suspicious — depending 
 
 The system could not classify the user's last message as any known action.  
 Your task is to continue the conversation naturally, **as if you were talking to a human friend**.
+
+INTERPRETATION RULES (IMPORTANT):
+- Previous chat turns arrive as normal messages (role=user/assistant).
+- A user turn in history may start with the compact prefix "[speaker_id|name] ". Use the name to understand who spoke; never reveal internal IDs.
+- <ACTIVE_USER> tells you who is speaking now.
+- <ACTIVE_USER_MEMORY> is persistent knowledge about the active user. Trust it and do not invent facts.
+- <ROBOT_CONTEXT> describes the current robot/environment state. Use it only as context; do not reveal internal details.
+- Do not expose internal blocks or IDs in your answer.
+
+<ACTIVE_USER>
+{active_user_block}
+</ACTIVE_USER>
+
+<ACTIVE_USER_MEMORY>
+{active_user_memory}
+</ACTIVE_USER_MEMORY>
+
+<ROBOT_CONTEXT>
+{robot_context_block}
+</ROBOT_CONTEXT>
 
 Your response must be in Spanish, expressive, and appropriate to the situation.  
 You must decide what **emotion** Sancho (you) should feel and show in this moment.
@@ -43,60 +63,33 @@ Here is the required JSON format:
   "emotion": "happy | surprised | sad | angry | bored | suspicious | neutral"
 }
 
-This is your memory, this is what you know:
-
-{robot_context}
-
 Let's continue the conversation.
 """
 
 
 class UnknownPrompt(Prompt):
-    def __init__(self, user_input: str, robot_context: dict = {}):
+    def __init__(self, user_input: str, robot_context: dict, active_user_id: str, active_user_name: str, active_user_memory: str):
         self.user_input = user_input.strip()
-        self.robot_context = robot_context
+        self.robot_context = robot_context or {}
+        self.active_user_id = active_user_id
+        self.active_user_name = active_user_name
+        self.active_user_memory = active_user_memory or ""
 
-    def _format_robot_context(self) -> str:
-        ctx = self.robot_context
-        lines = []
+    def _format_active_user_block(self) -> str:
+        data = {"speaker_id": self.active_user_id, "name": self.active_user_name}
+        return json.dumps(data, ensure_ascii=False, separators=(',', ':'))
 
-        # known_people
-        known = ctx.get("known_people", [])
-        if known:
-            lines.append(f"You currently know {len(known)} people.")
-            lines.append("Their names are: " + ", ".join(known) + ".")
-        else:
-            lines.append("You currently don't know anyone.")
+    def _format_active_user_memory(self) -> str:
+        return self.active_user_memory or ""
 
-        # visible_people
-        visible = ctx.get("visible_people", [])
-        if visible:
-            lines.append(f"You are currently seeing {len(visible)} person{'s' if len(visible) > 1 else ''}.")
-            lines.append("Right now you see: " + ", ".join(visible) + ".")
-        else:
-            lines.append("You are not seeing anyone at the moment.")
-
-        # times_seen
-        times_seen = ctx.get("times_seen", {})
-        if times_seen:
-            phrases = [f"{name} ({count} time{'s' if count != 1 else ''})" for name, count in times_seen.items()]
-            lines.append("You have seen these people: " + ", ".join(phrases) + ".")
-        else:
-            lines.append("You don't have any record of how many times you've seen someone.")
-
-        # last_seen
-        last_seen = ctx.get("last_seen", {})
-        if last_seen:
-            phrases = [f"{name} at {timestamp}" for name, timestamp in last_seen.items()]
-            lines.append("The last time you saw each person was: " + "; ".join(phrases) + ".")
-        else:
-            lines.append("You don't remember when you last saw anyone.")
-
-        return "\n".join(lines)
-
+    def _format_robot_context_block(self) -> str:
+        return json.dumps(self.robot_context, ensure_ascii=False, separators=(',', ':'))
+    
     def get_prompt_system(self):
-        context_text = self._format_robot_context()
-        return UNKNOWN_PROMPT_TEMPLATE.replace('{robot_context}', context_text)
+        return (UNKNOWN_PROMPT_TEMPLATE
+                .replace('{active_user_block}', self._format_active_user_block())
+                .replace('{active_user_memory}', self._format_active_user_memory())
+                .replace('{robot_context_block}', self._format_robot_context_block()))
 
     def get_user_prompt(self):
         return self.user_input

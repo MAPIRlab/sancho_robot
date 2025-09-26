@@ -15,6 +15,6 @@ class LLMClassifierGeneratorAI(ModularAI):
 
         llm_classifier = LLMClassifier(llm_engine)
         intent_executor = IntentExecutor(hri_engine)
-        llm_generator = LLMGenerator(hri_engine, llm_engine)
+        llm_generator = LLMGenerator(llm_engine)
 
-        super().__init__(llm_classifier, intent_executor, llm_generator)
+        super().__init__(hri_engine, llm_classifier, intent_executor, llm_generator)

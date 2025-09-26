@@ -40,10 +40,9 @@ Return only the JSON.
 """
 
 class SemanticResultPrompt(Prompt):
-    def __init__(self, semantic_result: dict, user_input: str, chat_history: list = []):
+    def __init__(self, semantic_result: dict, user_input: str):
         self.semantic_result = semantic_result
         self.user_input = user_input.strip()
-        self.chat_history = chat_history
         self.intent_descriptions = self._load_intent_descriptions()
 
     def _load_intent_descriptions(self):

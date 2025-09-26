@@ -82,9 +82,11 @@ class SystemDatabase:
     def get_all_logs(self):
         self.cursor.execute('SELECT * FROM logs')
         rows = self.cursor.fetchall()
+        
         return [dict(row) for row in rows]
 
     def get_log_by_id(self, id):
         self.cursor.execute('SELECT * FROM logs WHERE id = ?', (id,))
         row = self.cursor.fetchone()
+
         return dict(row) if row else {}
