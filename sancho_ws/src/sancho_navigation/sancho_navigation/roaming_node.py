@@ -136,6 +136,7 @@ class RoamingNode(Node):
         self.generating = False
         self._gen_attempt_idx = 0
         self._gen_start_pose = None  # pose inicial cacheada para esta tanda
+        self.get_logger().info("Iniciando roaming node")
 
     def _init_home(self):
         """Intento de obtener la pose actual: una vez válida, se fija como Home y arranca el roaming."""
@@ -205,7 +206,7 @@ class RoamingNode(Node):
                 rclpy.time.Time(),
                 timeout=Duration(seconds=self.compute_path_timeout),
             ):
-                return None
+                raise LookupException(f"Transform no disponible: {self.frame_id} <- base_link")
             trans = self.tf_buffer.lookup_transform(
                 self.frame_id,
                 "base_link",
