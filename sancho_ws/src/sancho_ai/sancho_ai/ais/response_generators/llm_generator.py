@@ -84,23 +84,23 @@ class LLMGenerator(ResponseGenerator):
             return "Lo siento, no te he entendido", "sad", provider_used, model_used
         
         LogManager.info(f"LLM for Unknown Prompt:\n{response}")
-        classification_response_json = SemanticResultPrompt.extract_json_from_code_block(response) # Gemini usually puts the response in ```json block
-        if not classification_response_json:
+        response_json = SemanticResultPrompt.extract_json_from_code_block(response) # Gemini usually puts the response in ```json block
+        if not response_json:
             LogManager.error(f"No JSON format found.")
 
             if "{" not in response and "}" not in response:
-                classification_response_json = json.dumps({ "response": response, "emotion": "neutral"})
+                response_json = json.dumps({ "response": response, "emotion": "neutral"})
                 LogManager.info(f"Assuming response is only text.")
             else:
                 return "Lo siento, no te he entendido", "neutral", provider_used, model_used
 
-        classification_response = SemanticResultPrompt.try_json_loads(classification_response_json)
-        if not classification_response:
+        response = SemanticResultPrompt.try_json_loads(response_json)
+        if not response:
             LogManager.error(f"Error on JSON loads.")
             return "Lo siento, no te he entendido", "neutral", provider_used, model_used
         
-        text_response = classification_response.get("response", "")
-        emotion = classification_response.get("emotion", "")
+        text_response = response.get("response", "")
+        emotion = response.get("emotion", "")
         if not text_response:
             LogManager.error(f"The JSON response does not contain a text response.")
             return "Lo siento, no te he entendido", "neutral", provider_used, model_used

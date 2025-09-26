@@ -8,7 +8,7 @@ from ..prompts import Prompt, ExtractNamePrompt, ConfirmNamePrompt, NoOneKnownPr
 from ..log_manager import LogManager
 
 
-class LLMTaskAI(TaskAI):
+class LLMTaskAI(TaskAI): # Only callable tasks as a single SanchoPrompt, no tasks like classification or memory builder
 
     _llm_engine: LLMEngine | None = None
     _provider: str | None = None

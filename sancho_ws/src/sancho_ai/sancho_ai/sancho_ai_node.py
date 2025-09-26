@@ -35,7 +35,7 @@ class SanchoAINode(Node):
     def __init__(self, ai_type):
         super().__init__("sancho_ai")
 
-        self.ai_type = ai_type
+        self.ai_type = ai_type 
         self.sancho_ai = create_sancho_ai(self.ai_type)
         self.memory_manager = MemoryManager()
         self.chats = {}
@@ -77,16 +77,6 @@ class SanchoAINode(Node):
         user_memory = self.memory_manager.get_memory(user_id)
         value, intent, arguments, provider, model = self.sancho_ai.on_message(text, chat_history, user_id, user_name, user_memory)
 
-        chat_history.append({"role": "user", "content": text, "id": user_id, "name": user_name})
-
-        # Antes guardaba esto asi porque el LLM repetia mejor le hecho de poner response y emotion asi en JSON, si no fallaba mas
-        # Lo comento de momento y si resulta que vuelve a fallar mas pues vuelvo a ese formato y ya veo como lo hago
-        #chat_history.append({"role": "assistant", "content": json.dumps({"response": value["text"], "emotion": value["emotion"]})})
-        
-        chat_history.append({"role": "assistant", "content": value["text"]})
-
-        self.chats[chat_id] = chat_history[-20:] # últimos 10 turnos (20 mensajes)
-
         response.value_json = json.dumps(value)
         response.method = self.ai_type
         response.intent = intent
@@ -94,8 +84,19 @@ class SanchoAINode(Node):
         response.provider = provider
         response.model = model
 
-        chat = list(self.chats[chat_id])
-        threading.Thread(target=self.memory_manager.update_memory, args=(user_id, chat), daemon=True).start()
+
+        # Update memory (Could be handled inside on_message, only if unknown intent...)
+        chat = list(chat_history) # Without last user input and last user answer
+        threading.Thread(target=self.memory_manager.update_memory, args=(text, chat_history, user_id, user_name), daemon=True).start()
+
+
+        # Update chat history
+        chat_history.append({"role": "user", "content": text, "id": user_id, "name": user_name})
+        chat_history.append({"role": "assistant", "content": value["text"]})
+        # Antes guardaba esto asi porque el LLM repetia mejor le hecho de poner response y emotion asi en JSON, si no fallaba mas
+        # Lo comento de momento y si resulta que vuelve a fallar mas pues vuelvo a ese formato y ya veo como lo hago
+        #chat_history.append({"role": "assistant", "content": json.dumps({"response": value["text"], "emotion": value["emotion"]})})
+        self.chats[chat_id] = chat_history[-20:] # últimos 10 turnos (20 mensajes)
 
         return response
 

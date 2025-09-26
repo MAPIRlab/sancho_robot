@@ -48,7 +48,7 @@ CONTRADICTIONS & UPDATES
 
 OUTPUT (STRICT)
 - Output **only** a valid JSON object with **exactly**:
-  - "updated_memory": string — the **entire** memory after applying changes (may be an empty string).
+  - "new_memory": string — the **entire** memory after applying changes (may be an empty string).
   - "memory_updated": boolean — **true** if you changed anything, **false** if identical to <CURRENT_MEMORY>.
 
 EXAMPLES
@@ -67,7 +67,7 @@ LATEST_USER_MESSAGE:
 No, prefiero café.
 Expected JSON:
 {
-  "updated_memory": "Le gusta el chocolate.\\nVive en Málaga.\\nPrefiere el café.",
+  "new_memory": "Le gusta el chocolate.\\nVive en Málaga.\\nPrefiere el café.",
   "memory_updated": true
 }
 
@@ -84,7 +84,7 @@ LATEST_USER_MESSAGE:
 Ya no me gusta el chocolate.
 Expected JSON:
 {
-  "updated_memory": "No le gusta el chocolate.\\nVive en Málaga.",
+  "new_memory": "No le gusta el chocolate.\\nVive en Málaga.",
   "memory_updated": true
 }
 
@@ -100,7 +100,7 @@ LATEST_USER_MESSAGE:
 Sí.
 Expected JSON:
 {
-  "updated_memory": "Su deporte favorito es el baloncesto.",
+  "new_memory": "Su deporte favorito es el baloncesto.",
   "memory_updated": true
 }
 
@@ -115,7 +115,7 @@ LATEST_USER_MESSAGE:
 Cuéntame un chiste.
 Expected JSON:
 {
-  "updated_memory": "Vive en Málaga.",
+  "new_memory": "Vive en Málaga.",
   "memory_updated": false
 }
 

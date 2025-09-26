@@ -33,9 +33,6 @@ class MemoryDatabase:
         return dict(row) if row else None
 
     # ----------------- MEMORIES -----------------
-    def get_memory(self, faceprint_id):
-        return self._read_latest(faceprint_id)
-
     def update_memory(self, faceprint_id, memory_text):
         now_ts = datetime.now().timestamp()
 
@@ -45,4 +42,7 @@ class MemoryDatabase:
         ''', (faceprint_id, memory_text, now_ts, faceprint_id))
         self.conn.commit()
         
+        return self._read_latest(faceprint_id)
+    
+    def get_memory(self, faceprint_id):
         return self._read_latest(faceprint_id)
