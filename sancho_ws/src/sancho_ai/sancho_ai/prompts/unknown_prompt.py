@@ -68,6 +68,7 @@ Let's continue the conversation.
 
 
 class UnknownPrompt(Prompt):
+    
     def __init__(self, user_input: str, robot_context: dict, active_user_id: str, active_user_name: str, active_user_memory: str):
         self.user_input = user_input.strip()
         self.robot_context = robot_context or {}
