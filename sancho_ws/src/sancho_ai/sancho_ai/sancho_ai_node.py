@@ -3,9 +3,11 @@ import rclpy
 import threading
 
 from rclpy.node import Node
+from datetime import datetime
 from enum import Enum
 
 from hri_msgs.srv import SanchoPrompt
+from sancho_msgs.msg import ConversationTurn
 
 from .log_manager import LogManager
 from .memory_manager import MemoryManager
@@ -40,6 +42,7 @@ class SanchoAINode(Node):
         self.memory_manager = MemoryManager()
         self.chats = {}
 
+        self.conversation_log_pub = self.create_publisher(ConversationTurn, "conversation_log/add", 10)
         self.prompt_serv = self.create_service(SanchoPrompt, "sancho_ai/prompt", self.prompt_service)
 
         LLMTaskAI.init(self)
@@ -72,10 +75,12 @@ class SanchoAINode(Node):
     def normal_message(self, response, chat_id, text, user_id, user_name):
         user_id = user_id or "Unknown"
         user_name = user_name or "Usuario"
+        user_timestamp = datetime.now().timestamp()
 
         chat_history = self.chats.get(chat_id, [])
         user_memory = self.memory_manager.get_memory(user_id)
         value, intent, arguments, provider, model = self.sancho_ai.on_message(text, chat_history, user_id, user_name, user_memory)
+        assistant_timestamp = datetime.now().timestamp()
 
         response.value_json = json.dumps(value)
         response.method = self.ai_type
@@ -96,7 +101,25 @@ class SanchoAINode(Node):
         # Lo comento de momento y si resulta que vuelve a fallar mas pues vuelvo a ese formato y ya veo como lo hago
         #chat_history.append({"role": "assistant", "content": json.dumps({"response": value["text"], "emotion": value["emotion"]})})
         self.chats[chat_id] = chat_history[-20:] # últimos 10 turnos (20 mensajes)
-        
+
+        # Add to logs
+        self.conversation_log_pub.publish(ConversationTurn(
+            chat_id=chat_id,
+
+            user_timestamp=user_timestamp,
+            user_id=user_id,
+            user_name=user_name,
+            user_text=text,
+            user_intent=intent,
+            user_arguments_json=json.dumps(arguments),
+
+            assistant_timestamp=assistant_timestamp,
+            assistant_text=value["text"],
+            assistant_value_json=json.dumps(value),
+            assistant_provider=provider,
+            assistant_model=model
+        ))
+
         return response
 
     def task_message(self, response, text, task_method):
