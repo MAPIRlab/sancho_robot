@@ -86,7 +86,6 @@ class SanchoAINode(Node):
 
 
         # Update memory (Could be handled inside on_message, only if unknown intent...)
-        chat = list(chat_history) # Without last user input and last user answer
         threading.Thread(target=self.memory_manager.update_memory, args=(text, chat_history, user_id, user_name), daemon=True).start()
 
 
@@ -97,7 +96,7 @@ class SanchoAINode(Node):
         # Lo comento de momento y si resulta que vuelve a fallar mas pues vuelvo a ese formato y ya veo como lo hago
         #chat_history.append({"role": "assistant", "content": json.dumps({"response": value["text"], "emotion": value["emotion"]})})
         self.chats[chat_id] = chat_history[-20:] # últimos 10 turnos (20 mensajes)
-
+        
         return response
 
     def task_message(self, response, text, task_method):

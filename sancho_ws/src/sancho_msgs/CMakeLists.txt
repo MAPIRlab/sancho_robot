@@ -30,6 +30,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/InputTTS.msg"
   "msg/QuestionTTS.msg"
   "msg/UserTranscription.msg"
+  "msg/ConversationTurn.msg"
   "srv/SetHome.srv"
   "srv/GetNoiseFloor.srv"
   "srv/SocialState.srv"
