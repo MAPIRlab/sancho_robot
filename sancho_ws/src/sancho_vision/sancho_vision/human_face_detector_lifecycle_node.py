@@ -112,7 +112,7 @@ class HumanFaceDetectorLifecycleNode(LifecycleNode):
         self.pub_dets.publish(msg_array)
 
     def detection_service(self, request, response):
-        positions, confidences = self.detect(request.image)
+        positions, confidences = self.detect(request.frame)
 
         response.positions, response.scores = self.bridge.detector_to_msg(positions, confidences)
 

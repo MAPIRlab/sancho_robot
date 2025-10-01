@@ -29,6 +29,13 @@ def generate_launch_description():
         emulate_tty=True,
     )
 
+    audio_doa_overlay_node = Node(
+        namespace='',
+        package='sancho_audio',
+        executable='audio_doa_overlay',
+        name='audio_doa_overlay'
+    )
+
     configurator_node = Node(
         package='sancho_lifecycle_utils',            
         executable='node_configurator',          
@@ -58,6 +65,7 @@ def generate_launch_description():
         GroupAction([
             microphone_node,
             audio_doa_node,
+            audio_doa_overlay_node,
             configurator_node
         ]),
     ])

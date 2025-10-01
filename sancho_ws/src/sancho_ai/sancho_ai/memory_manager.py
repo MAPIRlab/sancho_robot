@@ -1,4 +1,4 @@
-import json
+import os
 
 from .database.memory_database import MemoryDatabase
 from .prompts import MemoryBuilderPrompt
@@ -9,7 +9,9 @@ from .engines import LLMEngine
 class MemoryManager:
 
     def __init__(self):
-        self.db = MemoryDatabase()
+        self.db_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "database/memory.db"))
+        self.db = MemoryDatabase(self.db_path)
+
         self.llm_engine = LLMEngine()
 
     def update_memory(self, user_input: str, chat_history: str, faceprint_id: str, faceprint_name: str):

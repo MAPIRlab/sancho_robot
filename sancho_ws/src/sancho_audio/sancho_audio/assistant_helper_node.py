@@ -114,8 +114,8 @@ class AssistantHelper:
         self.check_audio = []
         self.previous_chunk = []
 
-        #self.hotword_detector = STTHotword(self.stt_request, name=name)
-        self.hotword_detector = PVPorcupineHotword()
+        self.hotword_detector = STTHotword(self.stt_request, name=name)
+        #self.hotword_detector = PVPorcupineHotword()
         self.chunk_attach_criterion = IntensityAttachCriterion(self.intensity_threshold)
         #self.chunk_attach_criterion = SileroVADAttachCriterion()
         
@@ -213,8 +213,9 @@ class AssistantHelper:
                 self.node.get_logger().info(f"✅✅✅ '{self.name.upper()}' DETECTED AGAIN")
             else: # Enviar transcripción al nodo assistant
                 id, name = self.determine_user(self.node.face_recog_list, self.node.audio_doa_list)
-                self.node.assistant_text_pub.publish(UserTranscription(text=rec, id=id, name=name))
+                self.node.get_logger().info(f"📖📖📖 USUARIO IDENTIFICADO: {id}-{name}")
 
+                self.node.assistant_text_pub.publish(UserTranscription(text=rec, id=id, name=name))
                 self.node.get_logger().info(f"✅✅✅ Text transcribed ({len(audio) / self.sample_rate}s): {rec}")
 
                 self.transcription_sent = True

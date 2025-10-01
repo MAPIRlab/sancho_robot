@@ -1,11 +1,10 @@
 import torch
 import numpy as np
 
-from rclpy.node import Node
 from scipy.signal import resample_poly
 
 
-class SileroVADAttachCriterion(Node):
+class SileroVADAttachCriterion:
     
     VAD_SAMPLE_RATE = 16000
 

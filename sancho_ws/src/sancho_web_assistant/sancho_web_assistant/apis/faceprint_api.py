@@ -75,7 +75,7 @@ class FaceprintAPI:
 
                         log_message = f"Se ha creado una nueva clase con id {classified_id} desde la web"
                         metadata_json = json.dumps({ "faceprint_id": classified_id, "name": name, "face_score": score })
-                        self.engine.create_log(CONSTANTS.ACTION.ADD_CLASS, classified_id)
+                        self.engine.create_log(CONSTANTS.ACTION.ADD_CLASS, classified_id, log_message, metadata_json)
 
                         return JSONResponse(content=updated_item)
                     

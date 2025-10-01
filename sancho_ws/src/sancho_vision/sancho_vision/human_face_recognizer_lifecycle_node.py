@@ -136,7 +136,7 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
         msg_out.image = msg.image
         msg_out.detections = msg.detections
 
-        for recog in self.recognize(msg.image, msg.detections):
+        for recog in self.recognize(msg.image, msg.detections, self.learn_without_name):
             face_aligned, features, faceprint, distance, pos, face_updated = recog
 
             recog = FaceRecognition(
@@ -157,7 +157,7 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
         [rx, ry, rw, rh] = [request.position.x, request.position.y, request.position.w, request.position.h]
         face_detection = FaceDetection(corner=Point(x=rx, y=ry), width=rw, height=rh, confidence=request.score)
 
-        face_aligned, features, faceprint, distance, pos, face_updated = self.recognize(request.frame, [face_detection])[0]
+        face_aligned, features, faceprint, distance, pos, face_updated = self.recognize(request.frame, [face_detection], False)[0]
 
         response.face_aligned = self.bridge.cv2_to_imgmsg(face_aligned, "bgr8")
         response.features = features
@@ -171,7 +171,7 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
 
         return response
 
-    def recognize(self, frame, detections):
+    def recognize(self, frame, detections, learn_without_name):
         if isinstance(frame, Image): # Normaliza el frame si viene como sensor_msgs/Image
             frame = self.bridge.imgmsg_to_cv2(frame, "bgr8")
 
@@ -190,7 +190,7 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
                 if face_updated:
                     self.send_faceprint_event(FaceprintEvent.UPDATE, faceprint["id"], FaceprintEvent.ORIGIN_ROS)
 
-            if self.learn_without_name and confidence >= 1.0 and distance < 0.75: # Ir ajustando el valor de distance 
+            if learn_without_name and confidence >= 1.0 and distance < 0.75: # Ir ajustando el valor de distance 
                 face = self.bridge.cv2_to_base64(face_aligned)
                 distance = 1.0
 

@@ -7,7 +7,7 @@ import { useCamera } from "../../../hooks/useCamera";
 import { useNavigate } from "react-router-dom";
 import { useAPI } from "../../../contexts/APIContext";
 
-const NewFaceprintModal = ({ handleClose, isOpen, doAddFaceprint }) => {
+const NewFaceprintModal = ({ handleClose, isOpen, action }) => {
     const { videoRef, isActive: usingCamera, startCamera, stopCamera, takePhoto } = useCamera();
     const { showToast } = useToast();
     const { isResponseOk } = useAPI();
@@ -61,7 +61,7 @@ const NewFaceprintModal = ({ handleClose, isOpen, doAddFaceprint }) => {
 
         try {
             const base64Image = await convertToBase64(selectedImage);
-            const response = await doAddFaceprint(trimmedName, base64Image);
+            const response = await action(trimmedName, base64Image);
 
             cleanAndClose();
             if (isResponseOk(response)) navigate(`/faceprints/${response.data.id}`)

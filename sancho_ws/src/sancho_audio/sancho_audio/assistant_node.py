@@ -51,8 +51,8 @@ class AssistantNode(Node):
             self.get_logger().info('TTS service not available, waiting again...')
 
         self.gui_client = self.create_client(TriggerUserInteraction, 'gui/request')
-        while not self.gui_client.wait_for_service(timeout_sec=1.0):
-            self.get_logger().info('GUI service not available, waiting again...')
+        #while not self.gui_client.wait_for_service(timeout_sec=1.0):
+        #    self.get_logger().info('GUI service not available, waiting again...')
         
         self.queue = Queue(maxsize=1)
         self.tts_queue = Queue(maxsize=1)
@@ -193,6 +193,10 @@ class Assistant:
         return result_tts.audio, result_tts.sample_rate
 
     def gui_request(self, mode, data_json):
+        if not self.node.gui_client.service_is_ready():
+            self.node.get_logger().error("ERROR: GUI SERVICE IS NOT AVAILABLE")
+            return
+        
         req = TriggerUserInteraction.Request()
         req.mode = mode
         req.data_json = data_json
