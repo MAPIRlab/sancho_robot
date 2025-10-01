@@ -13,15 +13,15 @@ from .log_manager import LogManager
 from .memory_manager import MemoryManager
 from .ais import create_sancho_ai, AIType, LLMTaskAI
 
-class MODE(int, Enum):
-    NORMAL = 0
+class MODE(str, Enum):
+    NORMAL = "normal"
 
-    GET_NAME = 1
-    CONFIRM_NAME = 2
+    GET_NAME = "get_name"
+    CONFIRM_NAME = "confirm_name"
 
-    NO_ONE_KNOWN = 3
-    SOME_KNOWN = 4
-    ALL_KNOWN = 5
+    NO_ONE_KNOWN = "no_one_known"
+    SOME_KNOWN = "some_known"
+    ALL_KNOWN = "all_known"
 
 
 class SanchoAINode(Node):

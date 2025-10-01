@@ -66,7 +66,7 @@ async def create_faceprint(
         image_base64 = update_data["image"]
         
         response = faceprint_api.create_faceprint(name, image_base64)
-
+        
         return response.to_fastapi()
 
     except HTTPException as e:

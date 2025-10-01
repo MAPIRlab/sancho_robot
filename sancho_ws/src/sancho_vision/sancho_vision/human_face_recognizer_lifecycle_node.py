@@ -155,19 +155,17 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
 
     def recognition_service(self, request, response):
         [rx, ry, rw, rh] = [request.position.x, request.position.y, request.position.w, request.position.h]
-        face_detection = FaceDetection(corner=Point(x=rx, y=ry), width=rw, height=rh, confidence=request.score)
+        face_detection = FaceDetection(corner=Point(x=float(rx), y=float(ry)), width=float(rw), height=float(rh), confidence=request.score)
 
-        face_aligned, features, faceprint, distance, pos, face_updated = self.recognize(request.frame, [face_detection], False)[0]
+        face_aligned, features, faceprint, distance, pos, face_updated = next(self.recognize(request.frame, [face_detection], False))
 
         response.face_aligned = self.bridge.cv2_to_imgmsg(face_aligned, "bgr8")
-        response.features = features
+        response.features = [float(f) for f in features]
         response.classified_id = faceprint["id"]
         response.classified_name = faceprint["name"]
         response.distance = distance
         response.pos = pos
         response.face_updated = face_updated
-        response.result = 0
-        response.message = String(data="Reconocimiento exitoso")
 
         return response
 
@@ -223,7 +221,7 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
                 self.send_faceprint_event(event, id, origin)
 
         response.result = result
-        response.message = String(data=str(message))
+        response.message = String(data=str(message["id"] if cmd_type == "add_class" and result >= 0 else message))
         return response
 
     def get_people_service(self, request, response):

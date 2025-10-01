@@ -35,6 +35,8 @@ class STTHotword(ModelHotword):
             return ""
 
     def _check_hotword(self, transcript: str) -> bool:
+        if transcript:
+            return True
         if not transcript:
             return False
 

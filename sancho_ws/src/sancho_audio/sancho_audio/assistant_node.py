@@ -58,8 +58,6 @@ class AssistantNode(Node):
         self.tts_queue = Queue(maxsize=1)
         self.question_queue = Queue()
 
-        self.question_id = QUESTION.NO_QUESTION
-
         self.get_logger().info("Assistant Node initializated succesfully.")
 
     def text_callback(self, msg):
@@ -78,7 +76,9 @@ class Assistant:
 
     def __init__(self):
         self.node = AssistantNode()
-    
+
+        self.question_id = QUESTION.NO_QUESTION
+
     def spin(self):
         while rclpy.ok():
             if not self.node.queue.empty():
@@ -100,7 +100,7 @@ class Assistant:
             rclpy.spin_once(self.node)
 
     def process_user_transcription(self, text, user_id, user_name):
-        self.node.get_logger().info(f"Usuario {user_name or 'desconocido'}: {text}")
+        self.node.get_logger().info(f"Usuario {user_name or 'desconocido'} dice: {text}")
         self.node.face_mode_pub.publish(String(data="thinking"))
 
         if self.question_id == QUESTION.NO_QUESTION: # Si es un mensaje normal
@@ -136,7 +136,7 @@ class Assistant:
         sancho_prompt_request.chat_id = "0" # Dejarlo vacio y que con un servicio se pueda cambiar y decidir dinamicamente cuando iniciar nuevo chat
         sancho_prompt_request.text = text
         sancho_prompt_request.args_json = json.dumps({ "user_id": id, "user_name": name })
-        sancho_prompt_request.mode = MODE.NORMAL
+        sancho_prompt_request.mode = MODE.NORMAL.value
 
         future_sancho_prompt = self.node.sancho_prompt_client.call_async(sancho_prompt_request)
         rclpy.spin_until_future_complete(self.node, future_sancho_prompt)
@@ -153,7 +153,7 @@ class Assistant:
     def sancho_get_name_request(self, text):
         sancho_prompt_request = SanchoPrompt.Request()
         sancho_prompt_request.text = text
-        sancho_prompt_request.mode = MODE.GET_NAME
+        sancho_prompt_request.mode = MODE.GET_NAME.value
 
         future_sancho_prompt = self.node.sancho_prompt_client.call_async(sancho_prompt_request)
         rclpy.spin_until_future_complete(self.node, future_sancho_prompt)
@@ -169,7 +169,7 @@ class Assistant:
     def sancho_confirm_name_request(self, text):
         sancho_prompt_request = SanchoPrompt.Request()
         sancho_prompt_request.text = text
-        sancho_prompt_request.mode = MODE.CONFIRM_NAME
+        sancho_prompt_request.mode = MODE.CONFIRM_NAME.value
 
         future_sancho_prompt = self.node.sancho_prompt_client.call_async(sancho_prompt_request)
         rclpy.spin_until_future_complete(self.node, future_sancho_prompt)
