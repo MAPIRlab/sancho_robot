@@ -1,2 +1,2 @@
-int question_id
+int32 question_id
 string args_json
