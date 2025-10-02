@@ -141,9 +141,9 @@ Now perform the memory update using this latest user message:
 
 class MemoryBuilderPrompt(Prompt):
 
-    def __init__(self, user_input: str, chat_history: str, user_id: str, user_name: str, user_memory: str):
+    def __init__(self, user_input: str, chat_history: list, user_id: str, user_name: str, user_memory: str):
         self.user_input = (user_input or "").strip()
-        self.chat_history = chat_history or ""
+        self.chat_history = chat_history or []
         self.user_id = user_id or ""
         self.user_name = user_name or ""
         self.user_memory = user_memory or ""
@@ -152,11 +152,25 @@ class MemoryBuilderPrompt(Prompt):
         data = {"user_id": self.user_id, "user_name": self.user_name}
         return json.dumps(data, ensure_ascii=False, separators=(',', ':'))
 
+    def _format_history(self):
+        lines = []
+        for msg in self.chat_history:
+            role = msg["role"].lower()
+            content = msg["content"].replace('\n', ' ')
+            if role == "user":
+                id = msg["id"]
+                name = msg["name"]
+                lines.append(f'[{id}|{name}] {content}')
+            else:
+                lines.append(f'{content}')
+                
+        return "\n".join(lines) if lines else "No previous conversation."
+
     def get_prompt_system(self):
         return (MEMORY_BUILDER_PROMPT
                 .replace('{user_context_block}', self._format_user_context_block())
                 .replace('{current_memory_block}', self.user_memory)
-                .replace('{chat_history_block}', self.chat_history)
+                .replace('{chat_history_block}', self._format_history())
                 .replace('{latest_user_message_block}', self.user_input))
 
     def get_user_prompt(self):

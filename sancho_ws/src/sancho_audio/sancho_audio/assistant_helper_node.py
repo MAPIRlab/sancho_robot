@@ -7,7 +7,7 @@ from enum import Enum
 import rclpy
 from rclpy.node import Node
 
-from std_msgs.msg import String, Float32
+from std_msgs.msg import String, Float32, Int16
 from hri_msgs.msg import ChunkMono
 from sancho_msgs.msg import QuestionTTS, FaceRecognitionArray, UserTranscription
 from sancho_msgs.srv import AskUser
@@ -46,7 +46,7 @@ class AssistantHelperNode(Node):
         self.question_tts_pub = self.create_publisher(QuestionTTS, 'question_tts', 10)
 
         self.micro_sub = self.create_subscription(ChunkMono, 'sancho_audio/microphone/mono', self.microphone_callback, 10)
-        self.mode_sub = self.create_subscription(String, 'sancho_audio/assistant_helper/mode', self.mode_callback, 10)
+        self.mode_sub = self.create_subscription(Int16, 'sancho_audio/assistant_helper/mode', self.mode_callback, 10)
         self.face_recog_sub = self.create_subscription(FaceRecognitionArray, 'face_recognitions', self.face_recog_callback, 10)
         self.audio_doa_sub = self.create_subscription(Float32, 'sancho_audio/doa', self.audio_doa_callback, 10)
 
@@ -84,7 +84,7 @@ class AssistantHelperNode(Node):
 
     def audio_doa_callback(self, msg):
         if self.assistant_helper.audio_state != AUDIO_STATE.NO_AUDIO:
-            self.face_recog_list.append(msg) # Habria que poner el timestamp de cuando se recibio el chunk
+            self.audio_doa_list.append(msg) # Habria que poner el timestamp de cuando se recibio el chunk
 
     def ask_user_service(self, request, response):
         self.question_queue.put([request.question_id, request.args_json])
@@ -230,7 +230,7 @@ class AssistantHelper:
         DEFAULT = ("", "")
         if len(face_recog_list) <= 0:
             return DEFAULT
-        
+
         last_face_recog = face_recog_list[-1]
         recognitions = last_face_recog.recognitions
         detections = last_face_recog.detections

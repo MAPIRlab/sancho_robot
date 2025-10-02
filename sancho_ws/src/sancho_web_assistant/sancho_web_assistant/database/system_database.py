@@ -215,7 +215,8 @@ class SystemDatabase:
             raise ValueError(f"message_id {message_id} does not exist")
         if row['role'] != 'user':
             raise ValueError(f"message_id {message_id} is not a 'user' message")
-
+        print("message_id", message_id, "user_id", user_id, "user_name", user_name, "intent", intent, "arguments_json", arguments_json)
+        # da error aqui por la cara
         self.cursor.execute('''
             INSERT INTO message_nlu (message_id, user_id, user_name, intent, arguments_json)
             VALUES (?, ?, ?, ?, ?, ?)

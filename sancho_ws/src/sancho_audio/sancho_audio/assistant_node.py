@@ -6,7 +6,7 @@ from rclpy.node import Node
 from enum import Enum
 from queue import Queue
 
-from std_msgs.msg import String, Bool
+from std_msgs.msg import String, Int16, Bool
 from hri_msgs.srv import SanchoPrompt, TriggerUserInteraction
 from sancho_msgs.msg import InputTTS, QuestionTTS, UserTranscription
 from speech_msgs.srv import TTS
@@ -34,7 +34,7 @@ class AssistantNode(Node):
         super().__init__("assistant")
 
         self.face_mode_pub = self.create_publisher(String, "face/mode", 10)
-        self.helper_mode_pub = self.create_publisher(String, 'sancho_audio/assistant_helper/mode', 10)
+        self.helper_mode_pub = self.create_publisher(Int16, 'sancho_audio/assistant_helper/mode', 10)
         self.name_answer_pub = self.create_publisher(String, "gui/name_answer", 10)
         self.confirm_name_pub = self.create_publisher(Bool, "gui/confirm_name", 10)
 
@@ -210,7 +210,7 @@ class Assistant:
     def play_tts(self, text, emotion="neutral", keep_asking=False, wait=True):
         self.node.face_mode_pub.publish(String(data="speaking")) # Mouth speaking
         self.node.face_mode_pub.publish(String(data=emotion.lower())) # Mouth color
-        self.node.helper_mode_pub.publish(String(data=json.dumps({ "helper_state": HELPER_STATE.SPEAKING.value }))) # Speaking mode
+        self.node.helper_mode_pub.publish(Int16(data=HELPER_STATE.SPEAKING.value)) # Speaking mode
         
         audio, sample_rate = self.tts_request(text)
         
@@ -225,7 +225,7 @@ class Assistant:
         self.question_id = self.question_id if keep_asking else QUESTION.NO_QUESTION
         
         self.node.face_mode_pub.publish(String(data=face_mode)) # Mouth mode
-        self.node.helper_mode_pub.publish(String(data=helper_mode.value)) # Helper mode
+        self.node.helper_mode_pub.publish(Int16(data=helper_mode.value)) # Helper mode
 
     def create_question_text(self, question_id, args): # Hacer con templates mejor por variedad y demas. LLM meteria mas delay
         if question_id == QUESTION.GET_NAME:

@@ -50,7 +50,7 @@ class ModularAI(ABC):
         return [{k: m[k] for k in ["role", "content"] if k in m} for m in chat_history]
     
     def _get_history_for_conversation(self, chat_history): # Role and content with [id:name] content
-        return [{k: (f"[{m['id']}|{m['user']}] {m[k]}" if k == "content" and m["role"] == "user" else m[k]) 
+        return [{k: (f"[{m['id']}|{m['name']}] {m[k]}" if k == "content" and m["role"] == "user" else m[k]) 
                  for k in ["role", "content"] if k in m} for m in chat_history]
     
     def _build_robot_context(self):

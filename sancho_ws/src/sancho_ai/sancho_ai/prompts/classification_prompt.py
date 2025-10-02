@@ -42,7 +42,7 @@ Output:
 class ClassificationPrompt(Prompt):
     def __init__(self, user_input: str, chat_history: list = []):
         self.user_input = user_input.strip()
-        self.chat_history = chat_history
+        self.chat_history = chat_history or []
 
         self.commands = CommandRegistry.get_commands()
 
@@ -71,7 +71,7 @@ class ClassificationPrompt(Prompt):
         examples.append('Input: "me gusta mucho el fútbol"\nOutput: {"intent": "UNKNOWN", "arguments": {}}')
         return "\n\n".join(examples)
 
-    def _format_history(self):
+    def _format_history(self): # Sin user: ni assistant:
         lines = []
         for msg in self.chat_history:
             role = msg.get("role", "user").lower()
