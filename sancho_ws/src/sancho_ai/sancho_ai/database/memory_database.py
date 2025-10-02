@@ -41,19 +41,24 @@ class MemoryDatabase:
                 LIMIT 1
             ''', (faceprint_id,))
             row = cur.fetchone()
-            return dict(row) if row else None
+            return dict(row) if row else {}
 
     # ----------------- MEMORIES -----------------
-    def update_memory(self, faceprint_id, memory_text):
+    def update_memory(self, faceprint_id: str, memory_text: str):
         now_ts = datetime.now().timestamp()
 
-        self.cursor.execute('''
-            INSERT INTO memories (faceprint_id, version, memory_text, created_at) SELECT ?, COALESCE(MAX(version), 0) + 1, ?, ?
-            FROM memories WHERE faceprint_id = ?
-        ''', (faceprint_id, memory_text, now_ts, faceprint_id))
-        self.conn.commit()
+        with self._lock:
+            cur = self.conn.cursor()
+            cur.execute('''
+                INSERT INTO memories (faceprint_id, version, memory_text, created_at) SELECT ?, COALESCE(MAX(version), 0) + 1, ?, ?
+                FROM memories WHERE faceprint_id = ?
+            ''', (faceprint_id, memory_text, now_ts, faceprint_id))
+            self.conn.commit()
         
         return self._read_latest(faceprint_id)
     
-    def get_memory(self, faceprint_id):
+    def get_memory(self, faceprint_id: str) -> dict:
         return self._read_latest(faceprint_id)
+
+    def get_memory_text(self, faceprint_id: str) -> str:
+        return self.get_memory(faceprint_id).get("memory_text", "")

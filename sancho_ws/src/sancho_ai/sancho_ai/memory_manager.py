@@ -8,13 +8,13 @@ from .engines import LLMEngine
 
 class MemoryManager:
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.db_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "database/memory.db"))
         self.db = MemoryDatabase(self.db_path)
 
         self.llm_engine = LLMEngine()
 
-    def update_memory(self, user_input: str, chat_history: str, faceprint_id: str, faceprint_name: str):
+    def update_memory(self, user_input: str, chat_history: str, faceprint_id: str, faceprint_name: str) -> None:
         current_memory = self.get_memory(faceprint_id)
         memory_builder_prompt = MemoryBuilderPrompt(user_input, chat_history, faceprint_id, faceprint_name, current_memory)
         LogManager.info(f"User: {user_input}")
@@ -51,5 +51,5 @@ class MemoryManager:
             self.db.update_memory(faceprint_id, new_memory)
             LogManager.info(f"Memory of {faceprint_id} - {faceprint_name} has been updated!")
 
-    def get_memory(self, faceprint_id: str):
-        return self.db.get_memory(faceprint_id)
+    def get_memory_text(self, faceprint_id: str) -> str:
+        return self.db.get_memory_text(faceprint_id)

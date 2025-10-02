@@ -61,7 +61,7 @@ class SanchoAINode(Node):
         if mode == MODE.NORMAL:
             self.get_logger().info("Normal Sancho Prompt")
             args = json.loads(request.args_json)
-            return self.normal_message(response, request.chat_id, request.text, args["user_id"], args["user_name"])
+            return self.normal_message(response, request.chat_id, request.text, args.get("user_id", ""), args.get("user_name", ""))
         
         elif mode in self.MODE_TASK:
             self.get_logger().info(f"{mode.name} Sancho Prompt")
@@ -72,14 +72,14 @@ class SanchoAINode(Node):
             response.value_json = json.dumps({"error": "Unsupported Mode"})
             return response
 
-    def normal_message(self, response, chat_id, text, user_id, user_name):
-        user_id = user_id or "Unknown"
-        user_name = user_name or "Usuario"
+    def normal_message(self, response, chat_id, text, real_user_id, real_user_name):
+        display_user_id = real_user_id or "Unknown"
+        display_user_name = real_user_name or "Usuario"
         user_timestamp = datetime.now().timestamp()
 
         chat_history = self.chats.get(chat_id, [])
-        user_memory = self.memory_manager.get_memory(user_id)
-        value, intent, arguments, provider, model = self.sancho_ai.on_message(text, chat_history, user_id, user_name, user_memory)
+        user_memory = self.memory_manager.get_memory_text(real_user_id) # If no user_id, memory will be ""
+        value, intent, arguments, provider, model = self.sancho_ai.on_message(text, chat_history, display_user_id, display_user_name, user_memory)
         assistant_timestamp = datetime.now().timestamp()
 
         response.value_json = json.dumps(value)
@@ -91,11 +91,12 @@ class SanchoAINode(Node):
 
 
         # Update memory (Could be handled inside on_message, only if unknown intent...)
-        threading.Thread(target=self.memory_manager.update_memory, args=(text, chat_history, user_id, user_name), daemon=True).start()
+        if real_user_id: # Only if we have a user_id, we wont store memory for unknown users
+            threading.Thread(target=self.memory_manager.update_memory, args=(text, chat_history, display_user_id, display_user_name), daemon=True).start()
 
 
         # Update chat history
-        chat_history.append({"role": "user", "content": text, "id": user_id, "name": user_name})
+        chat_history.append({"role": "user", "content": text, "id": display_user_id, "name": display_user_name})
         chat_history.append({"role": "assistant", "content": value["text"]})
         # Antes guardaba esto asi porque el LLM repetia mejor le hecho de poner response y emotion asi en JSON, si no fallaba mas
         # Lo comento de momento y si resulta que vuelve a fallar mas pues vuelvo a ese formato y ya veo como lo hago
@@ -107,8 +108,8 @@ class SanchoAINode(Node):
             chat_id=chat_id,
 
             user_timestamp=user_timestamp,
-            user_id=user_id,
-            user_name=user_name,
+            user_id=real_user_id,
+            user_name=real_user_name,
             user_text=text,
             user_intent=intent,
             user_arguments_json=json.dumps(arguments),
