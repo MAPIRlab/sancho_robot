@@ -1,5 +1,6 @@
 import cv2
 import rclpy
+import threading
 
 from rclpy.lifecycle import LifecycleNode, TransitionCallbackReturn
 from rclpy.qos import QoSProfile
@@ -50,7 +51,7 @@ class HumanFaceDetectorLifecycleNode(LifecycleNode):
             self.get_logger().error(f"Error cargando el detector: {e}")
             return TransitionCallbackReturn.FAILURE
 
-        qos = QoSProfile(depth=10)
+        qos = QoSProfile(depth=1)
         self.pub_dets = self.create_lifecycle_publisher(FaceDetectionArray, self.detections_topic, qos)
 
         self.detection_srv = self.create_service(Detection, "detection", self.detection_service)
@@ -63,6 +64,7 @@ class HumanFaceDetectorLifecycleNode(LifecycleNode):
         qos = QoSProfile(depth=1)
         self.sub_camera = self.create_subscription(Image, self.image_topic, self.image_callback, qos)
 
+        self._lock = threading.Lock()
         self.latest_img = None
         self.spin_timer = self.create_timer(1.0 / self.processing_rate, self.spin)
 
@@ -71,6 +73,8 @@ class HumanFaceDetectorLifecycleNode(LifecycleNode):
     def on_deactivate(self, state) -> TransitionCallbackReturn:
         self.get_logger().info("Desactivando nodo de detección...")
 
+        self.latest_img = None
+        
         if self.spin_timer:
             self.spin_timer.cancel()
             self.spin_timer = None
@@ -79,16 +83,23 @@ class HumanFaceDetectorLifecycleNode(LifecycleNode):
             self.destroy_subscription(self.sub_camera)
             self.sub_camera = None
 
+        if self._lock:
+            self._lock = None
+
         return super().on_deactivate(state)
 
     def image_callback(self, msg: Image):
-        self.latest_img = msg
+        with self._lock:
+            self.latest_img = msg
 
     def spin(self):
-        if self.latest_img is None:
+        with self._lock:
+            msg = self.latest_img
+            self.latest_img = None
+
+        if msg is None:
             return
 
-        msg = self.latest_img
         positions, confidences = self.detect(msg)
 
         msg_array = FaceDetectionArray()

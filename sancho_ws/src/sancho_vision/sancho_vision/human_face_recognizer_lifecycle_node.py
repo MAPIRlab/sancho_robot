@@ -1,6 +1,7 @@
 import json
-
 import rclpy
+import threading
+
 from rclpy.lifecycle import LifecycleNode, TransitionCallbackReturn
 from rclpy.qos import QoSProfile
 
@@ -16,7 +17,7 @@ from .hri_bridge import HRIBridge
 from .aligners.aligner_dlib import align_face
 from .classifiers.complex_classifier import ComplexClassifier
 from .encoders import load_encoder
-
+from .api.gui_utils import mark_face
 
 class HumanFaceRecognizerLifecycleNode(LifecycleNode):
 
@@ -38,8 +39,9 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
         self.encoder = None
 
         self.sub_dets = None
-        self.pub_recog = None
         self.pub_faceprint_event = None
+        self.pub_recog = None
+        self.pub_img_recog = None
 
         self.recognition_srv = None
         self.training_srv = None
@@ -65,9 +67,11 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
     
         self.classifier = ComplexClassifier(self.db_mode)
 
-        qos = QoSProfile(depth=10)
-        self.pub_faceprint_event = self.create_publisher(FaceprintEvent, "recognition/event", qos)
-        self.pub_recog = self.create_lifecycle_publisher(FaceRecognitionArray, self.recognitions_topic, qos)
+        qos1 = QoSProfile(depth=1)
+        qos10 = QoSProfile(depth=10)
+        self.pub_faceprint_event = self.create_publisher(FaceprintEvent, "recognition/event", qos10)
+        self.pub_recog = self.create_lifecycle_publisher(FaceRecognitionArray, self.recognitions_topic, qos1)
+        self.pub_img_recog = self.create_lifecycle_publisher(Image, 'camera/color/recognition', qos1)
 
         self.recognition_srv = self.create_service(Recognition, "recognition", self.recognition_service)
         self.training_srv = self.create_service(Training, "recognition/training", self.training_service)
@@ -97,10 +101,11 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
     def on_activate(self, state) -> TransitionCallbackReturn:
         self.get_logger().info("Activando nodo de reconocimiento...")
 
-        qos = QoSProfile(depth=10)
+        qos = QoSProfile(depth=1)
         self.sub_dets = self.create_subscription(FaceDetectionArray, self.detections_topic, self.detections_callback, qos)
 
-        self.last_detections = None
+        self._lock = threading.Lock()
+        self.lastest_detections = None
         self.save_db_timer = self.create_timer(10.0, lambda: self.classifier.db.save())
         self.spin_timer = self.create_timer(1.0 / self.processing_rate, self.spin)
 
@@ -108,6 +113,8 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
 
     def on_deactivate(self, state) -> TransitionCallbackReturn:
         self.get_logger().info("Desactivando nodo de reconocimiento...")
+
+        self.lastest_detections = None
 
         if self.spin_timer:
             self.spin_timer.cancel()
@@ -121,16 +128,23 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
             self.destroy_subscription(self.sub_dets)
             self.sub_dets = None
 
+        if self._lock:
+            self._lock = None
+
         return super().on_deactivate(state)
 
     def detections_callback(self, msg: FaceDetectionArray):
-        self.last_detections = msg
+        with self._lock:
+            self.lastest_detections = msg
     
     def spin(self):
-        if self.last_detections is None:
+        with self._lock:
+            msg = self.lastest_detections
+            self.lastest_detections = None
+
+        if msg is None:
             return
         
-        msg = self.last_detections
         msg_out = FaceRecognitionArray()
         msg_out.header = msg.header
         msg_out.image = msg.image
@@ -157,7 +171,7 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
         [rx, ry, rw, rh] = [request.position.x, request.position.y, request.position.w, request.position.h]
         face_detection = FaceDetection(corner=Point(x=float(rx), y=float(ry)), width=float(rw), height=float(rh), confidence=request.score)
 
-        face_aligned, features, faceprint, distance, pos, face_updated = next(self.recognize(request.frame, [face_detection], False))
+        face_aligned, features, faceprint, distance, pos, face_updated = next(self.recognize(request.frame, [face_detection], publish_marked_img=False))
 
         response.face_aligned = self.bridge.cv2_to_imgmsg(face_aligned, "bgr8")
         response.features = [float(f) for f in features]
@@ -169,15 +183,16 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
 
         return response
 
-    def recognize(self, frame, detections, learn_without_name):
+    def recognize(self, frame, detections, learn_without_name=False, publish_marked_img=True):
         if isinstance(frame, Image): # Normaliza el frame si viene como sensor_msgs/Image
             frame = self.bridge.imgmsg_to_cv2(frame, "bgr8")
 
+        marked_image = frame.copy()
         for det in detections:
-            pos = [det.corner.x, det.corner.y, det.width, det.height]
+            position = [det.corner.x, det.corner.y, det.width, det.height]
             confidence = det.confidence
 
-            face_aligned = align_face(frame, pos)
+            face_aligned = align_face(frame, position)
             features = self.encoder.encode_face(face_aligned)
             faceprint, distance, pos = self.classifier.classify_face(features)
 
@@ -195,8 +210,14 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
                 _, faceprint = self.classifier.add_class("", features, face, confidence)
 
             self.get_logger().info(f"{faceprint['name'] or faceprint['id'] or 'Not classified'} -> Distance: {distance:.4f} | Confidence: {confidence:.4f}")
+            
+            display_name = "Unknown" if not faceprint["id"] else (faceprint["name"] if faceprint["name"] else f"User-{faceprint['id']}")
+            mark_face(marked_image, [int(i) for i in position], distance, 0.80, 0.90, display_name, score=confidence, showDistance=True, showScore=True)
 
             yield face_aligned, features, faceprint, distance, pos, face_updated
+
+        marked_img_msg = self.bridge.cv2_to_imgmsg(marked_image, "bgr8") # Si eso mover todo esto a assistant helper que ahi se determina al interlocutor
+        self.pub_img_recog.publish(marked_img_msg)
 
     def training_service(self, request, response):
         try:
