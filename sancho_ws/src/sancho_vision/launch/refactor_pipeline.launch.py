@@ -13,6 +13,7 @@ from llm_tools.models import PROVIDER, MODELS
 load_dotenv()
 GOOGLE_STT_API_KEY = os.environ.get("GOOGLE_STT_API_KEY")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 
 
 def generate_launch_description():
@@ -23,9 +24,9 @@ def generate_launch_description():
         executable='llm',
         name='llm',
         parameters=[{
-            "llm_load_models": f"[['{PROVIDER.GEMINI}', ['{MODELS.LLM.GEMINI.GEMINI_2_5_FLASH}'], '{GEMINI_API_KEY}']]",
-            "llm_active_provider": f"{PROVIDER.GEMINI}",
-            "llm_active_model": f"{MODELS.LLM.GEMINI.GEMINI_2_5_FLASH}",         
+            "llm_load_models": f"[['{PROVIDER.OPENAI}', ['{MODELS.LLM.OPENAI.GPT_3_5_TURBO}'], '{OPENAI_API_KEY}']]",
+            "llm_active_provider": f"{PROVIDER.OPENAI}",
+            "llm_active_model": f"{MODELS.LLM.OPENAI.GPT_3_5_TURBO}",         
             #"embedding_load_models": f"[['{PROVIDER.GEMINI}', ['{MODELS.LLM.GEMINI.GEMINI_2_5_FLASH}'], '{GEMINI_API_KEY}']]",
             #"embedding_active_provider": f"{PROVIDER.GEMINI}",
             #"embedding_active_model": f"{MODELS.LLM.GEMINI.GEMINI_2_5_FLASH}",

@@ -49,13 +49,6 @@ class DatabaseManagerNode(Node):
             self.chat_conversation_map[msg.chat_id] = self.db.create_conversation(msg.user_timestamp)
         
         try:
-            self.get_logger().info(f"Storing conversation turn for chat_id {msg.chat_id} in conversation_id {self.chat_conversation_map[msg.chat_id]}")
-            self.get_logger().info(f"User id: {msg.user_id}, User name: {msg.user_name}")
-            self.get_logger().info(f"User: {msg.user_text} → Assistant: {msg.assistant_text}")
-            self.get_logger().info(f"User intent: {msg.user_intent}, args: {msg.user_arguments_json}")
-            self.get_logger().info(f"Assistant value: {msg.assistant_value_json}, provider: {msg.assistant_provider}, model: {msg.assistant_model}")
-            self.get_logger().info(f"User timestamp: {msg.user_timestamp}, Assistant timestamp: {msg.assistant_timestamp}")
-
             self.db.append_turn(
                 conversation_id=self.chat_conversation_map[msg.chat_id],
 

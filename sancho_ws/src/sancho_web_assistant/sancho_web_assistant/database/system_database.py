@@ -215,17 +215,11 @@ class SystemDatabase:
             raise ValueError(f"message_id {message_id} does not exist")
         if row['role'] != 'user':
             raise ValueError(f"message_id {message_id} is not a 'user' message")
-        print("message_id", message_id, "user_id", user_id, "user_name", user_name, "intent", intent, "arguments_json", arguments_json)
-        # da error aqui por la cara
-        self.cursor.execute('''
+
+        self.cursor.execute(f'''
             INSERT INTO message_nlu (message_id, user_id, user_name, intent, arguments_json)
-            VALUES (?, ?, ?, ?, ?, ?)
-            ON CONFLICT(message_id) DO UPDATE SET
-                user_id=excluded.user_id,
-                user_name=excluded.user_name,
-                intent=excluded.intent,
-                arguments_json=excluded.arguments_json
-        ''', (message_id, user_id, user_name, intent, arguments_json))
+            VALUES ({message_id}, '{user_id}', '{user_name}', '{intent}', '{arguments_json}')
+        ''')
         self.conn.commit()
 
     def get_message_nlu(self, message_id: int) -> dict:
@@ -245,7 +239,7 @@ class SystemDatabase:
 
         self.cursor.execute('''
             INSERT INTO message_llm (message_id, value_json, provider, model)
-            VALUES (?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?)
             ON CONFLICT(message_id) DO UPDATE SET
                 value_json=excluded.value_json,
                 provider=excluded.provider,
