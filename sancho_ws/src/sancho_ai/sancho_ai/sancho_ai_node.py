@@ -92,7 +92,12 @@ class SanchoAINode(Node):
 
         # Update memory (Could be handled inside on_message, only if unknown intent...)
         if real_user_id: # Only if we have a user_id, we wont store memory for unknown users
-            threading.Thread(target=self.memory_manager.update_memory, args=(text, chat_history, display_user_id, display_user_name), daemon=True).start()
+            chat_history_copy = list(chat_history) # bc of race conditions with appends bellow
+            threading.Thread(
+                target=self.memory_manager.update_memory, 
+                args=(text, chat_history_copy, display_user_id, display_user_name), 
+                daemon=True
+            ).start()
 
 
         # Update chat history

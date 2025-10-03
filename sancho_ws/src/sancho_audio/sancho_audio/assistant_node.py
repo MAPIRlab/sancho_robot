@@ -100,12 +100,11 @@ class Assistant:
             rclpy.spin_once(self.node)
 
     def process_user_transcription(self, text, user_id, user_name):
-        self.node.get_logger().info(f"Usuario {user_name or 'desconocido'} dice: {text}")
+        self.node.get_logger().info(f"{user_name or 'Desconocido'} dice: {text}")
         self.node.face_mode_pub.publish(String(data="thinking"))
 
         if self.question_id == QUESTION.NO_QUESTION: # Si es un mensaje normal
             ai_response, emotion, data, intent = self.sancho_prompt_request(text, user_id, user_name)
-            self.node.get_logger().info(f"✅✅✅ Respuesta recibida '{ai_response}'")
 
             if intent == COMMANDS.TAKE_PICTURE:
                 data_json = json.dumps(data)
@@ -215,7 +214,7 @@ class Assistant:
         audio, sample_rate = self.tts_request(text)
         
         sd.play(audio, samplerate=sample_rate)
-        self.node.get_logger().info(f"✅✅✅ Reproduciendo por audio: {text}")
+        self.node.get_logger().info(f"✅✅✅ Sancho dice por audio: {text}")
 
         if wait:
             sd.wait()

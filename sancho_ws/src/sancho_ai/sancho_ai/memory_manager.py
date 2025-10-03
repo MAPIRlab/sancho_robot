@@ -15,7 +15,7 @@ class MemoryManager:
         self.llm_engine = LLMEngine()
 
     def update_memory(self, user_input: str, chat_history: str, faceprint_id: str, faceprint_name: str) -> None:
-        current_memory = self.get_memory(faceprint_id)
+        current_memory = self.get_memory_text(faceprint_id)
         memory_builder_prompt = MemoryBuilderPrompt(user_input, chat_history, faceprint_id, faceprint_name, current_memory)
         LogManager.info(f"User: {user_input}")
         LogManager.info(f"Memory Builder Prompt system: {memory_builder_prompt.get_prompt_system()}")
@@ -41,15 +41,15 @@ class MemoryManager:
             LogManager.error(f"Error on JSON loads.")
             return
         
-        new_memory = memory.get("new_memory", "")
+        new_memory = memory.get("new_memory", None)
         memory_updated = bool(memory.get("memory_updated", False))
-        if not new_memory and memory_updated:
+        if new_memory is None and memory_updated:
             LogManager.error(f"The JSON response does not contain new memory and says is updated.")
             return
         
         if memory_updated:
             self.db.update_memory(faceprint_id, new_memory)
-            LogManager.info(f"Memory of {faceprint_id} - {faceprint_name} has been updated!")
+            LogManager.info(f"Memory of ID {faceprint_id} ({faceprint_name or 'No name'}) has been updated!")
 
     def get_memory_text(self, faceprint_id: str) -> str:
         return self.db.get_memory_text(faceprint_id)
