@@ -63,7 +63,7 @@ class ModularAI(ABC):
         id_to_name = {int(fp["id"]): fp["name"] for fp in faceprints}
 
         visible_people = [id_to_name[pid] for pid in visible_ids if pid in id_to_name]
-        known_people = list(id_to_name.values())
+        known_people = [name for name in id_to_name.values() if name] # Exclude empty names
 
         sessions_summary_json = self.hri_engine.get_sessions_summary_request()
         sessions_summary = json.loads(sessions_summary_json)
