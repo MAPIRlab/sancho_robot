@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, GroupAction
 from launch.substitutions import LaunchConfiguration
-from launch_ros.actions import LifecycleNode, Node
+from launch_ros.actions import Node
 
 from sancho_web_assistant.apis import API_LIST
 from speech_tools.models import STT_MODELS, TTS_MODELS, TTS_SPEAKERS
@@ -15,6 +15,8 @@ GOOGLE_STT_API_KEY = os.environ.get("GOOGLE_STT_API_KEY")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 
+# --- Ruta del venv SOLO para assistant_helper
+VENV = "/home/mapir/sancho_robot/sancho_ws/runtimes/assistant_helper/venv"
 
 def generate_launch_description():
     prefix_cmd = LaunchConfiguration('prefix')
@@ -26,10 +28,7 @@ def generate_launch_description():
         parameters=[{
             "llm_load_models": f"[['{PROVIDER.OPENAI}', ['{MODELS.LLM.OPENAI.GPT_3_5_TURBO}'], '{OPENAI_API_KEY}']]",
             "llm_active_provider": f"{PROVIDER.OPENAI}",
-            "llm_active_model": f"{MODELS.LLM.OPENAI.GPT_3_5_TURBO}",         
-            #"embedding_load_models": f"[['{PROVIDER.GEMINI}', ['{MODELS.LLM.GEMINI.GEMINI_2_5_FLASH}'], '{GEMINI_API_KEY}']]",
-            #"embedding_active_provider": f"{PROVIDER.GEMINI}",
-            #"embedding_active_model": f"{MODELS.LLM.GEMINI.GEMINI_2_5_FLASH}",
+            "llm_active_model": f"{MODELS.LLM.OPENAI.GPT_3_5_TURBO}",
         }]
     )
 
@@ -54,18 +53,21 @@ def generate_launch_description():
         }]
     )
 
+    # ---- SOLO ESTE NODO con venv
     assistant_helper = Node(
-        package='sancho_audio',            
-        executable='assistant_helper',          
+        package='sancho_audio',
+        #executable='assistant_helper',
+        executable=os.path.join(VENV, "bin", "python"),
+        arguments=['-m', 'sancho_audio.assistant_helper_node'],  # <-- tu módulo exacto
         name='assistant_helper',
         output='screen',
-        prefix=prefix_cmd,
         emulate_tty=True,
+        prefix=prefix_cmd
     )
 
     assistant = Node(
-        package='sancho_audio',            
-        executable='assistant',          
+        package='sancho_audio',
+        executable='assistant',
         name='assistant',
         output='screen',
         prefix=prefix_cmd,
@@ -74,7 +76,7 @@ def generate_launch_description():
 
     sancho_ai = Node(
         package='sancho_ai',
-        executable='sancho_ai',          
+        executable='sancho_ai',
         name='sancho_ai',
         output='screen',
         prefix=prefix_cmd,
@@ -83,7 +85,7 @@ def generate_launch_description():
 
     database_manager = Node(
         package='sancho_web_assistant',
-        executable='database_manager',          
+        executable='database_manager',
         name='database_manager',
         output='screen',
         prefix=prefix_cmd,
@@ -91,23 +93,16 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
-        # -------------------
-        #  DECLARO ARGUMENTOS
-        # -------------------
         DeclareLaunchArgument(
             'prefix',
             default_value='xterm -hold -e' if os.environ.get('DISPLAY') else '',
             description='Prefijo para lanzar nodos en terminal (p.ej.: “xterm -hold -e”)'
         ),
-
-        # --------------------
-        #  AGRUPO TODOS LOS NODOS
-        # --------------------
         GroupAction([
             llm,
             tts,
             stt,
-            assistant_helper,
+            assistant_helper,   # ← este va con venv
             assistant,
             sancho_ai,
             database_manager

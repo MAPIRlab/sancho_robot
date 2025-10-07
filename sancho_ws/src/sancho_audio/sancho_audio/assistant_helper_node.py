@@ -16,8 +16,8 @@ from speech_msgs.srv import STT
 from .utils.sound import play
 from .utils.sounds import ACTIVATION_SOUND, TIME_OUT_SOUND
 
-from .utils import STTHotword, PVPorcupineHotword, IntensityAttachCriterion, SileroVADAttachCriterion
-
+from .utils.silero_vad_attach_criterion import SileroVADAttachCriterion
+from .utils.intensity_attach_criterion import IntensityAttachCriterion
 
 class AUDIO_STATE(int, Enum):
     NO_AUDIO = -1
@@ -62,6 +62,7 @@ class AssistantHelperNode(Node):
         self.get_logger().info("Assistant Helper Node initializated succesfully.")
 
     def microphone_callback(self, msg):
+        #self.get_logger().info(f"New microphone chunk received ({len(msg.chunk_mono)} samples at {msg.sample_rate}Hz)")
         new_audio = list([np.int16(x) for x in msg.chunk_mono])
         sample_rate = msg.sample_rate
         
@@ -114,10 +115,8 @@ class AssistantHelper:
         self.check_audio = []
         self.previous_chunk = []
 
-        self.hotword_detector = STTHotword(self.stt_request, name=name)
-        #self.hotword_detector = PVPorcupineHotword()
-        self.chunk_attach_criterion = IntensityAttachCriterion(self.intensity_threshold)
-        #self.chunk_attach_criterion = SileroVADAttachCriterion()
+        self.hotword_detector = self._init_hotword_detector()
+        self.chunk_attach_criterion = self._init_chunk_attach_criterion()
         
         self.node = AssistantHelperNode(self)
 
@@ -148,7 +147,7 @@ class AssistantHelper:
     def detect_hotword(self, new_audio): 
         if self.hotword_detector.detect(new_audio, self.sample_rate):
             self.node.face_mode_pub.publish(String(data="listening"))
-            self.helper_state = HELPER_STATE.COMMAND
+            #self.helper_state = HELPER_STATE.COMMAND
 
             self.hotword_detection_time = time.time()
 
@@ -277,7 +276,24 @@ class AssistantHelper:
         result_stt = future_stt.result()
 
         return result_stt.text
-    
+
+    def _init_hotword_detector(self, hotword="openwakeword"):
+        if hotword == "stt":
+            from .utils.stt_hotword import STTHotword
+            return STTHotword(self.stt_request, name=self.name)
+        elif hotword == "pvporcupine":
+            from .utils.pvporcupine_hotword import PVPorcupineHotword
+            return PVPorcupineHotword()
+        else: # openwakeword
+            from .utils.openwakeword_hotword import OpenWakeWordHotword
+            return OpenWakeWordHotword()
+        
+    def _init_chunk_attach_criterion(self, criterion="intensity"):
+        if criterion == "intensity":
+            return IntensityAttachCriterion(self.intensity_threshold)
+        else: # silero_vad
+            return SileroVADAttachCriterion()
+
     def is_audio_length(self, audio, seconds):
         return len(audio) >= seconds * self.sample_rate
 
@@ -289,3 +305,6 @@ def main(args=None):
 
     assistant_helper.spin()
     rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()
