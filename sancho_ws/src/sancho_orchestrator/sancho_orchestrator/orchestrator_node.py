@@ -228,7 +228,9 @@ class OrchestratorNode(Node):
             and elapsed > self.navigation_timeout
         ):
             self.get_logger().warn("Timeout NAVEGANDO.")
+            #TODO: Cancelar goal de navegación
             self._recover_to_search()
+
         elif self.current_state == OrchestratorState.SOCIALIZANDO:
             if self.social_state == self.STATE_SOCIAL_FINISHED:
                 self.get_logger().info(
@@ -264,6 +266,7 @@ class OrchestratorNode(Node):
     def _change_node_state(
         self, node_name, transition_id, on_done=None, on_done_chain=None
     ):
+        #TODO: Mover los clients a init y reutilizarlos
         # Async GetState
         get_cli = self.create_client(GetState, f"/{node_name}/get_state")
         if not get_cli.wait_for_service(timeout_sec=2.0):
@@ -317,6 +320,7 @@ class OrchestratorNode(Node):
         res = future.result()
         ok = bool(res and res.success)
         if not ok:
+            #TODO: Volver a un estado seguro
             self.get_logger().error(f"Transición fallida en {node_name}")
         if on_done:
             on_done(ok)

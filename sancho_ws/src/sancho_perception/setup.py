@@ -28,6 +28,8 @@ setup(
             'movenet_postprocessing_node = sancho_perception.movenet_postprocessing_node:main',
             'group_detection_node = sancho_perception.group_detection_node:main',
             'group_waypoint_generator_node = sancho_perception.group_waypoint_generator_node:main',
+            'single_person_detector_node = sancho_perception.single_person_detector_node:main',
+            'single_person_waypoint_generator_node = sancho_perception.single_person_waypoint_generator_node:main',
             'relay_metrics_node = sancho_perception.metrics_node:main',
             'perception_test = sancho_perception.perception_test:main',
         ],
