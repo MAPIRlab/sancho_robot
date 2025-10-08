@@ -1,6 +1,14 @@
+"""Interaction Manager Node.
+
+This module manages the interaction flow of a robot with users by coordinating
+various modules such as face detection, recognition, tracking, and audio playback.
+"""
+
 import math
 import os
 import threading
+from enum import IntEnum
+from typing import Optional
 
 import rclpy
 from ament_index_python.packages import get_package_share_directory
@@ -13,12 +21,30 @@ from rclpy.executors import MultiThreadedExecutor
 from rclpy.lifecycle import LifecycleNode, TransitionCallbackReturn
 from rclpy.qos import QoSProfile, ReliabilityPolicy
 from sancho_msgs.action import PlayAudio
-from sancho_msgs.msg import FaceArray
+from sancho_msgs.msg import FaceDetectionArray, FaceRecognitionArray
 from sancho_msgs.srv import SocialState
 from std_msgs.msg import Float32
-from tf_transformations import (
-    quaternion_from_euler,  # Asegúrate de que este paquete está instalado
-)
+from tf_transformations import quaternion_from_euler
+
+
+# ============================================================================
+# CONSTANTS
+# ============================================================================
+
+class SocialStateEnum(IntEnum):
+    """Social interaction states."""
+    READY = 0
+    FINISHED = 1
+    ERROR = 2
+
+
+class ModuleNames:
+    """Names of managed modules."""
+    FACE_DETECTOR = "/human_face_detector"
+    FACE_RECOGNIZER = "/human_face_recognizer"
+    FACE_TRACKER = "/human_face_tracker"
+    FACE_MANAGER = "/human_face_manager"
+    AUDIO_PLAYER = "/audio_player"
 
 
 class IMState:
@@ -101,9 +127,6 @@ class InteractionManager(LifecycleNode):
 
     """
 
-    # Estados de la state machine
-    (STATE_SOCIAL_READY, STATE_SOCIAL_FINISHED, STATE_SOCIAL_ERROR) = range(3)
-
     def __init__(self):
 
         super().__init__("interaction_manager")
@@ -128,12 +151,18 @@ class InteractionManager(LifecycleNode):
         self.declare_parameter("lifecycle_timeout", 5.0)
         self.declare_parameter("tdoa_timeout", 5.0)
         self.declare_parameter("fallback_max_attempts", 3)
-        self.declare_parameter(
-            "fallback_retry_backoff", 1.5
-        )  # factor de exponenciación
+        self.declare_parameter("fallback_retry_backoff", 1.5)
         self.declare_parameter("face_detection_topic", "/face_detections")
-        # Módulos a gestionar
-        self.modules = ["/face_detector", "/face_tracker", "/audio_player"]
+        self.declare_parameter("face_recognition_topic", "/face_recognitions")
+        
+        # Módulos a gestionar con los nuevos nombres
+        self.modules = [
+            ModuleNames.FACE_DETECTOR,
+            ModuleNames.FACE_RECOGNIZER,
+            ModuleNames.FACE_TRACKER,
+            ModuleNames.FACE_MANAGER,
+            ModuleNames.AUDIO_PLAYER
+        ]
         self.module_clients = {}
         self.active_modules = set()
 
@@ -228,7 +257,7 @@ class InteractionManager(LifecycleNode):
         self.get_logger().info("Activando interacción (sync)")
         # Subscriptions de sensores
         self.face_sub = self.create_subscription(
-            FaceArray,
+            FaceDetectionArray,
             self.face_detection_topic,
             callback=self._face_cb,
             qos_profile=self.sensor_qos,
@@ -292,57 +321,104 @@ class InteractionManager(LifecycleNode):
     # ------------------------------------------------------------
     # Callbacks de sensores
     # ------------------------------------------------------------
-    def _face_cb(self, msg: FaceArray):
-        self.face_msgs = msg.faces
+    def _face_cb(self, msg: FaceDetectionArray):
+        """Callback for face detection messages."""
+        self.face_msgs = msg.detections
 
     def _tdoa_cb(self, msg: Float32):
+        """Callback for TDOA angle messages."""
         self.tdoa_angle = msg.data
 
     # ------------------------------------------------------------
-    # Utils sync: llamar servicio de lifecycle
+    # Lifecycle management utilities
     # ------------------------------------------------------------
     def call_lifecycle(
-        self, module: str, transition_id: int, timeout_sec: float = 5.0
+        self, module: str, transition_id: int, timeout_sec: Optional[float] = None
     ) -> bool:
-        self.get_logger().info(f"Llamando a {module} transición {transition_id}")
+        """Call lifecycle transition on a managed module.
+        
+        Args:
+            module: Module name (e.g., ModuleNames.FACE_DETECTOR)
+            transition_id: Transition ID from lifecycle_msgs
+            timeout_sec: Timeout in seconds (uses default if None)
+            
+        Returns:
+            True if transition succeeded, False otherwise
+        """
+        self.get_logger().info(f"Calling lifecycle transition {transition_id} on {module}")
+        
         cli = self.module_clients.get(module)
         if cli is None:
-            self.get_logger().error(f"Cliente inexistente: {module}")
+            self.get_logger().error(f"Lifecycle client does not exist: {module}")
             return False
+            
         req = ChangeState.Request()
         req.transition.id = transition_id
         future = cli.call_async(req)
-        # Evento para señalizar que el Future ha terminado
+        
+        # Event to signal completion
         done_evt = threading.Event()
+        future.add_done_callback(lambda _: done_evt.set())
 
-        def _on_done(fut):
-            done_evt.set()
-
-        future.add_done_callback(_on_done)  # no bloquea el executor
-
-        # Esperamos hasta que self o el executor procesen la respuesta
-        timeout = timeout_sec or self.lifecycle_timeout
+        # Wait for response
+        timeout = timeout_sec if timeout_sec is not None else self.lifecycle_timeout
         if not done_evt.wait(timeout):
             self.get_logger().error(
-                f"Timeout al esperar {module} transición {transition_id}"
+                f"Timeout waiting for {module} transition {transition_id}"
             )
             return False
 
-        # Comprobamos resultado
+        # Check result
         result = future.result()
         if result is None or not result.success:
-            self.get_logger().error(f"{module} transición {transition_id} fallida")
+            self.get_logger().error(f"{module} transition {transition_id} failed")
             return False
 
+        # Update active modules tracking
         if transition_id == Transition.TRANSITION_ACTIVATE:
             self.active_modules.add(module)
-            self.get_logger().info(f"{module} añadido a active_modules")
+            self.get_logger().info(f"{module} activated")
         elif transition_id == Transition.TRANSITION_DEACTIVATE:
             self.active_modules.discard(module)
-            self.get_logger().info(f"{module} eliminado de active_modules")
+            self.get_logger().info(f"{module} deactivated")
 
-        self.get_logger().info(f"{module} transición {transition_id} completada")
+        self.get_logger().info(f"{module} transition {transition_id} completed")
         return True
+
+    def activate_module(self, module: str) -> bool:
+        """Activate a specific module."""
+        return self.call_lifecycle(module, Transition.TRANSITION_ACTIVATE)
+
+    def deactivate_module(self, module: str) -> bool:
+        """Deactivate a specific module."""
+        return self.call_lifecycle(module, Transition.TRANSITION_DEACTIVATE)
+
+    def activate_face_detection_pipeline(self) -> bool:
+        """Activate detector, recognizer, and manager in sequence."""
+        modules = [
+            ModuleNames.FACE_DETECTOR,
+            ModuleNames.FACE_RECOGNIZER,
+            ModuleNames.FACE_MANAGER
+        ]
+        for module in modules:
+            if not self.activate_module(module):
+                self.get_logger().error(f"Failed to activate {module}")
+                return False
+        return True
+
+    def activate_face_tracking(self) -> bool:
+        """Activate face tracker module."""
+        return self.activate_module(ModuleNames.FACE_TRACKER)
+
+    def deactivate_all_modules(self) -> bool:
+        """Deactivate all active modules."""
+        self.get_logger().info("Deactivating all active modules...")
+        success = True
+        for module in list(self.active_modules):
+            if not self.deactivate_module(module):
+                self.get_logger().error(f"Failed to deactivate {module}")
+                success = False
+        return success
 
     # ------------------------------------------------------------
     # State machine
@@ -401,24 +477,31 @@ class InteractionManager(LifecycleNode):
         result_fut.add_done_callback(self._on_audio_result)
 
     def _on_audio_result(self, future):
-        """Callback cuando termina la reproducción de audio."""
-        result = future.result().result  # .result() es del ActionResult
+        """Callback when audio playback completes."""
+        result = future.result().result
         if result.success:
-            self.get_logger().info("Audio reproducido OK")
-            req = SocialState.Request()
-            req.state = self.STATE_SOCIAL_FINISHED
-            self.social_state_client.call_async(req)  # Llamada al servicio social_state
+            self.get_logger().info("Audio playback completed successfully")
+            self.success_social_service_call()
         else:
-            self.get_logger().error("Falló reproducción de audio")
-            self.fail_social_service_call()  # Llamada al servicio social_state con error
-        # ahora continuamos: desactivamos módulos y terminamos
+            self.get_logger().error("Audio playback failed")
+            self.fail_social_service_call()
+        
+        # Continue to deactivate modules and finish
         self.transition_to(DeactivateAllState)
 
     def fail_social_service_call(self):
-        """Llamada al servicio social_state con estado de error."""
+        """Call social_state service with error state."""
         req = SocialState.Request()
-        req.state = self.STATE_SOCIAL_ERROR
+        req.state = SocialStateEnum.ERROR
         self.social_state_client.call_async(req)
+        self.get_logger().error("Social state set to ERROR")
+
+    def success_social_service_call(self):
+        """Call social_state service with finished state."""
+        req = SocialState.Request()
+        req.state = SocialStateEnum.FINISHED
+        self.social_state_client.call_async(req)
+        self.get_logger().info("Social state set to FINISHED")
 
     def _on_wait_complete(self):
         # reactivar el main_timer
@@ -428,25 +511,7 @@ class InteractionManager(LifecycleNode):
         self.main_timer = self.create_timer(0.1, self._run_state)
         self.transition_to(SearchFaceState)
 
-    # Funciion para apagar todos los modulos comprobando si estan activos
-    def _deactivate_all_modules(self):
-        self.get_logger().info("Desactivando módulos activos...")
-        for m in list(self.active_modules):
-            if self.call_lifecycle(m, Transition.TRANSITION_DEACTIVATE):
-                self.get_logger().info(f"{m} desactivado correctamente")
-                # Eliminar el módulo de module_clients tras desactivarlo correctamente
-                self.active_modules.discard(m)
-            else:
-                self.get_logger().error(f"Error al desactivar {m}")
-        if not self.active_modules:
-            self.get_logger().info("Todos los módulos desactivados")
-        else:
-            self.get_logger().warn(
-                "No se pudieron desactivar todos los módulos. Módulos activos: "
-                + ", ".join(self.active_modules)
-            )
-        self.get_logger().info("Desactivando este nodo...")
-        self.trigger_deactivate()
+    
 
     # ------------------------------------------------------------
     # Helpers
@@ -496,27 +561,39 @@ class IdleState(IMState):
 
 
 class ActivateFaceDetectorState(IMState):
+    """State to activate the face detection pipeline."""
+    
+    def enter(self) -> None:
+        self.manager.get_logger().info("Activating face detection pipeline...")
+    
     def execute(self) -> None:
         mgr = self.manager
-        if mgr.call_lifecycle("/face_detector", Transition.TRANSITION_ACTIVATE):
-            mgr.get_logger().info("Face detector activado")
+        if mgr.activate_face_detection_pipeline():
+            mgr.get_logger().info("Face detection pipeline activated successfully")
             mgr.attempt = 0
+            mgr.tdoa_attempts = 0
             mgr.transition_to(SearchFaceState)
-            mgr.get_logger().info("Esperando detecciones de cara")
         else:
+            mgr.get_logger().error("Failed to activate face detection pipeline")
             mgr.fail_social_service_call()
             mgr.transition_to(DeactivateAllState)
 
 
 class SearchFaceState(IMState):
+    """State to search for a face in detection messages."""
+    
+    def enter(self) -> None:
+        self.manager.get_logger().info("Searching for face...")
+    
     def execute(self) -> None:
         mgr = self.manager
-        mgr.get_logger().info("Buscando cara")
         mgr.best_face = mgr._select_best_face()
+        
         if mgr.best_face:
-            mgr.get_logger().info("Cara encontrada!")
+            mgr.get_logger().info("Face found! Proceeding to tracking...")
             mgr.transition_to(TrackAndAudioState)
         elif mgr.attempt < mgr.max_attempts:
+            # Calculate rotation angle for scanning
             angle = (
                 0.0
                 if mgr.attempt == mgr.max_attempts - 1
@@ -524,85 +601,161 @@ class SearchFaceState(IMState):
             )
             mgr._rotate_head(angle)
             mgr.attempt += 1
+            mgr.get_logger().info(
+                f"No valid face detected. Attempt {mgr.attempt}/{mgr.max_attempts}, "
+                f"rotating head to {angle}°"
+            )
+            # Wait for rotation to complete
             if mgr.main_timer:
                 mgr.main_timer.cancel()
+                mgr.main_timer = None
             mgr.wait_timer = mgr.create_timer(
                 mgr.rotation_duration, mgr._on_wait_complete, callback_group=mgr.io_cb
             )
         else:
-            mgr.get_logger().warn("No se encontró cara, fallback TDOA")
+            mgr.get_logger().warn(
+                f"Max attempts ({mgr.max_attempts}) reached without detecting face. "
+                "Falling back to TDOA..."
+            )
             mgr.transition_to(FallbackTdoaState)
             mgr.tdoa_angle = None
             mgr.tdoa_attempts = 0
 
 
 class FallbackTdoaState(IMState):
+    """State to use TDOA (Time Difference of Arrival) as fallback for face detection."""
+    
+    def enter(self) -> None:
+        self.manager.get_logger().info("Entering TDOA fallback mode...")
+    
     def execute(self) -> None:
         mgr = self.manager
+        
         if mgr.tdoa_attempts < mgr.fallback_max_attempts:
+            # First check if we found a face
             mgr.best_face = mgr._select_best_face()
             if mgr.best_face:
+                mgr.get_logger().info("Face found during TDOA fallback!")
                 mgr.transition_to(TrackAndAudioState)
                 return
+            
+            # Try TDOA
             angle = mgr.tdoa_angle
             if angle is None:
-                mgr.get_logger().warn("Timeout esperando TDOA; reintentando fallback")
+                mgr.get_logger().warn(
+                    f"No TDOA data received. Attempt {mgr.tdoa_attempts + 1}/"
+                    f"{mgr.fallback_max_attempts}"
+                )
                 mgr.tdoa_attempts += 1
                 if mgr.main_timer:
                     mgr.main_timer.cancel()
+                    mgr.main_timer = None
                 mgr.wait_timer = mgr.create_timer(
                     mgr.tdoa_timeout,
                     mgr._on_tdoa_wait_complete,
                     callback_group=mgr.io_cb,
                 )
                 return
+            
+            # Check angle validity
             if abs(angle) <= mgr.tdoa_angle_limit:
-                mgr.get_logger().info(f"Girando por TDOA: {angle:.1f}°")
+                mgr.get_logger().info(f"Rotating head to TDOA angle: {angle:.1f}°")
                 mgr._rotate_head(angle)
                 mgr.tdoa_attempts += 1
                 if mgr.main_timer:
                     mgr.main_timer.cancel()
+                    mgr.main_timer = None
                 mgr.wait_timer = mgr.create_timer(
                     mgr.tdoa_timeout,
                     mgr._on_tdoa_wait_complete,
                     callback_group=mgr.io_cb,
                 )
                 return
-            mgr.get_logger().warn(f"[TDOA] ángulo {angle:.1f}° fuera de límite")
-        mgr.get_logger().warn("No se detectó persona tras TDOA, desactivando")
+            else:
+                mgr.get_logger().warn(
+                    f"TDOA angle {angle:.1f}° exceeds limit of {mgr.tdoa_angle_limit}°"
+                )
+        
+        # All attempts exhausted
+        mgr.get_logger().error(
+            "Failed to detect person after all TDOA attempts. Ending interaction."
+        )
         mgr.fail_social_service_call()
         mgr.transition_to(DeactivateAllState)
 
 
 class TrackAndAudioState(IMState):
+    """State to activate tracking and play audio message."""
+    
+    def enter(self) -> None:
+        self.manager.get_logger().info("Starting face tracking and audio playback...")
+    
     def execute(self) -> None:
         mgr = self.manager
-        mgr.call_lifecycle("/face_tracker", Transition.TRANSITION_ACTIVATE)
-        mgr.call_lifecycle("/audio_player", Transition.TRANSITION_ACTIVATE)
+        
+        # Activate face tracker
+        if not mgr.activate_face_tracking():
+            mgr.get_logger().error("Failed to activate face tracker")
+            mgr.fail_social_service_call()
+            mgr.transition_to(DeactivateAllState)
+            return
+        
+        # Activate audio player
+        if not mgr.activate_module(ModuleNames.AUDIO_PLAYER):
+            mgr.get_logger().error("Failed to activate audio player")
+            mgr.fail_social_service_call()
+            mgr.transition_to(DeactivateAllState)
+            return
+        
+        # Send audio playback goal
         goal = PlayAudio.Goal()
         goal.filename = mgr.speech_file_path
         send_goal_fut = mgr.audio_action.send_goal_async(goal)
         send_goal_fut.add_done_callback(mgr._on_audio_goal_response)
+        
         mgr.transition_to(WaitAudioState)
 
 
 class WaitAudioState(IMState):
-    def execute(self) -> None:  # wait until callbacks complete
+    """State to wait for audio playback to complete."""
+    
+    def enter(self) -> None:
+        self.manager.get_logger().info("Waiting for audio playback to complete...")
+    
+    def execute(self) -> None:
+        # Wait until audio callbacks complete
         pass
 
 
 class DeactivateAllState(IMState):
+    """State to deactivate all modules and clean up."""
+    
+    def enter(self) -> None:
+        self.manager.get_logger().info("Deactivating all modules...")
+    
     def execute(self) -> None:
         mgr = self.manager
+        
+        # Cancel main timer
         if mgr.main_timer:
             mgr.main_timer.cancel()
             mgr.main_timer = None
-        mgr._deactivate_all_modules()
+        
+        # Deactivate all modules
+        mgr.deactivate_all_modules()
+        
+        # Transition to done state
         mgr.transition_to(DoneState)
 
 
 class DoneState(IMState):
+    """Final state indicating interaction is complete."""
+    
+    def enter(self) -> None:
+        self.manager.get_logger().info("Interaction complete. Returning to idle...")
+    
     def execute(self) -> None:
+        # Interaction complete, waiting for deactivation
         pass
 
 

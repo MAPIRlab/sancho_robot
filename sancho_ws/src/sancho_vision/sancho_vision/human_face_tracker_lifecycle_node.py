@@ -12,7 +12,7 @@ from rclpy.qos import QoSPresetProfiles
 from sensor_msgs.msg import CameraInfo, JointState
 from std_msgs.msg import Header
 
-from sancho_msgs.msg import FaceArray
+from sancho_msgs.msg import FaceDetectionArray
 
 
 class FaceTrackerLifecycle(LifecycleNode):
@@ -45,7 +45,7 @@ class FaceTrackerLifecycle(LifecycleNode):
         tilt_joint (str): Name of the tilt joint in joint_states
 
     Subscribes:
-        - Face detections (FaceArray)
+        - Face detections (FaceDetectionArray)
         - Camera calibration info (CameraInfo)
         - Joint states (JointState)
 
@@ -124,7 +124,7 @@ class FaceTrackerLifecycle(LifecycleNode):
             CameraInfo, self.camera_info_topic, self.camera_info_callback, qos_sensor
         )
         self.face_sub = self.create_subscription(
-            FaceArray, self.face_topic, self.face_callback, qos_sensor
+            FaceDetectionArray, self.face_topic, self.face_callback, qos_sensor
         )
         self.joint_sub = self.create_subscription(
             JointState, "/wxxms/joint_states", self.joint_states_callback, 10
@@ -161,13 +161,15 @@ class FaceTrackerLifecycle(LifecycleNode):
         except ValueError:
             pass
 
-    def face_callback(self, msg: FaceArray):
+    def face_callback(self, msg: FaceDetectionArray):
         now = self.get_clock().now().seconds_nanoseconds()[0]
-        if not msg.faces or not self.camera_info_ready:
+        if not msg.detections or not self.camera_info_ready:
             return
 
-        best = max(msg.faces, key=lambda f: f.confidence)
-        u, v = best.center.x, best.center.y
+        best = max(msg.detections, key=lambda f: f.confidence)
+        # Calcular el centro del bounding box a partir del corner, width y height
+        u = best.corner.x + best.width / 2.0
+        v = best.corner.y + best.height / 2.0
 
         alpha = self.ema_alpha
         self.smoothed_u = (

@@ -4,11 +4,10 @@ import SessionItem from "./SessionItem";
 import Pagination from "../../../components/Pagination";
 import SessionModal from "./SessionModal";
 
-const SessionList = ({ faceprint, sessions }) => {
+const SessionList = ({ faceprint, sessions, perPage = 10 }) => {
     const [selectedSessionId, setSelectedSessionId] = useState(undefined);
 
     const [currentPage, setCurrentPage] = useState(1);
-    const perPage = 5;
 
     const sortedData = [...sessions].sort((a, b) => a.start_time - b.start_time);
     const totalPages = Math.ceil(sortedData.length / perPage);

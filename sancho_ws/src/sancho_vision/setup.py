@@ -28,11 +28,9 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'face_detector_lifecycle_node = sancho_vision.face_detector_lifecycle_node:main',
-            'face_tracker_lifecycle_node = sancho_vision.face_tracker_lifecycle_node:main',
             'face_cluster_node = sancho_vision.face_cluster_node:main',
             'central_faces_cluster_node = sancho_vision.central_faces_cluster_node:main',
-
+            'human_face_tracker_lifecycle = sancho_vision.human_face_tracker_lifecycle_node:main',
             'human_face_detector_lifecycle = sancho_vision.human_face_detector_lifecycle_node:main',       
             'human_face_recognizer_lifecycle = sancho_vision.human_face_recognizer_lifecycle_node:main',
             'human_face_manager_lifecycle = sancho_vision.human_face_manager_lifecycle_node:main',
