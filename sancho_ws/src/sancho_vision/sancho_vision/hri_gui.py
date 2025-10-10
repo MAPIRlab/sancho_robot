@@ -23,14 +23,14 @@ class HRIGUINode(Node):
 
         self.hri_gui = hri_gui
 
-        self.face_name_pub = self.create_publisher(FaceNameResponse, 'gui/face_name_response', 10)
-        self.face_question_pub = self.create_publisher(FaceQuestionResponse, 'gui/face_question_response', 10)
-        self.face_timeout_pub = self.create_publisher(Empty, 'gui/face_timeout_response', 10)
+        self.face_name_pub = self.create_publisher(FaceNameResponse, '/gui/face_name_response', 10)
+        self.face_question_pub = self.create_publisher(FaceQuestionResponse, '/gui/face_question_response', 10)
+        self.face_timeout_pub = self.create_publisher(Empty, '/gui/face_timeout_response', 10)
 
-        self.name_answer_sub = self.create_subscription(String, "gui/name_answer", self.name_answer_callback, 10)
-        self.confirm_name_sub = self.create_subscription(Bool, "gui/confirm_name", self.confirm_name_callback, 10)
+        self.name_answer_sub = self.create_subscription(String, "/gui/name_answer", self.name_answer_callback, 10)
+        self.confirm_name_sub = self.create_subscription(Bool, "/gui/confirm_name", self.confirm_name_callback, 10)
 
-        self.trigger_interaction_srv = self.create_service(TriggerUserInteraction, 'gui/request', self.hri_gui.user_interaction_service)
+        self.trigger_interaction_srv = self.create_service(TriggerUserInteraction, '/gui/request', self.hri_gui.user_interaction_service)
 
     def name_answer_callback(self, msg):
         name = str(msg.data)

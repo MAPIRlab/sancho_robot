@@ -145,24 +145,24 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
         if msg is None:
             return
         
+        recognitions, marked_img_msg = self.recognize(msg.image, msg.detections, self.learn_without_name)
+
         msg_out = FaceRecognitionArray()
         msg_out.header = msg.header
-        msg_out.image = msg.image
+        msg_out.image = marked_img_msg if marked_img_msg is not None else msg.image
         msg_out.detections = msg.detections
 
-        for recog in self.recognize(msg.image, msg.detections, self.learn_without_name):
-            face_aligned, features, faceprint, distance, pos, face_updated = recog
-
+        for face_aligned, features, faceprint, distance, pos, face_updated in recognitions:
             recog = FaceRecognition(
-                face_aligned = self.bridge.cv2_to_imgmsg(face_aligned, "bgr8"),
-                features = features,
-                classified_id = faceprint["id"],
-                classified_name = faceprint["name"],
-                distance = distance,
-                pos = pos,
-                face_updated = face_updated
+                face_aligned=self.bridge.cv2_to_imgmsg(face_aligned, "bgr8"),
+                features=features,
+                classified_id=faceprint["id"],
+                classified_name=faceprint["name"],
+                distance=distance,
+                pos=pos,
+                face_updated=face_updated
             )
-            
+
             msg_out.recognitions.append(recog)
 
         self.pub_recog.publish(msg_out)
@@ -171,7 +171,12 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
         [rx, ry, rw, rh] = [request.position.x, request.position.y, request.position.w, request.position.h]
         face_detection = FaceDetection(corner=Point(x=float(rx), y=float(ry)), width=float(rw), height=float(rh), confidence=request.score)
 
-        face_aligned, features, faceprint, distance, pos, face_updated = next(self.recognize(request.frame, [face_detection], publish_marked_img=False))
+        recognitions, _ = self.recognize(request.frame, [face_detection], publish_marked_img=False)
+        if not recognitions:
+            self.get_logger().warn("Recognition service received no results for provided detection.")
+            return response
+
+        face_aligned, features, faceprint, distance, pos, face_updated = recognitions[0]
 
         response.face_aligned = self.bridge.cv2_to_imgmsg(face_aligned, "bgr8")
         response.features = [float(f) for f in features]
@@ -188,6 +193,7 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
             frame = self.bridge.imgmsg_to_cv2(frame, "bgr8")
 
         marked_image = frame.copy()
+        recognitions = []
         for det in detections:
             position = [det.corner.x, det.corner.y, det.width, det.height]
             confidence = det.confidence
@@ -209,15 +215,20 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
 
                 _, faceprint = self.classifier.add_class("", features, face, confidence)
 
-            self.get_logger().info(f"{faceprint['name'] or faceprint['id'] or 'Not classified'} -> Distance: {distance:.4f} | Confidence: {confidence:.4f}")
+
+            display_name = "Unknown" if not faceprint["id"] or distance < 0.75 else (faceprint["name"] if faceprint["name"] else f"User-{faceprint['id']}")
+            self.get_logger().info(f"{display_name} -> Distance: {distance:.4f} | Confidence: {confidence:.4f}")
             
-            display_name = "Unknown" if not faceprint["id"] else (faceprint["name"] if faceprint["name"] else f"User-{faceprint['id']}")
             mark_face(marked_image, [int(i) for i in position], distance, 0.80, 0.90, display_name, score=confidence, showDistance=True, showScore=True)
+          
+            recognitions.append((face_aligned, features, faceprint, distance, pos, face_updated))
 
-            yield face_aligned, features, faceprint, distance, pos, face_updated
+        marked_img_msg = None # Si eso mover todo esto a assistant helper que ahi se determina al interlocutor
+        if publish_marked_img:
+            marked_img_msg = self.bridge.cv2_to_imgmsg(marked_image, "bgr8")
+            self.pub_img_recog.publish(marked_img_msg)
 
-        marked_img_msg = self.bridge.cv2_to_imgmsg(marked_image, "bgr8") # Si eso mover todo esto a assistant helper que ahi se determina al interlocutor
-        self.pub_img_recog.publish(marked_img_msg)
+        return recognitions, marked_img_msg
 
     def training_service(self, request, response):
         try:
@@ -228,6 +239,8 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
             response.result = -1
             response.message = String(data=f"Invalid JSON: {e}")
             return response
+
+        self.get_logger().info(f"Training command received: {cmd_type}")
 
         try:
             function = self.training_dispatcher[cmd_type]
@@ -265,7 +278,7 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
         return response
 
     def clear_no_name_service(self, request, response):
-        removed_ids = self.classifier.clear_no_name()
+        _, removed_ids = self.classifier.clear_no_name()
 
         for id in removed_ids:
             self.send_faceprint_event(FaceprintEvent.DELETE, id, FaceprintEvent.ORIGIN_ROS)
@@ -274,9 +287,6 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
 
     def set_learn_without_name_service(self, request, response):
         self.learn_without_name = request.data
-
-        response.success = True
-        response.message = String(data=f"Needs name set to {request.data}")
 
         return response
 

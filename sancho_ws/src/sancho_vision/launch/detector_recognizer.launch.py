@@ -12,7 +12,7 @@ from sancho_web_assistant.apis import API_LIST
 
 def generate_launch_description():
     prefix_cmd = LaunchConfiguration('prefix')
-    face_node_name = LaunchConfiguration('face_node_name')
+    face_detector_node_name = LaunchConfiguration('face_detector_node_name')
     face_recognizer_node_name = LaunchConfiguration('face_recognizer_node_name')
     face_manager_node_name = LaunchConfiguration('face_manager_node_name')
     activate_arg = LaunchConfiguration('activate')
@@ -25,7 +25,7 @@ def generate_launch_description():
         namespace='',
         package='sancho_vision',
         executable='human_face_detector_lifecycle',
-        name=face_node_name,
+        name=face_detector_node_name,
         output='screen',
         prefix=prefix_cmd,
         emulate_tty=True,
@@ -62,6 +62,15 @@ def generate_launch_description():
         }],
     )
 
+    gui = Node(
+        package='sancho_vision',
+        executable='gui',
+        name='hri_gui',
+        output='screen',
+        prefix="xterm -hold -e",
+        emulate_tty=True,
+    )
+
     return LaunchDescription([
         # -------------------
         #  DECLARO ARGUMENTOS
@@ -72,7 +81,7 @@ def generate_launch_description():
             description='Prefijo para lanzar nodos en terminal (p.ej.: “xterm -hold -e”)'
         ),
         DeclareLaunchArgument(
-            'face_node_name',
+            'face_detector_node_name',
             default_value='face_detector',
             description='Nombre del nodo de detección (face_detector)'
         ),
@@ -91,15 +100,6 @@ def generate_launch_description():
             default_value='true',
             choices=['true', 'false'],
             description='Si "true", node_configurator activará los nodos lifecycle automáticamente'
-        ),
-
-        Node(
-            package='sancho_vision',
-            executable='gui',
-            name='hri_gui',
-            output='screen',
-            prefix="xterm -hold -e",
-            emulate_tty=True,
         ),
 
         Node(
@@ -122,6 +122,8 @@ def generate_launch_description():
             prefix="xterm -hold -e",
             emulate_tty=True,
         ),
+
+        gui,
 
         # --------------------
         #  AGRUPO TODOS LOS NODOS
