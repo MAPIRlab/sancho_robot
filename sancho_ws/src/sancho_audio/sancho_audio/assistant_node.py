@@ -7,7 +7,7 @@ from enum import Enum
 from queue import Queue
 
 from std_msgs.msg import String, Int16, Bool
-from hri_msgs.srv import SanchoPrompt, TriggerUserInteraction
+from hri_msgs.srv import SanchoPrompt, TriggerUserInteraction, GetString
 from sancho_msgs.msg import InputTTS, QuestionTTS, UserTranscription
 from speech_msgs.srv import TTS
 
@@ -30,8 +30,10 @@ class QUESTION(int, Enum):
 
 class AssistantNode(Node):
 
-    def __init__(self):
+    def __init__(self, assistant: "Assistant"):
         super().__init__("assistant")
+
+        self.assistant = assistant
 
         self.face_mode_pub = self.create_publisher(String, "face/mode", 10)
         self.helper_mode_pub = self.create_publisher(Int16, 'sancho_audio/assistant_helper/mode', 10)
@@ -41,6 +43,8 @@ class AssistantNode(Node):
         self.text_sub = self.create_subscription(UserTranscription, 'sancho_audio/assistant_helper/transcription', self.text_callback, 10)
         self.tts_sub = self.create_subscription(InputTTS, 'input_tts', self.tts_callback, 10)
         self.tts_sub = self.create_subscription(QuestionTTS, 'question_tts', self.question_callback, 10)
+
+        self.sancho_greet_people_srv = self.create_service(GetString, 'assistant/greet_people', self.assistant.sancho_greet_people_service)
 
         self.sancho_prompt_client = self.create_client(SanchoPrompt, "sancho_ai/prompt")
         while not self.sancho_prompt_client.wait_for_service(timeout_sec=1.0):
@@ -75,7 +79,7 @@ class AssistantNode(Node):
 class Assistant:
 
     def __init__(self):
-        self.node = AssistantNode()
+        self.node = AssistantNode(self)
 
         self.question_id = QUESTION.NO_QUESTION
 
@@ -130,16 +134,20 @@ class Assistant:
             else:
                 self.play_tts("No te he entendido bien. ¿Podrías repetirlo?", "sad", keep_asking=True)
 
-    def process_found_people_service(self, request, response): # Cuando Sancho busca a un grupo y los ve y se prepara para decirles algo, aqui se dice ese algo
-        ids = request.ids
-        names = [n for n in request.names if n] # Remove the "" people (without name)
+    def sancho_greet_people_service(self, request, response): # Cuando Sancho busca a un grupo y los ve y se prepara para decirles algo, aqui se dice ese algo
+        args = json.loads(request.args)
+        ids = args.get("ids", [])
+        names = [n for n in args.get("names", []) if n] # Remove the "" people (without name)
 
-        args_json = json.dumps({"people": names})
-        mode = MODE.NO_ONE_KNOWN if not names else MODE.SOME_KNOWN if len(names) != len(ids) else MODE.ALL_KNOWN
+        text = self.sancho_prompt_greet_request( # Hacerlo async
+            args_json=json.dumps({"people": names}), 
+            mode=MODE.NO_ONE_KNOWN if not names else MODE.SOME_KNOWN if len(names) != len(ids) else MODE.ALL_KNOWN
+        )
 
-        text = self.sancho_prompt_greet_request(args_json, mode)
+        self.play_tts(text) # Hacerlo async, si esto esto a un queue y del queue se coge y se hace esto
 
-        self.play_tts(text)
+        # Ahora aqui hay que activar el assistant helper que es life cycle
+        # Y aqui activar el human manager que tambien es life cycle
 
         return response
 
