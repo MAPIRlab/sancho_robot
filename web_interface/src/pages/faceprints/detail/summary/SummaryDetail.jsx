@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { useFaceprints } from "../../../contexts/FaceprintsContext";
-import { useAPI } from "../../../contexts/APIContext";
+import { useFaceprints } from "../../../../contexts/FaceprintsContext";
+import { useAPI } from "../../../../contexts/APIContext";
 import ConfirmDeleteFaceModal from "./ConfirmDeleteFaceModal";
 
 const SummaryDetail = ({ faceprint }) => {

@@ -69,6 +69,7 @@ class OpenWakeWordHotword(ModelHotword):
                 if self.consec_hits >= self.frames_needed:
                     self.consec_hits = 0
                     fired = True
+                    # HAY QUE LIMPIAR EL BUFFER
                     break
             else:
                 self.consec_hits = 0

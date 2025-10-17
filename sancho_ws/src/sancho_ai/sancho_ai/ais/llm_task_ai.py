@@ -55,7 +55,7 @@ class LLMTaskAI(TaskAI): # Only callable tasks as a single SanchoPrompt, no task
             return default, provider_used, model_used
         
         LogManager.info(f"LLM Response for {prompt_name}:\n{response}")
-        raw_json = Prompt.extract_json_from_code_block(prompt_obj, response)
+        raw_json = Prompt.extract_json_from_code_block(response)
         if not raw_json:
             LogManager.error(f"No JSON format found for {prompt_name}.")
             return default, provider_used, model_used

@@ -19,6 +19,11 @@ def set_stt_model_api(api):
     global stt_model_api
     stt_model_api = api
 
+def get_stt_model_api_dep() -> STTModelAPI:
+    if stt_model_api is None:
+        raise HTTPException(status_code=503, detail="STT Models API no inicializada")
+    return stt_model_api
+
 @router.get("", tags=["STT Models CRUD endpoints"], response_model=List[STTModel])
 async def get_stt_models(
     request: Request,
@@ -26,15 +31,9 @@ async def get_stt_models(
 ):
     APIUtils.check_accept_json(request)
 
-    try:
-        response = stt_model_api.get_all_stt_models(**({ "models": models } if models else {}))
+    response = get_stt_model_api_dep().get_all_stt_models(**({ "models": models } if models else {}))
 
-        return response.to_fastapi()
-
-    except HTTPException as e:
-        raise e
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return response.to_fastapi()
 
 @router.get("/{model}", tags=["STT Models CRUD endpoints"], response_model=STTModel)
 async def get_stt_model_by_name(
@@ -48,15 +47,9 @@ async def get_stt_model_by_name(
 ):
     APIUtils.check_accept_json(request)
 
-    try:
-        response = stt_model_api.get_stt_model(model)
+    response = get_stt_model_api_dep().get_stt_model(model)
 
-        return response.to_fastapi()
-
-    except HTTPException as e:
-        raise e
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return response.to_fastapi()
 
 @router.post("/load", tags=["STT Models CRUD endpoints"], response_model=STTResult)
 async def load_stt_model(
@@ -66,19 +59,13 @@ async def load_stt_model(
     APIUtils.check_accept_json(request)
     APIUtils.check_content_type_json(request)
 
-    try:
-        data = stt_load_model.model_dump(exclude_defaults=True)
-        model = data.get("model")
-        api_key = data.get("api_key", "")
+    data = stt_load_model.model_dump(exclude_defaults=True)
+    model = data.get("model")
+    api_key = data.get("api_key", "")
 
-        response = stt_model_api.load_stt_model(model, api_key)
+    response = get_stt_model_api_dep().load_stt_model(model, api_key)
 
-        return response.to_fastapi()
-
-    except HTTPException as e:
-        raise e
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return response.to_fastapi()
 
 @router.post("/unload", tags=["STT Models CRUD endpoints"], response_model=STTResult)
 async def unload_stt_model(
@@ -88,18 +75,12 @@ async def unload_stt_model(
     APIUtils.check_accept_json(request)
     APIUtils.check_content_type_json(request)
 
-    try:
-        data = stt_unload_model.model_dump(exclude_defaults=True)
-        model = data.get("model")
+    data = stt_unload_model.model_dump(exclude_defaults=True)
+    model = data.get("model")
 
-        response = stt_model_api.unload_stt_model(model)
+    response = get_stt_model_api_dep().unload_stt_model(model)
 
-        return response.to_fastapi()
-
-    except HTTPException as e:
-        raise e
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return response.to_fastapi()
 
 @router.post("/activate", tags=["STT Models CRUD endpoints"], response_model=STTResult)
 async def activate_stt_model(
@@ -109,15 +90,9 @@ async def activate_stt_model(
     APIUtils.check_accept_json(request)
     APIUtils.check_content_type_json(request)
 
-    try:
-        data = stt_active_model.model_dump(exclude_defaults=True)
-        model = data.get("model")
+    data = stt_active_model.model_dump(exclude_defaults=True)
+    model = data.get("model")
 
-        response = stt_model_api.set_active_stt_model(model)
+    response = get_stt_model_api_dep().set_active_stt_model(model)
 
-        return response.to_fastapi()
-
-    except HTTPException as e:
-        raise e
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return response.to_fastapi()

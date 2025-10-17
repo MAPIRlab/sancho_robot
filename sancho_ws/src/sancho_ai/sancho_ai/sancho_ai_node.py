@@ -6,7 +6,7 @@ from rclpy.node import Node
 from datetime import datetime
 from enum import Enum
 
-from hri_msgs.srv import SanchoPrompt
+from hri_msgs.srv import SanchoPrompt, GetString
 from sancho_msgs.msg import ConversationTurn
 
 from .log_manager import LogManager
@@ -43,9 +43,11 @@ class SanchoAINode(Node):
         self.chats = {}
 
         self.conversation_log_pub = self.create_publisher(ConversationTurn, "conversation_log/add", 10)
-        self.prompt_serv = self.create_service(SanchoPrompt, "sancho_ai/prompt", self.prompt_service)
 
-        LLMTaskAI.init(self)
+        self.prompt_srv = self.create_service(SanchoPrompt, "sancho_ai/prompt", self.prompt_service)
+        self.get_memories_srv = self.create_service(GetString, "sancho_ai/get_memories", self.get_memories_service)
+        self.update_memory_srv = self.create_service(GetString, "sancho_ai/update_memory", self.update_memory_service)
+
         LogManager.init(self)
 
         self.get_logger().info("SanchoAI Node initializated successfully")
@@ -71,6 +73,30 @@ class SanchoAINode(Node):
             self.get_logger().error(f"Sancho prompt with mode that has no associated task: {mode}")
             response.value_json = json.dumps({"error": "Unsupported Mode"})
             return response
+
+    def get_memories_service(self, request, response):
+        args = json.loads(request.args)
+        faceprint_id = args.get("faceprint_id", "")
+        versions = args.get("versions", False)
+
+        if not faceprint_id:
+            response.text = json.dumps(self.memory_manager.get_all_latest_memories())
+        elif versions:
+            response.text = json.dumps(self.memory_manager.get_all_versions(faceprint_id))
+        else:
+            response.text = json.dumps(self.memory_manager.get_memory(faceprint_id))
+
+        return response
+    
+    def update_memory_service(self, request, response):
+        args = json.loads(request.args)
+        faceprint_id = args.get("faceprint_id", "")
+        memory_text = args.get("memory_text", "")
+
+        new_memory = self.memory_manager.direct_update_memory(faceprint_id, memory_text)
+        response.text = json.dumps(new_memory)
+
+        return response
 
     def normal_message(self, response, chat_id, text, real_user_id, real_user_name):
         display_user_id = real_user_id or "Unknown"
@@ -130,7 +156,7 @@ class SanchoAINode(Node):
 
     def task_message(self, response, text, task_method):
         value, provider, model = task_method(text)
-
+        
         response.value_json = json.dumps(value)
         response.provider = provider
         response.model = model

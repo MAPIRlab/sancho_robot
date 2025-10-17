@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import SessionList from "./SessionList";
 
-import { useAPI } from "../../../contexts/APIContext";
+import { useAPI } from "../../../../contexts/APIContext";
 
 const ActivityDetail = ({ faceprint }) => {
     const { sessions, isResponseOk } = useAPI();

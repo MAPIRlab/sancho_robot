@@ -19,21 +19,20 @@ def set_faceprint_api(api):
     global faceprint_api
     faceprint_api = api
 
+def get_faceprint_api_dep() -> FaceprintAPI:
+    if faceprint_api is None:
+        raise HTTPException(status_code=503, detail="Faceprints API no inicializada")
+    return faceprint_api
+
 @router.get("", tags=["Faceprints CRUD endpoints"], response_model=List[Faceprint])
 async def get_faceprints(
     request: Request,
 ):
     APIUtils.check_accept_json(request)
 
-    try:
-        response = faceprint_api.get_all_faceprints()
-        
-        return response.to_fastapi()
+    response = get_faceprint_api_dep().get_all_faceprints()
     
-    except HTTPException as e:
-        raise e 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return response.to_fastapi()
 
 @router.get("/{id}", tags=["Faceprints CRUD endpoints"], response_model=Faceprint)
 async def get_faceprint_by_id(
@@ -42,15 +41,9 @@ async def get_faceprint_by_id(
 ):
     APIUtils.check_accept_json(request)
     
-    try:
-        response = faceprint_api.get_faceprint(id)
+    response = get_faceprint_api_dep().get_faceprint(id)
 
-        return response.to_fastapi()
-    
-    except HTTPException as e:
-        raise e 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return response.to_fastapi()
 
 @router.post("", tags=["Faceprints CRUD endpoints"], response_model=FaceprintCreate)
 async def create_faceprint(
@@ -60,19 +53,13 @@ async def create_faceprint(
     APIUtils.check_accept_json(request)
     APIUtils.check_content_type_json(request)
 
-    try:
-        update_data = faceprint_create.model_dump(exclude_defaults=True)
-        name = update_data["name"]
-        image_base64 = update_data["image"]
-        
-        response = faceprint_api.create_faceprint(name, image_base64)
-        
-        return response.to_fastapi()
-
-    except HTTPException as e:
-        raise e
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    update_data = faceprint_create.model_dump(exclude_defaults=True)
+    name = update_data["name"]
+    image_base64 = update_data["image"]
+    
+    response = get_faceprint_api_dep().create_faceprint(name, image_base64)
+    
+    return response.to_fastapi()
 
 @router.put("/{id}", tags=["Faceprints CRUD endpoints"], response_model=Faceprint)
 async def update_faceprint(
@@ -83,16 +70,10 @@ async def update_faceprint(
     APIUtils.check_accept_json(request)
     APIUtils.check_content_type_json(request)
 
-    try:
-        update_data = faceprint_update.model_dump(exclude_defaults=True)
-        response = faceprint_api.update_faceprint(id, update_data)
+    update_data = faceprint_update.model_dump(exclude_defaults=True)
+    response = get_faceprint_api_dep().update_faceprint(id, update_data)
 
-        return response.to_fastapi()
-    
-    except HTTPException as e:
-        raise e
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return response.to_fastapi()
     
 @router.delete("/{id}", tags=["Faceprints CRUD endpoints"], response_model=FaceprintDeleteResponse)
 async def delete_faceprint(
@@ -101,15 +82,9 @@ async def delete_faceprint(
 ):
     APIUtils.check_accept_json(request)
 
-    try:
-        response = faceprint_api.delete_faceprint(id)
+    response = get_faceprint_api_dep().delete_faceprint(id)
 
-        return response.to_fastapi()
-    
-    except HTTPException as e:
-        raise e
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return response.to_fastapi()
 
 @router.delete("", tags=["Faceprints CRUD endpoints"], response_model=FaceprintDeleteAllResponse)
 async def delete_all_faceprints(
@@ -117,12 +92,6 @@ async def delete_all_faceprints(
 ):
     APIUtils.check_accept_json(request)
 
-    try:
-        response = faceprint_api.delete_all_faceprints()
+    response = get_faceprint_api_dep().delete_all_faceprints()
 
-        return response.to_fastapi()
-
-    except HTTPException as e:
-        raise e
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return response.to_fastapi()

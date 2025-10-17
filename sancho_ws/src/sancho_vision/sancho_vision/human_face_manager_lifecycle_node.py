@@ -13,6 +13,7 @@ from std_msgs.msg import String, Empty
 from std_srvs.srv import SetBool, Empty as EmptySrv
 from hri_msgs.srv import Training, TriggerUserInteraction
 from hri_msgs.msg import Log, FaceNameResponse, FaceQuestionResponse
+from rumi_msgs.msg import SessionMessage
 from sancho_msgs.msg import FaceRecognitionArray, InputTTS
 from sancho_msgs.srv import AskUser
 
@@ -23,11 +24,6 @@ from .hri_bridge import HRIBridge
 
 
 def _call_service_sync(node, client, request, timeout=5.0):
-    """
-    Llama a un servicio de forma síncrona SIN bloquear el executor.
-    Usa call_async + Event, permitiendo que otros hilos del executor
-    procesen la respuesta. Evita deadlocks dentro de callbacks.
-    """
     if not client.service_is_ready():
         raise RuntimeError(f"Service {client.srv_name} is not ready")
 
@@ -45,7 +41,6 @@ def _call_service_sync(node, client, request, timeout=5.0):
     fut.add_done_callback(_on_done)
 
     deadline = time.monotonic() + timeout if timeout else None
-    # Espera activa suave: no bloquea el executor; otros hilos pueden atender el response
     while True:
         if done.wait(timeout=0.01):
             return fut.result()
@@ -66,6 +61,7 @@ class HumanFaceManagerLifecycleNode(LifecycleNode):
             ("gui_face_timeout_response_topic", "/gui/face_timeout_response"),
             ("logs_topic", "/logs/add"),
             ("people_topic", "/logic/info/actual_people"),
+            ("sessions_topic", "/rumi/sessions/process"),
             ("input_tts_topic", "/input_tts"),
             ("processing_rate", 10.0),
             ("service_wait_attempts", 10),
@@ -84,6 +80,7 @@ class HumanFaceManagerLifecycleNode(LifecycleNode):
         self.sub_recognitions = None
         self.pub_log = None
         self.pub_people = None
+        self.pub_session = None
         self.pub_input_tts = None
 
         self.training_client = None
@@ -104,6 +101,7 @@ class HumanFaceManagerLifecycleNode(LifecycleNode):
         self.gui_face_timeout_response_topic = self.get_parameter("gui_face_timeout_response_topic").value
         self.logs_topic = self.get_parameter("logs_topic").value
         self.people_topic = self.get_parameter("people_topic").value
+        self.sessions_topic = self.get_parameter("sessions_topic").value
         self.input_tts_topic = self.get_parameter("input_tts_topic").value
         self.processing_rate = float(self.get_parameter("processing_rate").value)
         self.service_wait_attempts = int(self.get_parameter("service_wait_attempts").value)
@@ -113,6 +111,7 @@ class HumanFaceManagerLifecycleNode(LifecycleNode):
         qos1 = QoSProfile(depth=1)
         self.pub_log = self.create_lifecycle_publisher(Log, self.logs_topic, qos10)
         self.pub_people = self.create_lifecycle_publisher(String, self.people_topic, qos1)
+        self.pub_session = self.create_lifecycle_publisher(SessionMessage, self.sessions_topic, qos10)
         self.pub_input_tts = self.create_lifecycle_publisher(InputTTS, self.input_tts_topic, qos10)
 
         self.ask_user_client = self.create_client(AskUser, 'sancho_audio/ask_user', callback_group=self.cb_group)
@@ -276,8 +275,8 @@ class HumanFaceManager:
                 self.create_log(CONSTANTS.ACTION.UPDATE_FACE, classified_id, log_message, metadata_json)
 
             if distance < self.LOWER_BOUND:  # Desconocido → pedir nombre
-                classified_name = None
                 classified_id = None
+                classified_name = None
 
                 if score >= self.DETECTOR_BOUND and self.ask_unknowns:
                     if not self.gui_request_sent_info:

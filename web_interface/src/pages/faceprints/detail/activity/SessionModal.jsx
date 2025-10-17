@@ -1,5 +1,5 @@
 import React from "react";
-import SimpleModal from "../../../components/SimpleModal";
+import SimpleModal from "../../../../components/SimpleModal";
 import ScoresChart from "./ScoresChart";
 
 const formatDuration = (start, end) => {

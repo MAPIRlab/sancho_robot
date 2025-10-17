@@ -27,7 +27,7 @@ class FaceprintAPI:
         
         return JSONResponse(content=faceprint)
 
-    def create_faceprint(self, name: str, image_base64: str) -> APIResponse:
+    def create_faceprint(self, name: str, image_base64: str) -> APIResponse: # Esto es codigo dupped del human manger, habría que revisar como no dupear...
         image_cv2 = self.engine.br.base64_to_cv2(image_base64)
         image_msg = self.engine.br.cv2_to_imgmsg(image_cv2, encoding="bgr8")
         

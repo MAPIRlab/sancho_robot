@@ -116,7 +116,7 @@ def generate_launch_description():
             executable='api_rest',
             name='api_rest',
             parameters=[{
-                "apis": f"['{API_LIST.FACEPRINTS}', '{API_LIST.SESSIONS}']"
+                "apis": f"['{API_LIST.FACEPRINTS}', '{API_LIST.SESSIONS}', '{API_LIST.MEMORIES}']"
             }],
             output='screen',
             prefix="xterm -hold -e",

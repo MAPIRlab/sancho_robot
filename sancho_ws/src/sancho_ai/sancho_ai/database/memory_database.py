@@ -44,6 +44,27 @@ class MemoryDatabase:
             return dict(row) if row else {}
 
     # ----------------- MEMORIES -----------------
+    def direct_update_memory(self, faceprint_id: str, memory_text: str):
+        latest = self._read_latest(faceprint_id)
+
+        with self._lock:
+            cur = self.conn.cursor()
+            if not latest:
+                now_ts = datetime.now().timestamp()
+                cur.execute('''
+                    INSERT INTO memories (faceprint_id, version, memory_text, created_at)
+                    VALUES (?, 0, ?, ?)
+                    ''', (faceprint_id, memory_text, now_ts))
+            else:
+                cur.execute('''
+                    UPDATE memories
+                    SET memory_text = ?
+                    WHERE faceprint_id = ? AND version = ?
+                    ''', (memory_text, faceprint_id, latest["version"]))
+            self.conn.commit()
+
+        return self._read_latest(faceprint_id)
+
     def update_memory(self, faceprint_id: str, memory_text: str):
         now_ts = datetime.now().timestamp()
 
@@ -56,7 +77,37 @@ class MemoryDatabase:
             self.conn.commit()
         
         return self._read_latest(faceprint_id)
-    
+
+    def get_all_latest_memories(self) -> list:
+        with self._lock:
+            cur = self.conn.cursor()
+            cur.execute('''
+                SELECT m.faceprint_id, m.version, m.memory_text, m.created_at
+                FROM memories AS m
+                JOIN (
+                    SELECT faceprint_id, MAX(version) AS max_version
+                    FROM memories
+                    GROUP BY faceprint_id
+                ) AS t
+                ON t.faceprint_id = m.faceprint_id
+                AND t.max_version  = m.version
+                ORDER BY m.faceprint_id
+            ''')
+            rows = cur.fetchall()
+            return [dict(r) for r in rows]
+
+    def get_all_versions(self, faceprint_id: str) -> list:
+        with self._lock:
+            cur = self.conn.cursor()
+            cur.execute('''
+                SELECT faceprint_id, version, memory_text, created_at
+                FROM memories
+                WHERE faceprint_id = ?
+                ORDER BY version DESC
+            ''', (faceprint_id))
+            rows = cur.fetchall()
+            return [dict(r) for r in rows]
+
     def get_memory(self, faceprint_id: str) -> dict:
         return self._read_latest(faceprint_id)
 

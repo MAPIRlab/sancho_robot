@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 
 import SessionItem from "./SessionItem";
-import Pagination from "../../../components/Pagination";
+import Pagination from "../../../../components/Pagination";
 import SessionModal from "./SessionModal";
 
 const SessionList = ({ faceprint, sessions, perPage = 10 }) => {

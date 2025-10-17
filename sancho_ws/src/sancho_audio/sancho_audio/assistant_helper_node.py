@@ -62,7 +62,6 @@ class AssistantHelperNode(Node):
         self.get_logger().info("Assistant Helper Node initializated succesfully.")
 
     def microphone_callback(self, msg):
-        #self.get_logger().info(f"New microphone chunk received ({len(msg.chunk_mono)} samples at {msg.sample_rate}Hz)")
         new_audio = list([np.int16(x) for x in msg.chunk_mono])
         sample_rate = msg.sample_rate
         
@@ -145,9 +144,10 @@ class AssistantHelper:
         self.helper_state = HELPER_STATE.SPEAKING
 
     def detect_hotword(self, new_audio): 
+        self.node.get_logger().info(f"Listening for hotword: {len(new_audio)}")
         if self.hotword_detector.detect(new_audio, self.sample_rate):
             self.node.face_mode_pub.publish(String(data="listening"))
-            #self.helper_state = HELPER_STATE.COMMAND
+            self.helper_state = HELPER_STATE.COMMAND
 
             self.hotword_detection_time = time.time()
 

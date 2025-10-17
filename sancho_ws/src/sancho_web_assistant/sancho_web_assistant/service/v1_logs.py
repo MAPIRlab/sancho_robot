@@ -19,21 +19,20 @@ def set_log_api(api):
     global log_api
     log_api = api
 
+def get_log_api_dep() -> LogAPI:
+    if log_api is None:
+        raise HTTPException(status_code=503, detail="Logs API no inicializada")
+    return log_api
+
 @router.get("", tags=["Logs CRUD endpoints"], response_model=List[Log])
 async def get_logs(
     request: Request
 ):
     APIUtils.check_accept_json(request)
 
-    try:
-        response = log_api.get_all_logs()
-        
-        return response.to_fastapi()
+    response = get_log_api_dep().get_all_logs()
     
-    except HTTPException as e:
-        raise e 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return response.to_fastapi()
 
 @router.get("/{id}", tags=["Logs CRUD endpoints"], response_model=Log)
 async def get_logs_by_id(
@@ -41,13 +40,7 @@ async def get_logs_by_id(
     id: str = Path(description="Id del log")
 ):
     APIUtils.check_accept_json(request)
-    
-    try:
-        response = log_api.get_log_by_id(id)
 
-        return response.to_fastapi()
-    
-    except HTTPException as e:
-        raise e 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    response = get_log_api_dep().get_log_by_id(id)
+
+    return response.to_fastapi()

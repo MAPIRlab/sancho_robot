@@ -1,6 +1,6 @@
 import React from "react";
 
-import ActionModal from "../../../components/ActionModal";
+import ActionModal from "../../../../components/ActionModal";
 
 const ConfirmDeleteFaceModal = ({ faceprint, isOpen, handleClose, action }) => {
     return (

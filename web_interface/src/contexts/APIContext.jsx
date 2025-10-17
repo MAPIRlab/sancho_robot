@@ -112,6 +112,12 @@ export const APIProvider = ({ children }) => {
         update: () => alert("Not implemented"),
         delete: () => alert("Not implemented"),
     });
+    const memoryAPI = createEndpointMethods("memories", {
+        getVersions: (id, version = "v1") =>
+            apiMethods.get(`${BASE_URL}/api/${version}/memories/${id}/versions`, getAuthorizationHeader()),
+        create: () => alert("Not implemented"),
+        delete: () => alert("Not implemented")
+    });
 
     return (
         <APIContext.Provider
@@ -122,6 +128,7 @@ export const APIProvider = ({ children }) => {
                 ttsModels: ttsModelsAPI,
                 sttModels: sttModelsAPI,
                 llmModels: llmModelsAPI,
+                memory: memoryAPI,
 
                 isResponseOk: isResponseOk,
                 setAuthToken: setAuthToken,

@@ -209,18 +209,21 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
                 if face_updated:
                     self.send_faceprint_event(FaceprintEvent.UPDATE, faceprint["id"], FaceprintEvent.ORIGIN_ROS)
 
-            if learn_without_name and confidence >= 1.0 and distance < 0.75: # Ir ajustando el valor de distance 
-                face = self.bridge.cv2_to_base64(face_aligned)
-                distance = 1.0
+            if distance < 0.75: # Si es menor que el limite inferior
+                if learn_without_name and confidence >= 1.0: # Si aprender sin nombre y buena calidad, aprendemos
+                    face = self.bridge.cv2_to_base64(face_aligned)
+                    distance = 1.0
 
-                _, faceprint = self.classifier.add_class("", features, face, confidence)
+                    _, faceprint = self.classifier.add_class("", features, face, confidence)
+                
+                else: # Si no lo marcamos como desconocido
+                    faceprint, distance, pos = {"id": "", "name": ""}, 0.0, 0
 
-
-            display_name = "Unknown" if not faceprint["id"] or distance < 0.75 else (faceprint["name"] if faceprint["name"] else f"User-{faceprint['id']}")
+            display_name = "Unknown" if not faceprint["id"] else (faceprint["name"] if faceprint["name"] else f"User-{faceprint['id']}")
             self.get_logger().info(f"{display_name} -> Distance: {distance:.4f} | Confidence: {confidence:.4f}")
             
             mark_face(marked_image, [int(i) for i in position], distance, 0.80, 0.90, display_name, score=confidence, showDistance=True, showScore=True)
-          
+            
             recognitions.append((face_aligned, features, faceprint, distance, pos, face_updated))
 
         marked_img_msg = None # Si eso mover todo esto a assistant helper que ahi se determina al interlocutor

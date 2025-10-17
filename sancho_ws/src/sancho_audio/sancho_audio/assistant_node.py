@@ -35,8 +35,8 @@ class AssistantNode(Node):
 
         self.face_mode_pub = self.create_publisher(String, "face/mode", 10)
         self.helper_mode_pub = self.create_publisher(Int16, 'sancho_audio/assistant_helper/mode', 10)
-        self.name_answer_pub = self.create_publisher(String, "gui/name_answer", 10)
-        self.confirm_name_pub = self.create_publisher(Bool, "gui/confirm_name", 10)
+        self.name_answer_pub = self.create_publisher(String, "/gui/name_answer", 10)
+        self.confirm_name_pub = self.create_publisher(Bool, "/gui/confirm_name", 10)
 
         self.text_sub = self.create_subscription(UserTranscription, 'sancho_audio/assistant_helper/transcription', self.text_callback, 10)
         self.tts_sub = self.create_subscription(InputTTS, 'input_tts', self.tts_callback, 10)
@@ -69,7 +69,7 @@ class AssistantNode(Node):
             self.tts_queue.put([msg.text, msg.emotion])
 
     def question_callback(self, msg):
-        self.question_queue.put([msg.question_id, json.loads(msg.args_json)])
+        self.question_queue.put([msg.question_id, json.loads(msg.args_json) if msg.args_json else {}])
 
 
 class Assistant:
@@ -102,7 +102,7 @@ class Assistant:
     def process_user_transcription(self, text, user_id, user_name):
         self.node.get_logger().info(f"{user_name or 'Desconocido'} dice: {text}")
         self.node.face_mode_pub.publish(String(data="thinking"))
-
+        
         if self.question_id == QUESTION.NO_QUESTION: # Si es un mensaje normal
             ai_response, emotion, data, intent = self.sancho_prompt_request(text, user_id, user_name)
 
@@ -116,7 +116,7 @@ class Assistant:
             name_said, name = self.sancho_get_name_request(text)
             if name_said:
                 self.node.name_answer_pub.publish(String(data=name))
-                self.node.helper_mode_pub.publish(String(data=HELPER_STATE.NAME.value))
+                self.node.helper_mode_pub.publish(Int16(data=HELPER_STATE.NAME.value))
                 self.node.face_mode_pub.publish(String(data="idle"))
             else:
                 self.play_tts("¿Podrías repetirlo? No he reconocido que hayas dicho ningún nombre.", "sad", keep_asking=True)
@@ -125,7 +125,7 @@ class Assistant:
             answer_said, answer = self.sancho_confirm_name_request(text)
             if answer_said:
                 self.node.confirm_name_pub.publish(Bool(data=answer))
-                self.node.helper_mode_pub.publish(String(data=HELPER_STATE.NAME.value))
+                self.node.helper_mode_pub.publish(Int16(data=HELPER_STATE.NAME.value))
                 self.node.face_mode_pub.publish(String(data="idle"))
             else:
                 self.play_tts("No te he entendido bien. ¿Podrías repetirlo?", "sad", keep_asking=True)

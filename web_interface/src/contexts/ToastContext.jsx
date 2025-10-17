@@ -1,4 +1,5 @@
 import { useContext, createContext, useState } from "react";
+import { v4 as uuidv4 } from "uuid";
 
 const ToastContext = createContext();
 
@@ -6,7 +7,7 @@ export const ToastProvider = ({ children }) => {
     const [toasts, setToasts] = useState([]);
 
     const showToast = (title, subtitle, color) => {
-        const id = Date.now(); // ID único para cada toast
+        const id = uuidv4();
         const newToast = { id, title, subtitle, color };
 
         setToasts((prevToasts) => [...prevToasts, newToast]);

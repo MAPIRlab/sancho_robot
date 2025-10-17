@@ -10,7 +10,7 @@ class PeopleManager:
 
     def process_detection(self, faceprint_id: int, score_face: float, score_classification: float):
         self.actual_people[faceprint_id] = datetime.now().timestamp()
-        self.node.publisher_session.publish(SessionMessage(
+        self.node.pub_session.publish(SessionMessage(
             faceprint_id=str(faceprint_id),
             detection_score=float(score_face),
             classification_score=float(score_classification)

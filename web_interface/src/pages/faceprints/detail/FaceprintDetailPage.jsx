@@ -1,13 +1,13 @@
-import React, { act, useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
-import { useFaceprints } from "../../contexts/FaceprintsContext";
-import { useAPI } from "../../contexts/APIContext";
-import { useToast } from "../../contexts/ToastContext";
+import { useFaceprints } from "../../../contexts/FaceprintsContext";
+import { useAPI } from "../../../contexts/APIContext";
+import { useToast } from "../../../contexts/ToastContext";
 
-import SummaryDetail from "./components/SummaryDetail";
-import ActivityDetail from "./components/ActivityDetail";
-import MemoryDetail from "./components/MemoryDetail";
+import SummaryDetail from "./summary/SummaryDetail";
+import ActivityDetail from "./activity/ActivityDetail";
+import MemoryDetail from "./memory/MemoryDetail";
 
 const FaceprintDetailPage = () => {
     const { id } = useParams();

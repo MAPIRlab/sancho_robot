@@ -4,8 +4,8 @@ import Header from "./components/Header";
 import Footer from "./components/Footer";
 import HomePage from "./pages/home/HomePage";
 import ChatPage from "./pages/chat/ChatPage";
-import FaceprintListPage from "./pages/faceprints/FaceprintListPage";
-import FaceprintDetailPage from "./pages/faceprints/FaceprintDetailPage";
+import FaceprintListPage from "./pages/faceprints/list/FaceprintListPage";
+import FaceprintDetailPage from "./pages/faceprints/detail/FaceprintDetailPage";
 
 import WebSocketVideoViewer from "./components/WebSocketVideoViewer";
 import LoadingScreen from "./components/LoadingScreen";

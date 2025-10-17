@@ -1,11 +1,11 @@
 import React, { useState } from "react";
 
-import { useFaceprints } from "../../contexts/FaceprintsContext";
+import { useFaceprints } from "../../../contexts/FaceprintsContext";
 
-import NewFaceprintModal from "./components/NewFaceprintModal";
-import FaceprintList from "./components/FaceprintList";
-import SummaryModal from "./components/SummaryModal";
-import ConfirmDeleteAllModal from "./components/ConfirmDeleteAllModal";
+import NewFaceprintModal from "./NewFaceprintModal";
+import FaceprintList from "./FaceprintList";
+import SummaryModal from "./SummaryModal";
+import ConfirmDeleteAllModal from "./ConfirmDeleteAllModal";
 
 const FaceprintListPage = () => {
     const { doDeleteAllFaceprints, doAddFaceprint, fetchFaceprintsData, loadingFaceprints, faceprintsData } = useFaceprints();

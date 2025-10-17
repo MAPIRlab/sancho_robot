@@ -34,6 +34,7 @@ class HRIGUINode(Node):
 
     def name_answer_callback(self, msg):
         name = str(msg.data)
+        self.get_logger().info(f"Received name answer: {name}")
         
         self.hri_gui.send_face_name_response(name)
         self.hri_gui.controller.set_mode_normal()

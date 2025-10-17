@@ -14,10 +14,15 @@ router = APIRouter()
 endpoint_name = "sessions"
 version = "v1"
 
-session_api: SessionAPI = None
+session_api: SessionAPI = None # Se podria hacer un archivo de registros, un objeto, en el sancho ai se registra y de aqui se getea y ya.
 def set_session_api(api):
     global session_api
     session_api = api
+
+def get_session_api_dep() -> SessionAPI:
+    if session_api is None:
+        raise HTTPException(status_code=503, detail="Sessions API no inicializada")
+    return session_api
 
 @router.get("", tags=["Sessions CRUD endpoints"], response_model=List[Session])
 async def get_sessions(
@@ -26,15 +31,9 @@ async def get_sessions(
 ):
     APIUtils.check_accept_json(request)
 
-    try:
-        response = session_api.get_all_sessions(**({ "faceprint_id": faceprint_id} if faceprint_id else {}))
-        
-        return response.to_fastapi()
+    response = get_session_api_dep().get_all_sessions(**({ "faceprint_id": faceprint_id} if faceprint_id else {}))
     
-    except HTTPException as e:
-        raise e 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return response.to_fastapi()
 
 @router.get("/summary", tags=["Sessions CRUD endpoints"], response_model=Session)
 async def get_sessions_summary(
@@ -42,16 +41,9 @@ async def get_sessions_summary(
 ):
     APIUtils.check_accept_json(request)
     
-    try:
-        response = session_api.get_sessions_summary()
+    response = get_session_api_dep().get_sessions_summary()
 
-        return response.to_fastapi()
-    
-    except HTTPException as e:
-        raise e 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
+    return response.to_fastapi()
 
 @router.get("/{id}", tags=["Sessions CRUD endpoints"], response_model=Session)
 async def get_sessions_by_id(
@@ -59,13 +51,7 @@ async def get_sessions_by_id(
     id: str = Path(description="Id de la sesión")
 ):
     APIUtils.check_accept_json(request)
-    
-    try:
-        response = session_api.get_session_by_id(id)
 
-        return response.to_fastapi()
-    
-    except HTTPException as e:
-        raise e 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    response = get_session_api_dep().get_session_by_id(id)
+
+    return response.to_fastapi()

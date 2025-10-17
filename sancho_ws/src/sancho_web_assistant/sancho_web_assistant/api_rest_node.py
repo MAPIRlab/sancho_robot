@@ -11,8 +11,9 @@ from .service.v1_sessions import set_session_api
 from .service.v1_tts_models import set_tts_model_api
 from .service.v1_stt_models import set_stt_model_api
 from .service.v1_llm_models import set_llm_model_api
+from .service.v1_memories import set_memory_api
 
-from .apis import FaceprintAPI, LogAPI, SessionAPI, TTSModelAPI, STTModelAPI, LLMModelAPI, API_LIST
+from .apis import FaceprintAPI, LogAPI, SessionAPI, TTSModelAPI, STTModelAPI, LLMModelAPI, MemoryAPI, API_LIST
 
 
 class APIRESTNode(Node):
@@ -23,7 +24,8 @@ class APIRESTNode(Node):
         API_LIST.SESSIONS: (SessionAPI, set_session_api),
         API_LIST.TTS_MODELS: (TTSModelAPI, set_tts_model_api),
         API_LIST.STT_MODELS: (STTModelAPI, set_stt_model_api),
-        API_LIST.LLM_MODELS: (LLMModelAPI, set_llm_model_api)
+        API_LIST.LLM_MODELS: (LLMModelAPI, set_llm_model_api),
+        API_LIST.MEMORIES: (MemoryAPI, set_memory_api)
     }
 
     def __init__(self):
@@ -40,7 +42,7 @@ class APIRESTNode(Node):
     def configure_apis(self, selected):
         if not selected:
             selected = list(self.AVAILABLE_APIS.keys())
-
+        
         for api_name in selected:
             if api_name not in self.AVAILABLE_APIS:
                 self.get_logger().error(f"API '{api_name}' not found.")

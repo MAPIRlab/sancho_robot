@@ -51,5 +51,17 @@ class MemoryManager:
             self.db.update_memory(faceprint_id, new_memory)
             LogManager.info(f"Memory of ID {faceprint_id} ({faceprint_name or 'No name'}) has been updated!")
 
+    def direct_update_memory(self, faceprint_id: str, memory_text: str) -> dict:
+        return self.db.direct_update_memory(faceprint_id, memory_text)
+
+    def get_all_latest_memories(self) -> list:
+        return self.db.get_all_latest_memories()
+    
+    def get_all_versions(self, faceprint_id: str) -> list:
+        return self.db.get_all_versions(faceprint_id)
+
+    def get_memory(self, faceprint_id: str) -> dict:
+        return self.db.get_memory(faceprint_id)
+
     def get_memory_text(self, faceprint_id: str) -> str:
         return self.db.get_memory_text(faceprint_id)

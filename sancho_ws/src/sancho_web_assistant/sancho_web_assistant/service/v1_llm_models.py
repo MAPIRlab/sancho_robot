@@ -19,6 +19,10 @@ def set_llm_model_api(api):
     global llm_model_api
     llm_model_api = api
 
+def get_llm_model_api_dep() -> LLMModelAPI:
+    if llm_model_api is None:
+        raise HTTPException(status_code=503, detail="LLM Models API no inicializada")
+    return llm_model_api
 
 @router.get("", tags=["LLM Models CRUD endpoints"], response_model=List[LLMProvider])
 async def get_llm_providers(
@@ -26,15 +30,9 @@ async def get_llm_providers(
     providers: Optional[List[str]] = Query(None, description="Lista de proveedores a buscar")
 ):
     APIUtils.check_accept_json(request)
-
-    try:
-        response = llm_model_api.get_all_llm_providers(**({"providers": providers} if providers else {}))
-        return response.to_fastapi()
-
-    except HTTPException as e:
-        raise e
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    
+    response = get_llm_model_api_dep().get_all_llm_providers(**({"providers": providers} if providers else {}))
+    return response.to_fastapi()
 
 @router.get("/{provider}", tags=["LLM Models CRUD endpoints"], response_model=LLMProvider)
 async def get_llm_provider(
@@ -43,15 +41,9 @@ async def get_llm_provider(
 ):
     APIUtils.check_accept_json(request)
 
-    try:
-        response = llm_model_api.get_llm_provider(provider)
-        
-        return response.to_fastapi()
-
-    except HTTPException as e:
-        raise e
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    response = get_llm_model_api_dep().get_llm_provider(provider)
+    
+    return response.to_fastapi()
 
 @router.post("/load", tags=["LLM Models CRUD endpoints"], response_model=LLMResult)
 async def load_llm_model(
@@ -61,20 +53,14 @@ async def load_llm_model(
     APIUtils.check_accept_json(request)
     APIUtils.check_content_type_json(request)
 
-    try:
-        data = llm_load_model.model_dump(exclude_defaults=True)
-        provider = data.get("provider")
-        model = data.get("model")
-        api_key = data.get("api_key", "")
+    data = llm_load_model.model_dump(exclude_defaults=True)
+    provider = data.get("provider")
+    model = data.get("model")
+    api_key = data.get("api_key", "")
 
-        response = llm_model_api.load_llm_model(provider, model, api_key)
+    response = get_llm_model_api_dep().load_llm_model(provider, model, api_key)
 
-        return response.to_fastapi()
-
-    except HTTPException as e:
-        raise e
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return response.to_fastapi()
 
 @router.post("/unload", tags=["LLM Models CRUD endpoints"], response_model=LLMResult)
 async def unload_llm_model(
@@ -84,19 +70,13 @@ async def unload_llm_model(
     APIUtils.check_accept_json(request)
     APIUtils.check_content_type_json(request)
 
-    try:
-        data = llm_unload_model.model_dump(exclude_defaults=True)
-        provider = data.get("provider")
-        model = data.get("model")
+    data = llm_unload_model.model_dump(exclude_defaults=True)
+    provider = data.get("provider")
+    model = data.get("model")
 
-        response = llm_model_api.unload_llm_model(provider, model)
+    response = get_llm_model_api_dep().unload_llm_model(provider, model)
 
-        return response.to_fastapi()
-
-    except HTTPException as e:
-        raise e
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return response.to_fastapi()
 
 @router.post("/activate", tags=["LLM Models CRUD endpoints"], response_model=LLMResult)
 async def activate_llm_model(
@@ -106,16 +86,10 @@ async def activate_llm_model(
     APIUtils.check_accept_json(request)
     APIUtils.check_content_type_json(request)
 
-    try:
-        data = llm_active_model.model_dump(exclude_defaults=True)
-        provider = data.get("provider")
-        model = data.get("model")
+    data = llm_active_model.model_dump(exclude_defaults=True)
+    provider = data.get("provider")
+    model = data.get("model")
 
-        response = llm_model_api.set_active_llm_model(provider, model)
+    response = get_llm_model_api_dep().set_active_llm_model(provider, model)
 
-        return response.to_fastapi()
-
-    except HTTPException as e:
-        raise e
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return response.to_fastapi()

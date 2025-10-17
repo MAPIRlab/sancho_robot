@@ -19,6 +19,11 @@ def set_tts_model_api(api):
     global tts_model_api
     tts_model_api = api
 
+def get_tts_model_api_dep() -> TTSModelAPI:
+    if tts_model_api is None:
+        raise HTTPException(status_code=503, detail="TTS Models API no inicializada")
+    return tts_model_api
+
 @router.get("", tags=["TTS Models CRUD endpoints"], response_model=List[TTSModel])
 async def get_tts_models(
     request: Request,
@@ -26,15 +31,9 @@ async def get_tts_models(
 ):
     APIUtils.check_accept_json(request)
 
-    try:
-        response = tts_model_api.get_all_tts_models(**({ "models": models} if models else {}))
-        
-        return response.to_fastapi()
+    response = get_tts_model_api_dep().get_all_tts_models(**({ "models": models} if models else {}))
     
-    except HTTPException as e:
-        raise e 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return response.to_fastapi()
 
 @router.get("/{model}", tags=["TTS Models CRUD endpoints"], response_model=TTSModel)
 async def get_tts_model_by_name(
@@ -48,15 +47,9 @@ async def get_tts_model_by_name(
 ):
     APIUtils.check_accept_json(request)
     
-    try:
-        response = tts_model_api.get_tts_model(model)
+    response = get_tts_model_api_dep().get_tts_model(model)
 
-        return response.to_fastapi()
-    
-    except HTTPException as e:
-        raise e 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return response.to_fastapi()
 
 @router.post("/load", tags=["TTS Models CRUD endpoints"], response_model=TTSResult)
 async def load_tts_model(
@@ -66,19 +59,13 @@ async def load_tts_model(
     APIUtils.check_accept_json(request)
     APIUtils.check_content_type_json(request)
 
-    try:
-        data = tts_load_model.model_dump(exclude_defaults=True)
-        model = data.get("model")
-        api_key = data.get("api_key", "")
-        
-        response = tts_model_api.load_tts_model(model, api_key)
+    data = tts_load_model.model_dump(exclude_defaults=True)
+    model = data.get("model")
+    api_key = data.get("api_key", "")
+    
+    response = get_tts_model_api_dep().load_tts_model(model, api_key)
 
-        return response.to_fastapi()
-
-    except HTTPException as e:
-        raise e
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return response.to_fastapi()
 
 @router.post("/unload", tags=["TTS Models CRUD endpoints"], response_model=TTSResult)
 async def unload_tts_model(
@@ -88,18 +75,12 @@ async def unload_tts_model(
     APIUtils.check_accept_json(request)
     APIUtils.check_content_type_json(request)
 
-    try:
-        data = tts_unload_model.model_dump(exclude_defaults=True)
-        model = data.get("model")
-        
-        response = tts_model_api.unload_tts_model(model)
+    data = tts_unload_model.model_dump(exclude_defaults=True)
+    model = data.get("model")
+    
+    response = get_tts_model_api_dep().unload_tts_model(model)
 
-        return response.to_fastapi()
-
-    except HTTPException as e:
-        raise e
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return response.to_fastapi()
 
 @router.post("/activate", tags=["TTS Models CRUD endpoints"], response_model=TTSResult)
 async def activate_tts_model(
@@ -109,16 +90,10 @@ async def activate_tts_model(
     APIUtils.check_accept_json(request)
     APIUtils.check_content_type_json(request)
 
-    try:
-        data = tts_active_model.model_dump(exclude_defaults=True)
-        model = data.get("model")
-        speaker = data.get("speaker")
-        
-        response = tts_model_api.set_active_tts_model(model, speaker)
+    data = tts_active_model.model_dump(exclude_defaults=True)
+    model = data.get("model")
+    speaker = data.get("speaker")
+    
+    response = get_tts_model_api_dep().set_active_tts_model(model, speaker)
 
-        return response.to_fastapi()
-
-    except HTTPException as e:
-        raise e
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return response.to_fastapi()

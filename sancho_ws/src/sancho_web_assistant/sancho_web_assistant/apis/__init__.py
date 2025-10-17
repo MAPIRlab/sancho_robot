@@ -5,6 +5,7 @@ from .session_api import SessionAPI
 from .tts_model_api import TTSModelAPI
 from .stt_model_api import STTModelAPI
 from .llm_model_api import LLMModelAPI
+from .memory_api import MemoryAPI
 
 from enum import Enum
 
@@ -23,3 +24,4 @@ class API_LIST(SmartStrEnum):
     TTS_MODELS = "tts_models"
     STT_MODELS = "stt_models"
     LLM_MODELS = "llm_models"
+    MEMORIES = "memories"
