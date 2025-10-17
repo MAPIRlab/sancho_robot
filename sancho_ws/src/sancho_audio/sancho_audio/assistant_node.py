@@ -130,6 +130,34 @@ class Assistant:
             else:
                 self.play_tts("No te he entendido bien. ¿Podrías repetirlo?", "sad", keep_asking=True)
 
+    def process_found_people_service(self, request, response): # Cuando Sancho busca a un grupo y los ve y se prepara para decirles algo, aqui se dice ese algo
+        ids = request.ids
+        names = [n for n in request.names if n] # Remove the "" people (without name)
+
+        args_json = json.dumps({"people": names})
+        mode = MODE.NO_ONE_KNOWN if not names else MODE.SOME_KNOWN if len(names) != len(ids) else MODE.ALL_KNOWN
+
+        text = self.sancho_prompt_greet_request(args_json, mode)
+
+        self.play_tts(text)
+
+        return response
+
+    def sancho_prompt_greet_request(self, args_json, mode):
+        sancho_prompt_request = SanchoPrompt.Request()
+        sancho_prompt_request.args_json = args_json
+        sancho_prompt_request.mode = mode
+
+        future_sancho_prompt = self.node.sancho_prompt_client.call_async(sancho_prompt_request)
+        rclpy.spin_until_future_complete(self.node, future_sancho_prompt)
+        result_sancho_prompt = future_sancho_prompt.result()
+
+        value = json.loads(result_sancho_prompt.value_json)
+
+        response = value["response"]
+
+        return response
+
     def sancho_prompt_request(self, text, id, name):
         sancho_prompt_request = SanchoPrompt.Request()
         sancho_prompt_request.chat_id = "0" # Dejarlo vacio y que con un servicio se pueda cambiar y decidir dinamicamente cuando iniciar nuevo chat

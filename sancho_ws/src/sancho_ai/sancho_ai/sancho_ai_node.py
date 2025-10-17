@@ -53,6 +53,8 @@ class SanchoAINode(Node):
         self.get_logger().info("SanchoAI Node initializated successfully")
 
     def prompt_service(self, request, response):
+        args = {} if not request.args_json else json.loads(request.args_json)
+
         try:
             mode = MODE(request.mode)
         except ValueError:
@@ -62,12 +64,11 @@ class SanchoAINode(Node):
 
         if mode == MODE.NORMAL:
             self.get_logger().info("Normal Sancho Prompt")
-            args = json.loads(request.args_json)
             return self.normal_message(response, request.chat_id, request.text, args.get("user_id", ""), args.get("user_name", ""))
         
         elif mode in self.MODE_TASK:
             self.get_logger().info(f"{mode.name} Sancho Prompt")
-            return self.task_message(response, request.text, self.MODE_TASK[mode])
+            return self.task_message(response, request.text, args, self.MODE_TASK[mode])
         
         else:
             self.get_logger().error(f"Sancho prompt with mode that has no associated task: {mode}")
@@ -154,8 +155,8 @@ class SanchoAINode(Node):
 
         return response
 
-    def task_message(self, response, text, task_method):
-        value, provider, model = task_method(text)
+    def task_message(self, response, text, args, task_method):
+        value, provider, model = task_method(text, args)
         
         response.value_json = json.dumps(value)
         response.provider = provider

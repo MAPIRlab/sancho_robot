@@ -21,24 +21,24 @@ class LLMTaskAI(TaskAI): # Only callable tasks as a single SanchoPrompt, no task
         cls._model = model
 
     @classmethod
-    def get_name(cls, message: str) -> tuple[dict[str, Any], str, str]:
+    def get_name(cls, message: str, _: dict) -> tuple[dict[str, Any], str, str]:
         return cls._execute(ExtractNamePrompt(message), required=["name_said", "name"], default={"name_said": False, "name": ""})
 
     @classmethod
-    def confirm_name(cls, message: str) -> tuple[dict[str, Any], str, str]:
+    def confirm_name(cls, message: str, _: dict) -> tuple[dict[str, Any], str, str]:
         return cls._execute(ConfirmNamePrompt(message), required=["answer_said", "answer"], default={"answer_said": False, "answer": ""})
 
     @classmethod
-    def no_one_known(cls, message: str) -> tuple[dict[str, Any], str, str]:
+    def no_one_known(cls, message: str, _: dict) -> tuple[dict[str, Any], str, str]:
         return cls._execute(NoOneKnownPrompt(message), required=["response"], default={"response": ""})
 
     @classmethod
-    def some_known(cls, message: str) -> tuple[dict[str, Any], str, str]:
-        return cls._execute(SomeKnownPrompt(message), required=["response"], default={"response": ""})
+    def some_known(cls, message: str, args: dict) -> tuple[dict[str, Any], str, str]:
+        return cls._execute(SomeKnownPrompt(message, args.get("people", "")), required=["response"], default={"response": ""})
 
     @classmethod
-    def all_known(cls, message: str) -> tuple[dict[str, Any], str, str]:
-        return cls._execute(AllKnownPrompt(message), required=["response"], default={"response": ""})
+    def all_known(cls, message: str, args: dict) -> tuple[dict[str, Any], str, str]:
+        return cls._execute(AllKnownPrompt(message, args.get("people", "")), required=["response"], default={"response": ""})
 
     @classmethod
     def _execute(cls, prompt_obj: Prompt, required: list[str], default: dict[str, Any]) -> tuple[dict[str, Any], str, str]:
