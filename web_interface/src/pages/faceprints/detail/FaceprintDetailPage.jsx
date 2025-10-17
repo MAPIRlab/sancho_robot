@@ -41,7 +41,7 @@ const FaceprintDetailPage = () => {
 
     if (!faceprint) {
         return (
-            <div className="d-flex align-items-center justify-content-center p-4">
+            <div className="d-flex align-items-center justify-content-center p-5" style={{ marginTop: "76px" }}>
                 <div className="spinner-border text-primary me-3" role="status" />
                 <span className="fs-5">Cargando información...</span>
             </div>
