@@ -20,14 +20,12 @@ from sancho_msgs.msg import QuestionTTS, FaceRecognitionArray, UserTranscription
 from sancho_msgs.srv import AskUser
 from speech_msgs.srv import STT
 
-# ---- Utils (se mantienen igual que en tu código original) ----
 from .utils.sound import play
 from .utils.sounds import ACTIVATION_SOUND, TIME_OUT_SOUND
 from .utils.silero_vad_attach_criterion import SileroVADAttachCriterion
 from .utils.intensity_attach_criterion import IntensityAttachCriterion
 
 
-# ---------- Helper sincrono para llamadas a servicios (mismo estilo) ----------
 def _call_service_sync(node, client, request, timeout=5.0):
     if not client.service_is_ready():
         raise RuntimeError(f"Service {client.srv_name} is not ready")
@@ -53,7 +51,6 @@ def _call_service_sync(node, client, request, timeout=5.0):
             raise TimeoutError(f"Timeout waiting for service {client.srv_name} response")
 
 
-# ---------------------------- Enums ----------------------------
 class AUDIO_STATE(int, Enum):
     NO_AUDIO = -1
     SOME_AUDIO = 0
@@ -67,12 +64,10 @@ class HELPER_STATE(int, Enum):
     ASKING = 3
 
 
-# --------------------- Lifecycle Node principal ---------------------
 class AssistantHelperLifecycleNode(LifecycleNode):
     def __init__(self):
         super().__init__("assistant_helper")
 
-        # Declaración de parámetros (con valores por defecto)
         self.declare_parameters(namespace="", parameters=[
             ("name", "Sancho"),
             ("microphone_topic", "sancho_audio/microphone/mono"),
@@ -92,14 +87,11 @@ class AssistantHelperLifecycleNode(LifecycleNode):
             ("attach_criterion", "intensity"), # "intensity" | "silero_vad"
         ])
 
-        # Estructuras de colas compartidas
-        self.chunk_queue: Queue = Queue()
-        self.question_queue: Queue = Queue()
+        self.chunk_queue = Queue()
+        self.question_queue = Queue()
 
-        # Callback group reentrante para concurrencia
         self.cb_group = ReentrantCallbackGroup()
 
-        # Pubs/subs/timers/servicios (se inicializan en on_configure / on_activate)
         self.pub_face_mode = None
         self.pub_assistant_text = None
         self.pub_question_tts = None
@@ -114,18 +106,15 @@ class AssistantHelperLifecycleNode(LifecycleNode):
 
         self.spin_timer = None
 
-        # Listas temporales para DOA y reconocimiento facial
         self.face_recog_list: List[FaceRecognitionArray] = []
         self.audio_doa_list: List[Float32] = []
 
-        # Estado y helper (lógica)
         self.helper = None
 
     # ---------------- Lifecycle: configure ----------------
     def on_configure(self, state) -> TransitionCallbackReturn:
         self.get_logger().info("Configurando AssistantHelper lifecycle node...")
 
-        # Leer parámetros
         self.name = self.get_parameter("name").value
         self.microphone_topic = self.get_parameter("microphone_topic").value
         self.mode_topic = self.get_parameter("mode_topic").value
@@ -148,15 +137,10 @@ class AssistantHelperLifecycleNode(LifecycleNode):
         self.pub_assistant_text = self.create_lifecycle_publisher(UserTranscription, self.assistant_transcription_topic, qos10)
         self.pub_question_tts = self.create_lifecycle_publisher(QuestionTTS, self.question_tts_topic, qos10)
 
-        # Cliente STT
         self.stt_client = self.create_client(STT, self.stt_service_name, callback_group=self.cb_group)
-        attempts = 0
         while not self.stt_client.wait_for_service(timeout_sec=1.0):
-            attempts += 1
             self.get_logger().info('STT service not available, waiting again...')
-            # Opcionalmente romper si excede un número de intentos
 
-        # Instanciar la lógica del helper
         self.helper = AssistantHelper(self, name=self.name,
                                       helper_chunk_size=self.helper_chunk_size,
                                       intensity_threshold=self.intensity_threshold,
@@ -172,45 +156,13 @@ class AssistantHelperLifecycleNode(LifecycleNode):
 
         qos10 = QoSProfile(depth=10)
 
-        # Subscripciones
-        self.sub_micro = self.create_subscription(
-            ChunkMono,
-            self.microphone_topic,
-            self.microphone_callback,
-            qos10,
-            callback_group=self.cb_group
-        )
-        self.sub_mode = self.create_subscription(
-            Int16,
-            self.mode_topic,
-            self.mode_callback,
-            qos10,
-            callback_group=self.cb_group
-        )
-        self.sub_face_recog = self.create_subscription(
-            FaceRecognitionArray,
-            self.face_recognitions_topic,
-            self.face_recog_callback,
-            qos10,
-            callback_group=self.cb_group
-        )
-        self.sub_audio_doa = self.create_subscription(
-            Float32,
-            self.audio_doa_topic,
-            self.audio_doa_callback,
-            qos10,
-            callback_group=self.cb_group
-        )
+        self.sub_micro = self.create_subscription(ChunkMono, self.microphone_topic, self.microphone_callback, qos10, callback_group=self.cb_group)
+        self.sub_mode = self.create_subscription(Int16, self.mode_topic, self.mode_callback, qos10, callback_group=self.cb_group)
+        self.sub_face_recog = self.create_subscription(FaceRecognitionArray, self.face_recognitions_topic, self.face_recog_callback, qos10, callback_group=self.cb_group)
+        self.sub_audio_doa = self.create_subscription(Float32, self.audio_doa_topic, self.audio_doa_callback, qos10, callback_group=self.cb_group)
 
-        # Servidor de servicio AskUser (igual que en tu nodo original)
-        self.ask_user_server = self.create_service(
-            AskUser,
-            self.ask_user_service_name,
-            self.ask_user_service_callback,
-            callback_group=self.cb_group
-        )
+        self.ask_user_server = self.create_service(AskUser, self.ask_user_service_name, self.ask_user_service_callback, callback_group=self.cb_group)
 
-        # Timer de procesamiento al estilo del otro nodo
         self.spin_timer = self.create_timer(1.0 / self.processing_rate, self.helper.spin_step, callback_group=self.cb_group)
 
         return super().on_activate(state)
@@ -269,13 +221,12 @@ class AssistantHelperLifecycleNode(LifecycleNode):
             self.audio_doa_list.append(msg)
 
     def ask_user_service_callback(self, request: AskUser.Request, response: AskUser.Response):
-        # Igual que tu nodo original: mete en cola y responde accepted=True
         self.question_queue.put([request.question_id, request.args_json])
         response.accepted = True
         return response
 
 
-# ------------------------- Lógica (igual que tu clase original, adaptada) -------------------------
+# ------------------------- Lógica de negocio -------------------------
 class AssistantHelper:
 
     def __init__(self, node: AssistantHelperLifecycleNode, name="Sancho",
@@ -302,13 +253,11 @@ class AssistantHelper:
         self.hotword_detector = self._init_hotword_detector(hotword)
         self.chunk_attach_criterion = self._init_chunk_attach_criterion(attach_criterion)
 
-    # Llamado en cada tick del timer (estilo lifecycle)
     def spin_step(self):
         while not self.node.chunk_queue.empty(): # While para que si entran dos chunks antes del siguiente spin pues se procesen los dos
             [new_audio, self.sample_rate] = self.node.chunk_queue.get()
 
             if self.transcription_sent:
-                # No hacemos nada hasta que nos cambien de estado desde fuera
                 pass
 
             elif self.helper_state == HELPER_STATE.NAME:
@@ -321,7 +270,6 @@ class AssistantHelper:
             elif self.helper_state in [HELPER_STATE.COMMAND, HELPER_STATE.ASKING]:
                 self.build_audio_command(new_audio)
 
-    # ---------- Métricas/lógica iguales a tu código ----------
     def process_question(self, question_id, args_json):
         self.node.pub_question_tts.publish(QuestionTTS(question_id=question_id, args_json=args_json))
         self.helper_state = HELPER_STATE.SPEAKING
@@ -337,13 +285,11 @@ class AssistantHelper:
 
             play(ACTIVATION_SOUND, wait_for_end=True)
 
-            # Limpiar buffers y colas como en el original
             self._reset_audio_buffers(clear_chunk_queue=True)
 
     def build_audio_command(self, new_audio: List[int]):
         self.check_audio = self.check_audio + new_audio
 
-        # Timeout cuando todavía no hemos empezado a adjuntar audio
         if self.helper_state != HELPER_STATE.ASKING and len(self.audio) == 0 and time.time() - self.hotword_detection_time > self.timeout_seconds:
             self.node.pub_face_mode.publish(String(data="idle"))
             self.helper_state = HELPER_STATE.NAME
@@ -355,13 +301,13 @@ class AssistantHelper:
             if self.chunk_attach_criterion.should_attach_chunk(self.check_audio, self.sample_rate):
                 if self.audio_state == AUDIO_STATE.NO_AUDIO:
                     self.audio_state = AUDIO_STATE.SOME_AUDIO
-                if len(self.audio) == 0:
-                    # Adjuntar chunk previo la primera vez para no cortar inicio
+
+                if len(self.audio) == 0: # Adjuntar chunk previo la primera vez para no cortar inicio
                     self.audio = self.previous_chunk
+
                 self.audio = self.audio + self.check_audio
                 self.node.get_logger().info(f"Chunk attached ({len(self.audio) / self.sample_rate}s)")
-            elif self.audio_state != AUDIO_STATE.NO_AUDIO:
-                # Cierre de ventana de audio
+            elif self.audio_state != AUDIO_STATE.NO_AUDIO: # Cierre de ventana de audio
                 self.audio_state = AUDIO_STATE.END_AUDIO
                 self.audio = self.audio + self.check_audio
                 self.node.get_logger().info("No more audio detected. Closing chunk window")
@@ -378,7 +324,6 @@ class AssistantHelper:
             self.check_audio = []
             self.audio_state = AUDIO_STATE.NO_AUDIO
 
-            # Limpiar cola mientras hacemos STT, como en tu código
             self._reset_audio_buffers(clear_chunk_queue=True)
 
     def process_audio_command(self, audio: List[int]):
@@ -403,7 +348,6 @@ class AssistantHelper:
         else:
             self.node.get_logger().info("Transcription result is empty.")
 
-    # --------- Utilidades de lógica (igual que original) ----------
     def determine_user(self, face_recog_list, audio_doa_list) -> Tuple[str, str]:
         DEFAULT = ("", "")
         if len(face_recog_list) <= 0:
@@ -443,8 +387,7 @@ class AssistantHelper:
     def calc_x_from_azimut(self, azimut_deg, yaw_off=0.0, cx=939.37064, fx=1075.42921):
         theta = max(-89.9, min(89.9, float(azimut_deg) + yaw_off))
         return int(round(cx + fx * math.tan(math.radians(theta))))
-
-    # --------- Llamada STT con helper sincrono (mismo estilo) ----------
+    
     def stt_request(self, audio: List[int], sample_rate: int) -> str:
         if not self.node.stt_client or not self.node.stt_client.service_is_ready():
             self.node.get_logger().error("STT client not ready")
@@ -461,7 +404,9 @@ class AssistantHelper:
             self.node.get_logger().error(f"Error calling STT service: {e}")
             return ""
 
-    # --------- Inicialización de detectores/criterios (igual que original) ----------
+    def is_audio_length(self, audio: List[int], seconds: float) -> bool:
+        return len(audio) >= seconds * self.sample_rate
+
     def _init_hotword_detector(self, hotword="openwakeword"):
         if hotword == "stt":
             from .utils.stt_hotword import STTHotword
@@ -479,9 +424,6 @@ class AssistantHelper:
         else:  # silero_vad
             return SileroVADAttachCriterion()
 
-    def is_audio_length(self, audio: List[int], seconds: float) -> bool:
-        return len(audio) >= seconds * self.sample_rate
-
     def _reset_audio_buffers(self, clear_chunk_queue=False):
         if clear_chunk_queue:
             self.node.chunk_queue = Queue()
@@ -490,7 +432,6 @@ class AssistantHelper:
         self.previous_chunk = []
 
 
-# ------------------------------ main ------------------------------
 def main(args=None):
     rclpy.init(args=args)
     node = AssistantHelperLifecycleNode()

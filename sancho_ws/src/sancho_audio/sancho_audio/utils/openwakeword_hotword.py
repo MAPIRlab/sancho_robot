@@ -64,12 +64,14 @@ class OpenWakeWordHotword(ModelHotword):
 
             score = next(iter(self.model.predict(frame).values()))
             print(f"Hotword score: {score:.3f}")  # Debugging line to see the score
+
             if score >= self.threshold:
                 self.consec_hits += 1
                 if self.consec_hits >= self.frames_needed:
                     self.consec_hits = 0
                     fired = True
-                    # HAY QUE LIMPIAR EL BUFFER
+
+                    self.buffer = np.array([], dtype=np.int16) # Limpiar buffer para evitar re-disparo
                     break
             else:
                 self.consec_hits = 0

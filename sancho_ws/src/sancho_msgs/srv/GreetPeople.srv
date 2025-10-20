@@ -1,0 +1,4 @@
+int32[] ids
+string[] names
+---
+bool accepted

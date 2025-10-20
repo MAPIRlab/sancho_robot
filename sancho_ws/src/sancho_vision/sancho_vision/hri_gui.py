@@ -26,6 +26,7 @@ class HRIGUINode(Node):
         self.face_name_pub = self.create_publisher(FaceNameResponse, '/gui/face_name_response', 10)
         self.face_question_pub = self.create_publisher(FaceQuestionResponse, '/gui/face_question_response', 10)
         self.face_timeout_pub = self.create_publisher(Empty, '/gui/face_timeout_response', 10)
+        self.cancel_question_pub = self.create_publisher(Empty, 'assistant/cancel_question', 10)
 
         self.name_answer_sub = self.create_subscription(String, "/gui/name_answer", self.name_answer_callback, 10)
         self.confirm_name_sub = self.create_subscription(Bool, "/gui/confirm_name", self.confirm_name_callback, 10)
@@ -34,15 +35,14 @@ class HRIGUINode(Node):
 
     def name_answer_callback(self, msg):
         name = str(msg.data)
-        self.get_logger().info(f"Received name answer: {name}")
         
-        self.hri_gui.send_face_name_response(name)
+        self.hri_gui.send_face_name_response(name, notify_assistant=False) # False porque esto ya viene del assistant
         self.hri_gui.controller.set_mode_normal()
 
     def confirm_name_callback(self, msg):
         answer = bool(msg.data)
         
-        self.hri_gui.send_face_question_response(answer)
+        self.hri_gui.send_face_question_response(answer, notify_assistant=False)
         self.hri_gui.controller.set_mode_normal()
 
 class HRIGUI:
@@ -57,16 +57,21 @@ class HRIGUI:
     def spin(self):
         self.controller.start()
 
-    def send_face_name_response(self, name):
+    def send_face_name_response(self, name, notify_assistant=True):
         self.stop_timeout()
         self.node.face_name_pub.publish(FaceNameResponse(name=name))
+        if notify_assistant:
+            self.node.cancel_question_pub.publish(Empty())
 
-    def send_face_question_response(self, answer):
+    def send_face_question_response(self, answer, notify_assistant=True):
         self.stop_timeout()
         self.node.face_question_pub.publish(FaceQuestionResponse(answer=answer))
+        if notify_assistant:
+            self.node.cancel_question_pub.publish(Empty())
 
     def send_face_timeout_response(self):
         self.node.face_timeout_pub.publish(Empty())
+        self.node.cancel_question_pub.publish(Empty())
 
     def user_interaction_service(self, request, response):
         mode = request.mode

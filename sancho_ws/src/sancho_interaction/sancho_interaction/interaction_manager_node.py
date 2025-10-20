@@ -23,7 +23,7 @@ from rclpy.lifecycle import LifecycleNode, TransitionCallbackReturn
 from rclpy.qos import QoSProfile, ReliabilityPolicy
 from sancho_msgs.action import PlayAudio
 from sancho_msgs.msg import FaceDetectionArray, FaceRecognitionArray
-from sancho_msgs.srv import AskUser, GetCentralFaceCluster, SocialState
+from sancho_msgs.srv import GetCentralFaceCluster, SocialState, GreetPeople
 from std_msgs.msg import Float32, Int16
 from tf_transformations import quaternion_from_euler
 
@@ -170,7 +170,7 @@ class InteractionManager(LifecycleNode):
             "central_face_cluster_service",
             "/central_faces_cluster_node/get_central_cluster",
         )
-        self.declare_parameter("assistant_helper_service", "sancho_audio/ask_user")
+        self.declare_parameter("assistant_helper_service", "assistant/greet_people")
         self.declare_parameter("assistant_helper_mode_topic", "sancho_audio/assistant_helper/mode")
         self.declare_parameter("assistant_helper_question_id", 1)
         self.declare_parameter("assistant_helper_timeout", 60.0)
@@ -359,7 +359,7 @@ class InteractionManager(LifecycleNode):
             self.get_logger().info("Cliente de GetCentralFaceCluster listo")
 
         self.assistant_helper_client = self.create_client(
-            AskUser,
+            GreetPeople,
             self.assistant_helper_service_name,
             callback_group=self.io_cb,
         )
@@ -763,28 +763,9 @@ class InteractionManager(LifecycleNode):
             )
             return False
 
-        req = AskUser.Request()
-        req.question_id = self.assistant_helper_question_id
-        payload = {
-            "target_names": self.assistant_helper_target_names,
-            "target_ids": self.assistant_helper_target_ids,
-            "cluster_center": (
-                {
-                    "x": float(self.assistant_helper_cluster_center.x),
-                    "y": float(self.assistant_helper_cluster_center.y),
-                }
-                if self.assistant_helper_cluster_center is not None
-                else None
-            ),
-        }
-        # TODO: actualizar la estructura del payload cuando el equipo del assistant helper defina el contrato final.
-        try:
-            req.args_json = json.dumps(payload)
-        except (TypeError, ValueError) as exc:
-            self.get_logger().error(
-                f"No se pudo serializar la petición para assistant helper: {exc}"
-            )
-            return False
+        req = GreetPeople.Request()
+        req.ids = self.assistant_helper_target_ids
+        req.names = self.assistant_helper_target_names
 
         future = self.assistant_helper_client.call_async(req)
         done_evt = threading.Event()
@@ -795,7 +776,7 @@ class InteractionManager(LifecycleNode):
                 f"Timeout esperando respuesta del servicio {self.assistant_helper_service_name}"
             )
             return False
-
+        
         response = future.result()
         if response is None:
             self.get_logger().error(

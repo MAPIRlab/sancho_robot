@@ -1,4 +1,5 @@
 import json
+import time
 import rclpy
 import sounddevice as sd
 from rclpy.node import Node
@@ -6,14 +7,16 @@ from rclpy.node import Node
 from enum import Enum
 from queue import Queue
 
-from std_msgs.msg import String, Int16, Bool
-from hri_msgs.srv import SanchoPrompt, TriggerUserInteraction, GetString
+from std_msgs.msg import String, Int16, Bool, Empty
+from hri_msgs.srv import SanchoPrompt, TriggerUserInteraction
 from sancho_msgs.msg import InputTTS, QuestionTTS, UserTranscription
-from speech_msgs.srv import TTS
+from speech_msgs.srv import TTS, GreetPeople
 
 from sancho_audio.assistant_helper_node import HELPER_STATE
 from sancho_ai.sancho_ai_node import MODE
 from sancho_ai.prompts.commands import COMMANDS
+
+from lifecycle_msgs.srv import ChangeState, GetAvailableTransitions
 
 
 def try_json_loads(text):
@@ -39,12 +42,13 @@ class AssistantNode(Node):
         self.helper_mode_pub = self.create_publisher(Int16, 'sancho_audio/assistant_helper/mode', 10)
         self.name_answer_pub = self.create_publisher(String, "/gui/name_answer", 10)
         self.confirm_name_pub = self.create_publisher(Bool, "/gui/confirm_name", 10)
-
+        
         self.text_sub = self.create_subscription(UserTranscription, 'sancho_audio/assistant_helper/transcription', self.text_callback, 10)
         self.tts_sub = self.create_subscription(InputTTS, 'input_tts', self.tts_callback, 10)
         self.tts_sub = self.create_subscription(QuestionTTS, 'question_tts', self.question_callback, 10)
+        self.cancel_question_sub = self.create_subscription(Empty, 'assistant/cancel_question', self.cancel_question_callback, 10)
 
-        self.sancho_greet_people_srv = self.create_service(GetString, 'assistant/greet_people', self.assistant.sancho_greet_people_service)
+        self.sancho_greet_people_srv = self.create_service(GreetPeople, 'assistant/greet_people', self.sancho_greet_people_service)
 
         self.sancho_prompt_client = self.create_client(SanchoPrompt, "sancho_ai/prompt")
         while not self.sancho_prompt_client.wait_for_service(timeout_sec=1.0):
@@ -61,6 +65,7 @@ class AssistantNode(Node):
         self.queue = Queue(maxsize=1)
         self.tts_queue = Queue(maxsize=1)
         self.question_queue = Queue()
+        self.greet_queue = Queue(maxsize=1)
 
         self.get_logger().info("Assistant Node initializated succesfully.")
 
@@ -75,11 +80,23 @@ class AssistantNode(Node):
     def question_callback(self, msg):
         self.question_queue.put([msg.question_id, json.loads(msg.args_json) if msg.args_json else {}])
 
+    def cancel_question_callback(self, msg):
+        self.assistant.cancel_question()
+
+    def sancho_greet_people_service(self, request, response):
+        if self.greet_queue.qsize() < 1:
+            self.greet_queue.put([request.ids, request.names])
+            response.accepted = True
+        else:
+            response.accepted = False
+
+        return response
+
 
 class Assistant:
 
     def __init__(self):
-        self.node = AssistantNode(self)
+        self.node = AssistantNode()
 
         self.question_id = QUESTION.NO_QUESTION
 
@@ -100,6 +117,11 @@ class Assistant:
 
                 text = self.create_question_text(self.question_id, args)
                 self.play_tts(text, emotion="neutral", keep_asking=True)
+
+            if not self.node.greet_queue.empty():
+                [ids, names] = self.node.greet_queue.get()
+
+                self.sancho_greet_people(ids, names)
 
             rclpy.spin_once(self.node)
 
@@ -134,22 +156,16 @@ class Assistant:
             else:
                 self.play_tts("No te he entendido bien. ¿Podrías repetirlo?", "sad", keep_asking=True)
 
-    def sancho_greet_people_service(self, request, response): # Cuando Sancho busca a un grupo y los ve y se prepara para decirles algo, aqui se dice ese algo
-        args = json.loads(request.args)
-        ids = args.get("ids", [])
-        names = [n for n in args.get("names", []) if n] # Remove the "" people (without name)
-
-        text = self.sancho_prompt_greet_request( # Hacerlo async
+    def sancho_greet_people(self, ids, names): # Cuando Sancho busca a un grupo y los ve y se prepara para decirles algo, aqui se dice ese algo
+        text = self.sancho_prompt_greet_request( 
             args_json=json.dumps({"people": names}), 
             mode=MODE.NO_ONE_KNOWN if not names else MODE.SOME_KNOWN if len(names) != len(ids) else MODE.ALL_KNOWN
         )
 
-        self.play_tts(text) # Hacerlo async, si esto esto a un queue y del queue se coge y se hace esto
+        self.play_tts(text)
 
-        # Ahora aqui hay que activar el assistant helper que es life cycle
-        # Y aqui activar el human manager que tambien es life cycle
-
-        return response
+        self._activate_lifecycle_node("assistant_helper") # Activar assistant helper
+        self._activate_lifecycle_node("human_face_manager") # Activar human face manager
 
     def sancho_prompt_greet_request(self, args_json, mode):
         sancho_prompt_request = SanchoPrompt.Request()
@@ -261,6 +277,68 @@ class Assistant:
         
         self.node.face_mode_pub.publish(String(data=face_mode)) # Mouth mode
         self.node.helper_mode_pub.publish(Int16(data=helper_mode.value)) # Helper mode
+
+    def _get_available_transition_id(self, node_name: str, label: str):
+        cli_get = self.node.create_client(GetAvailableTransitions, f'/{node_name}/get_available_transitions')
+        if not cli_get.wait_for_service(timeout_sec=1.0):
+            self.node.get_logger().debug(f'[{node_name}] get_available_transitions no está listo.')
+            return None
+
+        req = GetAvailableTransitions.Request()
+        fut = cli_get.call_async(req)
+        rclpy.spin_until_future_complete(self.node, fut)
+        resp = fut.result()
+        if not resp:
+            return None
+
+        for t in resp.available_transitions:
+            if t.transition.label.lower() == label.lower():
+                return t.transition.id
+        return None
+
+    def _change_state(self, node_name: str, transition_id: int) -> bool:
+        cli_chg = self.node.create_client(ChangeState, f'/{node_name}/change_state')
+        if not cli_chg.wait_for_service(timeout_sec=1.0):
+            self.node.get_logger().warn(f'[{node_name}] change_state no está listo.')
+            return False
+
+        req = ChangeState.Request()
+        req.transition.id = transition_id
+        fut = cli_chg.call_async(req)
+        rclpy.spin_until_future_complete(self.node, fut)
+        resp = fut.result()
+        return bool(resp and resp.success)
+
+    def _activate_lifecycle_node(self, node_name: str, attempts: int = 10, sleep_s: float = 0.3):
+        self.node.get_logger().info(f'Intentando ACTIVAR lifecycle node "{node_name}"...')
+
+        for _ in range(attempts): # Intentar CONFIGURE si está disponible
+            cfg_id = self._get_available_transition_id(node_name, "configure")
+            if cfg_id is None:
+                break  # Puede que ya esté configurado; pasamos a activar
+            if self._change_state(node_name, cfg_id):
+                self.node.get_logger().info(f'[{node_name}] CONFIGURADO correctamente.')
+                break
+            time.sleep(sleep_s)
+
+        for _ in range(attempts): # Intentar ACTIVATE
+            act_id = self._get_available_transition_id(node_name, "activate")
+            if act_id is None:
+                time.sleep(sleep_s)
+                continue
+            if self._change_state(node_name, act_id):
+                self.node.get_logger().info(f'[{node_name}] ✅ ACTIVADO correctamente.')
+                return True
+            time.sleep(sleep_s)
+
+        self.node.get_logger().error(f'[{node_name}] No se pudo activar después de los intentos.')
+        return False
+
+    def cancel_question(self):
+        self.question_id = QUESTION.NO_QUESTION
+
+        self.node.face_mode_pub.publish(String(data="idle"))
+        self.node.helper_mode_pub.publish(Int16(data=HELPER_STATE.NAME.value))
 
     def create_question_text(self, question_id, args): # Hacer con templates mejor por variedad y demas. LLM meteria mas delay
         if question_id == QUESTION.GET_NAME:

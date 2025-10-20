@@ -36,6 +36,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/SocialState.srv"
   "srv/GetCentralFaceCluster.srv"
   "srv/AskUser.srv"
+  "srv/GreetPeople.srv"
   "action/PlayAudio.action"
   DEPENDENCIES sensor_msgs std_msgs geometry_msgs
   )

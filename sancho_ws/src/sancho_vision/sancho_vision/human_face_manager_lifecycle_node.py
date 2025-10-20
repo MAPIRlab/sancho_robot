@@ -212,7 +212,6 @@ class HumanFaceManagerLifecycleNode(LifecycleNode):
         self.face_recognitions_queue.put(msg)
 
     def face_name_response_callback(self, msg: FaceNameResponse):
-        self.get_logger().info(f"Nombre recibido de la GUI (sub): {msg.name}")
         self.face_name_queue.put(msg.name)
 
     def face_question_response_callback(self, msg: FaceQuestionResponse):

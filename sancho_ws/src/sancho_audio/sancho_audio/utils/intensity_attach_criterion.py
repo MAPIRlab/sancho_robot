@@ -1,8 +1,6 @@
-import torch
 import numpy as np
 
 from rclpy.node import Node
-from scipy.signal import resample_poly
 
 
 class IntensityAttachCriterion(Node):
