@@ -740,7 +740,7 @@ class InteractionManager(LifecycleNode):
 
         return True
 
-    def start_assistant_helper_interaction(self) -> bool:
+    def start_assistant_interaction(self) -> bool:
         """Trigger the assistant helper service with the detected user information."""
         if not self.assistant_helper_target_names:
             self.get_logger().error(
@@ -1106,7 +1106,7 @@ class StartAssistantHelperState(IMState):
             mgr.transition_to(DeactivateAllState)
             return
 
-        if not mgr.start_assistant_helper_interaction():
+        if not mgr.start_assistant_interaction():
             mgr.get_logger().error(
                 "Assistant helper no aceptó la interacción solicitada"
             )
