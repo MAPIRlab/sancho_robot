@@ -15,8 +15,7 @@ GOOGLE_STT_API_KEY = os.environ.get("GOOGLE_STT_API_KEY")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 
-# --- Ruta del venv SOLO para assistant_helper
-VENV = "/home/mapir/sancho_robot/sancho_ws/runtimes/assistant_helper/venv"
+ASSISTANT_HELPER_VENV = "/home/mapir/sancho_robot/sancho_ws/runtimes/assistant_helper/venv"
 
 def generate_launch_description():
     prefix_cmd = LaunchConfiguration('prefix')
@@ -53,16 +52,16 @@ def generate_launch_description():
         }]
     )
 
-    # ---- SOLO ESTE NODO con venv
+    # ---- ESTE NODO va con ASSISTANT_HELPER_VENV
     assistant_helper = Node(
         package='sancho_audio',
-        #executable='assistant_helper',
-        executable=os.path.join(VENV, "bin", "python"),
+        executable=os.path.join(ASSISTANT_HELPER_VENV, "bin", "python"),
         arguments=['-m', 'sancho_audio.assistant_helper_node'],  # <-- tu módulo exacto
         name='assistant_helper',
         output='screen',
         emulate_tty=True,
-        prefix=prefix_cmd
+        prefix=prefix_cmd,
+        parameters=[{ 'active': True }]
     )
 
     assistant = Node(

@@ -8,6 +8,7 @@ import rclpy
 from rclpy.node import Node
 
 from std_msgs.msg import String, Float32, Int16
+from std_srvs.srv import SetBool
 from hri_msgs.msg import ChunkMono
 from sancho_msgs.msg import QuestionTTS, FaceRecognitionArray, UserTranscription
 from sancho_msgs.srv import AskUser
@@ -38,8 +39,14 @@ class AssistantHelperNode(Node):
 
         self.assistant_helper = assistant_helper
 
+        self.declare_parameter("active", False)
+        self.is_active = bool(self.get_parameter("active").value)
+
         self.face_recog_list = []
         self.audio_doa_list = []
+        
+        self.chunk_queue = Queue()
+        self.question_queue = Queue()
 
         self.face_mode_pub = self.create_publisher(String, "face/mode", 10)
         self.assistant_text_pub = self.create_publisher(UserTranscription, 'sancho_audio/assistant_helper/transcription', 10)
@@ -55,19 +62,23 @@ class AssistantHelperNode(Node):
             self.get_logger().info('STT service not available, waiting again...')
         
         self.ask_user_srv = self.create_service(AskUser, 'sancho_audio/ask_user', self.ask_user_service)
-            
-        self.chunk_queue = Queue()
-        self.question_queue = Queue()
+        self.set_active_srv = self.create_service(SetBool, 'sancho_audio/assistant_helper/set_active', self.set_active_service)
 
         self.get_logger().info("Assistant Helper Node initializated succesfully.")
 
     def microphone_callback(self, msg):
+        if not self.is_active:
+            return
+        
         new_audio = list([np.int16(x) for x in msg.chunk_mono])
         sample_rate = msg.sample_rate
         
         self.chunk_queue.put([new_audio, sample_rate])
     
     def mode_callback(self, msg):
+        if not self.is_active:
+            return
+        
         new_helper_state = msg.data
 
         if new_helper_state in [e.value for e in HELPER_STATE]:
@@ -79,17 +90,35 @@ class AssistantHelperNode(Node):
             self.get_logger().info(f"Invalid helper state mode: {new_helper_state}")
 
     def face_recog_callback(self, msg):
+        if not self.is_active:
+            return
+        
         if self.assistant_helper.audio_state != AUDIO_STATE.NO_AUDIO:
             self.face_recog_list.append(msg) # Timestamp en header
 
     def audio_doa_callback(self, msg):
+        if not self.is_active:
+            return
+        
         if self.assistant_helper.audio_state != AUDIO_STATE.NO_AUDIO:
             self.audio_doa_list.append(msg) # Habria que poner el timestamp de cuando se recibio el chunk
 
     def ask_user_service(self, request, response):
+        if not self.is_active:
+            response.accepted = False
+            return response
+        
         self.question_queue.put([request.question_id, request.args_json])
 
         response.accepted = True
+
+        return response
+    
+    def set_active_service(self, request, response):
+        self.is_active = request.data
+        self.get_logger().info(f"ESTADO DE ASSISTANT HELPER CAMBIADO A {self.is_active}")
+
+        response.success = True
 
         return response
 
@@ -120,7 +149,7 @@ class AssistantHelper:
         self.node = AssistantHelperNode(self)
 
     def spin(self):
-        while rclpy.ok():
+        while self.node.is_active and rclpy.ok():
             while not self.node.chunk_queue.empty(): # Combine audio chunks
                 [new_audio, self.sample_rate] = self.node.chunk_queue.get()
 

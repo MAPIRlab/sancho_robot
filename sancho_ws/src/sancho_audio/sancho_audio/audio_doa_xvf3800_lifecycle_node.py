@@ -12,7 +12,7 @@ class AudioDOAXVF3800LifecycleNode(LifecycleNode):
 
     def __init__(self):
         super().__init__("audio_doa_xvf3800")
-
+        
         self.declare_parameters(namespace='', parameters={
             ("doa_topic", "sancho_audio/doa"),                  # tópico Float32 con grados
             ("poll_hz", 10.0),                                  # frecuencia de sondeo
