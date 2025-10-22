@@ -29,19 +29,13 @@ class MicrophoneCapturer:
         self.device_name = self.node.get_parameter("device_name").get_parameter_value().string_value
         self.chunk_size = int(self.node.get_parameter("chunk_size").get_parameter_value().integer_value or 1024)
 
-        if self.device_name.lower() == "xvf3800":
-            device, sr, ch = self.get_device_xvf3800()
-        else:
-            device = self.get_device_by_name(self.device_name)
-            if not device:
-                raise Exception(f"Microphone with name '{self.device_name}' not found.")
-
-            sr = int(device.get("defaultSampleRate", 16000))
-            ch = int(device.get("maxInputChannels", 1))
+        device = self.get_device_by_name(self.device_name)
+        if not device:
+            raise Exception(f"Microphone with name '{self.device_name}' not found.")
 
         self.device_index = device["index"]
-        self.sample_rate = sr
-        self.num_channels = ch
+        self.sample_rate = int(device.get("defaultSampleRate", 16000))
+        self.num_channels = int(device.get("maxInputChannels", 1))
         
         self.stream = self.setup_microphone(self.device_index, self.sample_rate, self.num_channels, self.chunk_size)
 
@@ -88,43 +82,12 @@ class MicrophoneCapturer:
                     d = dict(dev); d["index"] = i
                     target = d
                     break
+
         return target
 
-    def get_device_xvf3800(self):
-        try:
-            out = subprocess.check_output(["pactl", "list", "sources", "short"], text=True)
-            src_name = None
-            for ln in out.strip().splitlines():
-                parts = ln.split("\t")
-                if len(parts) >= 2 and re.search(r"(respeaker|xvf3800|seeed|4-mic)", parts[1], re.I):
-                    src_name = parts[1]; break
-            if src_name:
-                os.environ["PULSE_SOURCE"] = src_name
-            else:
-                self.node.get_logger().warn("XVF3800: Pulse source not found (select it as default input in your system).")
-        except Exception as e:
-            self.node.get_logger().warn(f"XVF3800: pactl error: {e}")
-
-        pulse_dev = None
-        for i in range(self.p.get_device_count()):
-            dev = self.p.get_device_info_by_index(i)
-            if dev.get("maxInputChannels", 0) > 0 and dev["name"].lower() == "pulse":
-                pulse_dev = dict(dev); pulse_dev["index"] = i; break
-        if not pulse_dev:
-            raise Exception("XVF3800: no 'pulse' input device found in PyAudio.")
-
-        forced_sr = 16000
-        forced_ch = min(2, int(pulse_dev.get("maxInputChannels", 2)) or 2)
-        return pulse_dev, forced_sr, forced_ch
-
     def setup_microphone(self, device_index, sample_rate, num_channels, chunk_size):
-        return self.p.open(format=pyaudio.paInt16,
-                           channels=num_channels,
-                           rate=sample_rate,
-                           input=True,
-                           frames_per_buffer=chunk_size,
-                           input_device_index=device_index)
-
+        return self.p.open(format=pyaudio.paInt16, channels=num_channels, rate=sample_rate,
+                      input=True, frames_per_buffer=chunk_size, input_device_index=device_index)
 
 
 def main(args=None):

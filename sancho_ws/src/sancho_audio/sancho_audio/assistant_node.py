@@ -10,7 +10,8 @@ from queue import Queue
 from std_msgs.msg import String, Int16, Bool, Empty
 from hri_msgs.srv import SanchoPrompt, TriggerUserInteraction
 from sancho_msgs.msg import InputTTS, QuestionTTS, UserTranscription
-from speech_msgs.srv import TTS, GreetPeople
+from sancho_msgs.srv import GreetPeople
+from speech_msgs.srv import TTS
 
 from sancho_audio.assistant_helper_node import HELPER_STATE
 from sancho_ai.sancho_ai_node import MODE
@@ -96,7 +97,7 @@ class AssistantNode(Node):
 class Assistant:
 
     def __init__(self):
-        self.node = AssistantNode()
+        self.node = AssistantNode(self)
 
         self.question_id = QUESTION.NO_QUESTION
 

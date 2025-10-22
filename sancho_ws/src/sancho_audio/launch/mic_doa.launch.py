@@ -22,8 +22,8 @@ def generate_launch_description():
     audio_doa_node = LifecycleNode(
         namespace='',
         package='sancho_audio',
-        executable='audio_doa_lifecycle',
-        name='audio_doa_lifecycle',
+        executable='audio_doa_xvf3800_lifecycle',
+        name='audio_doa_xvf3800_lifecycle',
         output='screen',
         prefix=prefix_cmd,
         emulate_tty=True,
@@ -44,7 +44,7 @@ def generate_launch_description():
         parameters=[
             {
                 'activate': True,
-                'node_names': ['microphone', 'audio_doa_lifecycle']
+                'node_names': ['microphone', 'audio_doa_xvf3800_lifecycle']
             }
         ],
     )
