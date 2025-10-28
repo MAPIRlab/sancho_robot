@@ -76,7 +76,7 @@ public:
         get_parameter("send_interval_sec", chunk_send_interval_);
         RCLCPP_INFO(get_logger(), "Intervalo de envío configurado: %.2f s", chunk_send_interval_);
 
-        std::vector<std::string> serial_paths = {"/dev/ttyUSB1", "/dev/ttyUSB1", "/dev/ttyUSB2"};
+        std::vector<std::string> serial_paths = {"/dev/esp32", "/dev/ttyUSB1", "/dev/ttyUSB2"};
         for (const auto &path : serial_paths)
         {
             serial_fd_ = open(path.c_str(), O_RDWR | O_NOCTTY | O_NONBLOCK);
