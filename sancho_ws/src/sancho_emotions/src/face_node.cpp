@@ -15,6 +15,9 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <termios.h>
+#include <array>
+#include <cstdio>
+#include <cstdlib>
 
 int configure_serial_port(int fd, int baudrate)
 {
@@ -67,6 +70,28 @@ int configure_serial_port(int fd, int baudrate)
     return 0;
 }
 
+// -------------------- Helpers para PulseAudio --------------------
+
+static std::string run_cmd(const std::string &cmd) {
+    std::array<char, 256> buf{};
+    std::string out;
+    FILE *pipe = popen(cmd.c_str(), "r");
+    if (!pipe) return out;
+    while (fgets(buf.data(), buf.size(), pipe) != nullptr) out += buf.data();
+    pclose(pipe);
+    while (!out.empty() && (out.back()=='\n' || out.back()=='\r' || out.back()==' ')) out.pop_back();
+    return out;
+}
+
+static bool pulse_source_exists(const std::string &name) {
+    if (name.empty()) return false;
+    std::string cmd =
+        "pactl list short sources | awk '{print $2}' | grep -Fx \"" + name + "\" || true";
+    return !run_cmd(cmd).empty();
+}
+
+// ----------------------------------------------------------------
+
 class FaceNode : public rclcpp::Node
 {
 public:
@@ -76,7 +101,7 @@ public:
         get_parameter("send_interval_sec", chunk_send_interval_);
         RCLCPP_INFO(get_logger(), "Intervalo de envío configurado: %.2f s", chunk_send_interval_);
 
-        std::vector<std::string> serial_paths = {"/dev/esp32", "/dev/ttyUSB1", "/dev/ttyUSB2"};
+        std::vector<std::string> serial_paths = {"/dev/esp32", "/dev/ttyUSB0", "/dev/ttyUSB1", "/dev/ttyUSB2"};
         for (const auto &path : serial_paths)
         {
             serial_fd_ = open(path.c_str(), O_RDWR | O_NOCTTY | O_NONBLOCK);
@@ -157,32 +182,73 @@ private:
 
     void start_audio_monitoring()
     {
-        Pa_Initialize();
+        // *** Monitor objetivo: "lo que suena" en tu equipo (concretamente el USB C-Media) ***
+        const std::string kDesiredPulseSource =
+            "alsa_output.usb-C-Media_Electronics_Inc._USB_Audio_Device-00.analog-stereo.monitor";
 
-        int pulse_device = -1;
-        int numDevices = Pa_GetDeviceCount();
-        for (int i = 0; i < numDevices; ++i)
-        {
-            const PaDeviceInfo *info = Pa_GetDeviceInfo(i);
-            if (info && std::string(info->name).find("pulse") != std::string::npos)
-            {
-                pulse_device = i;
+        // Fijar PULSE_SOURCE solo para este proceso (sin tocar configuración global)
+        if (pulse_source_exists(kDesiredPulseSource)) {
+            setenv("PULSE_SOURCE", kDesiredPulseSource.c_str(), 1);
+            RCLCPP_INFO(get_logger(), "Usando Pulse source (monitor): %s", kDesiredPulseSource.c_str());
+        } else {
+            // Fallback: monitor del sink por defecto
+            std::string def_sink = run_cmd("pactl info | sed -n 's/Default Sink: //p' | head -n1");
+            std::string fallback = def_sink.empty() ? "" : def_sink + ".monitor";
+            if (!fallback.empty() && pulse_source_exists(fallback)) {
+                setenv("PULSE_SOURCE", fallback.c_str(), 1);
+                RCLCPP_WARN(get_logger(), "Monitor fijo no encontrado. Usando monitor del sink por defecto: %s",
+                            fallback.c_str());
+            } else {
+                RCLCPP_ERROR(get_logger(),
+                             "No se encontró el monitor objetivo ni el del sink por defecto. Abortando captura.");
+                return;
             }
         }
 
-        if (pulse_device == -1)
-        {
-            RCLCPP_ERROR(get_logger(), "No se encontró el dispositivo 'pulse' en PortAudio.");
+        // Inicializa PortAudio DESPUÉS de fijar PULSE_SOURCE
+        Pa_Initialize();
+
+        // Seleccionar el dispositivo PortAudio llamado "pulse" (o fallback a "default")
+        int selected_device = paNoDevice;
+        int numDevices = Pa_GetDeviceCount();
+        if (numDevices < 0) {
+            RCLCPP_ERROR(get_logger(), "Pa_GetDeviceCount error: %s", Pa_GetErrorText(numDevices));
             return;
         }
 
-        const PaDeviceInfo *deviceInfo = Pa_GetDeviceInfo(pulse_device);
+        for (int i = 0; i < numDevices; ++i) {
+            const PaDeviceInfo *info = Pa_GetDeviceInfo(i);
+            if (!info || info->maxInputChannels <= 0) continue;
+            std::string name = info->name ? info->name : "";
+            if (name == "pulse") { selected_device = i; break; }
+        }
+        if (selected_device == paNoDevice) {
+            for (int i = 0; i < numDevices; ++i) {
+                const PaDeviceInfo *info = Pa_GetDeviceInfo(i);
+                if (!info || info->maxInputChannels <= 0) continue;
+                std::string name = info->name ? info->name : "";
+                if (name == "default") { selected_device = i; break; }
+            }
+        }
+        if (selected_device == paNoDevice) {
+            for (int i = 0; i < numDevices; ++i) {
+                const PaDeviceInfo *info = Pa_GetDeviceInfo(i);
+                if (info && info->maxInputChannels > 0) { selected_device = i; break; }
+            }
+        }
+
+        if (selected_device == paNoDevice) {
+            RCLCPP_ERROR(get_logger(), "No hay dispositivo de entrada disponible en PortAudio.");
+            return;
+        }
+
+        const PaDeviceInfo *deviceInfo = Pa_GetDeviceInfo(selected_device);
         sampleRate_ = deviceInfo->defaultSampleRate;
         size_t frames_per_chunk = 1024;
 
         PaStream *stream;
         PaStreamParameters inputParams;
-        inputParams.device = pulse_device;
+        inputParams.device = selected_device;
         inputParams.channelCount = 1;
         inputParams.sampleFormat = paInt16;
         inputParams.suggestedLatency = deviceInfo->defaultLowInputLatency;
@@ -204,7 +270,8 @@ private:
         }
 
         Pa_StartStream(stream);
-        RCLCPP_INFO(get_logger(), "Captura de audio iniciada con el dispositivo 'pulse'.");
+        RCLCPP_INFO(get_logger(), "Captura de audio iniciada: PortAudio '%s' con PULSE_SOURCE='%s'.",
+                    deviceInfo->name, getenv("PULSE_SOURCE"));
 
         audio_thread_ = std::thread([this, stream, frames_per_chunk]()
                                     {
