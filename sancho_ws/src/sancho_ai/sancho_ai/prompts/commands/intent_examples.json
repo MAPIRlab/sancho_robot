@@ -1,0 +1,59 @@
+{
+    "DELETE_USER": [
+      "borra al usuario Pedro",
+      "elimina a Marta",
+      "quiero borrar a Juan del sistema",
+      "puedes quitar al usuario Ana",
+      "borra a María de la lista",
+      "elimina completamente a Carlos",
+      "quítame a Pablo del sistema",
+      "borra el registro de Laura",
+      "quiero eliminar a Javier",
+      "puedes borrar al usuario Sofía",
+      "elimina a Raúl, por favor",
+      "quita a Teresa del sistema"
+    ],
+    "RENAME_USER": [
+      "cambia el nombre de Lucía a Ana",
+      "renombra a Juan como Pedro",
+      "quiero cambiar el nombre de Marcos por Leo",
+      "puedes renombrar a Clara a nombre Cristina",
+      "llama a David como Daniel",
+      "quiero que ahora Marta se llame María",
+      "renombra a Jorge a Javier",
+      "puedes cambiar el nombre de Paula a Patricia",
+      "reemplaza el nombre de Elena con Carolina",
+      "haz que ahora Víctor se llame Hugo",
+      "quiero renombrar a Adrián por Andrés",
+      "puedes actualizar el nombre de Sonia a Sara"
+    ],
+    "TAKE_PICTURE": [
+      "haz una foto",
+      "saca una foto ahora",
+      "puedes hacer una foto",
+      "toma una fotografía de lo que ves",
+      "haz una captura con la cámara",
+      "toma una instantánea",
+      "hazme una foto",
+      "toma una foto del entorno",
+      "saca una imagen con la cámara",
+      "puedes capturar una imagen",
+      "haz una foto para el recuerdo",
+      "fotografía lo que estás viendo"
+    ],
+    "UNKNOWN": [
+      "qué tiempo hace en Madrid",
+      "cuál es la capital de Alemania",
+      "cuántos años tienes",
+      "me puedes contar un chiste",
+      "cómo te llamas",
+      "qué hora es",
+      "dónde está la estación más cercana",
+      "quién fue el primer presidente de España",
+      "cuál es tu color favorito",
+      "puedes cantar una canción",
+      "tienes hermanos",
+      "de qué están hechas las estrellas"
+    ]
+  }
+  

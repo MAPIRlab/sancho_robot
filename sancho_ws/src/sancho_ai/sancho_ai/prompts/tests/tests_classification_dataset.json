@@ -1,0 +1,1046 @@
+[
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "Borra a Nacho."
+      }
+    ],
+    "expected_output": {
+      "intent": "DELETE_USER",
+      "arguments": {
+        "user": "Nacho"
+      }
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "Oye, ¿te acuerdas del tipo ese... el que siempre llegaba tarde a las reuniones?"
+      },
+      {
+        "role": "assistant",
+        "content": "¿Te refieres a Sergio?"
+      },
+      {
+        "role": "user",
+        "content": "Sí, ese. No quiero tenerlo más en el sistema, ¿vale?"
+      }
+    ],
+    "expected_output": {
+      "intent": "DELETE_USER",
+      "arguments": {
+        "user": "Sergio"
+      }
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "Elimina al usuario registrado como Ana Pérez, por favor."
+      }
+    ],
+    "expected_output": {
+      "intent": "DELETE_USER",
+      "arguments": {
+        "user": "Ana Pérez"
+      }
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "Ya sabes de quién hablo. Hazme el favor y elimínalo del sistema."
+      }
+    ],
+    "expected_output": {
+      "intent": "DELETE_USER",
+      "arguments": {
+        "user": ""
+      }
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "Creo que ya no necesitamos a nadie que no esté activo."
+      },
+      {
+        "role": "assistant",
+        "content": "¿Quieres eliminar a alguien en concreto?"
+      },
+      {
+        "role": "user",
+        "content": "Tú sabes quién. Quítalo."
+      }
+    ],
+    "expected_output": {
+      "intent": "DELETE_USER",
+      "arguments": {
+        "user": ""
+      }
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "Después de lo que hizo, no quiero volver a saber nada de Marcos."
+      },
+      {
+        "role": "assistant",
+        "content": "¿Te refieres al usuario Marcos del equipo de ventas?"
+      },
+      {
+        "role": "user",
+        "content": "Sí, ese. Elíminalo ya."
+      }
+    ],
+    "expected_output": {
+      "intent": "DELETE_USER",
+      "arguments": {
+        "user": "Marcos"
+      }
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "Ya no quiero que esa persona esté registrada aquí."
+      }
+    ],
+    "expected_output": {
+      "intent": "DELETE_USER",
+      "arguments": {
+        "user": ""
+      }
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "Quita a Alberto del sistema ahora mismo."
+      }
+    ],
+    "expected_output": {
+      "intent": "DELETE_USER",
+      "arguments": {
+        "user": "Alberto"
+      }
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "Marta ya no está en el proyecto, así que no hace falta que siga en la base de datos."
+      },
+      {
+        "role": "assistant",
+        "content": "¿Quieres que la elimine?"
+      },
+      {
+        "role": "user",
+        "content": "Sí, bórrala."
+      }
+    ],
+    "expected_output": {
+      "intent": "DELETE_USER",
+      "arguments": {
+        "user": "Marta"
+      }
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "¿Sabes quién causó el problema en el último despliegue?"
+      },
+      {
+        "role": "assistant",
+        "content": "¿Fue David?"
+      },
+      {
+        "role": "user",
+        "content": "Exacto. No quiero volver a verle por aquí."
+      },
+      {
+        "role": "assistant",
+        "content": "¿Quieres que lo elimine del sistema?"
+      },
+      {
+        "role": "user",
+        "content": "Sí, por favor."
+      }
+    ],
+    "expected_output": {
+      "intent": "DELETE_USER",
+      "arguments": {
+        "user": "David"
+      }
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "Carlos ya no se llama así, ahora es Mario. Haz el cambio, por favor."
+      }
+    ],
+    "expected_output": {
+      "intent": "RENAME_USER",
+      "arguments": {
+        "old_name": "Carlos",
+        "new_name": "Mario"
+      }
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "Tenemos que actualizar a Julia, ahora se llama Isabel. Apúntatelo."
+      }
+    ],
+    "expected_output": {
+      "intent": "RENAME_USER",
+      "arguments": {
+        "old_name": "Julia",
+        "new_name": "Isabel"
+      }
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "Cambia el nombre de Fernando por Claudia, que ha hecho la transición."
+      }
+    ],
+    "expected_output": {
+      "intent": "RENAME_USER",
+      "arguments": {
+        "old_name": "Fernando",
+        "new_name": "Claudia"
+      }
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "Actualiza el registro de Laura, ahora prefiere llamarse Luis."
+      }
+    ],
+    "expected_output": {
+      "intent": "RENAME_USER",
+      "arguments": {
+        "old_name": "Laura",
+        "new_name": "Luis"
+      }
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "Raúl cambió su nombre. Ahora se llama Nerea. Asegúrate de que en la base esté bien."
+      }
+    ],
+    "expected_output": {
+      "intent": "RENAME_USER",
+      "arguments": {
+        "old_name": "Raúl",
+        "new_name": "Nerea"
+      }
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "Valeria ahora se llama Manuel, por favor actualiza ese dato."
+      }
+    ],
+    "expected_output": {
+      "intent": "RENAME_USER",
+      "arguments": {
+        "old_name": "Valeria",
+        "new_name": "Manuel"
+      }
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "A Diego lo han rebautizado como Hugo."
+      },
+      {
+        "role": "assistant",
+        "content": "¿Quieres que actualice el nombre?"
+      },
+      {
+        "role": "user",
+        "content": "Sí, cámbialo."
+      }
+    ],
+    "expected_output": {
+      "intent": "RENAME_USER",
+      "arguments": {
+        "old_name": "Diego",
+        "new_name": "Hugo"
+      }
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "Elena ya no usa ese nombre, ahora va por Gabriel. Cambia eso también."
+      }
+    ],
+    "expected_output": {
+      "intent": "RENAME_USER",
+      "arguments": {
+        "old_name": "Elena",
+        "new_name": "Gabriel"
+      }
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "Hay que renombrar a alguien, pero no recuerdo cómo se llamaba antes."
+      },
+      {
+        "role": "assistant",
+        "content": "¿Sabes el nombre nuevo?"
+      },
+      {
+        "role": "user",
+        "content": "Sí, es Camilo."
+      }
+    ],
+    "expected_output": {
+      "intent": "RENAME_USER",
+      "arguments": {
+        "old_name": "",
+        "new_name": "Camilo"
+      }
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "Creo que deberíamos cambiarle el nombre, ya no le gusta cómo se llama."
+      }
+    ],
+    "expected_output": {
+      "intent": "RENAME_USER",
+      "arguments": {
+        "old_name": "",
+        "new_name": ""
+      }
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "Quiero renombrar a alguien que ahora se llama Andrea, pero no recuerdo cómo estaba registrado antes."
+      }
+    ],
+    "expected_output": {
+      "intent": "RENAME_USER",
+      "arguments": {
+        "old_name": "",
+        "new_name": "Andrea"
+      }
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "En los registros, Juan José ahora figura como Juanjo. Cambia eso."
+      }
+    ],
+    "expected_output": {
+      "intent": "RENAME_USER",
+      "arguments": {
+        "old_name": "Juan José",
+        "new_name": "Juanjo"
+      }
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "Saca una foto ya mismo, que esto es irrepetible."
+      }
+    ],
+    "expected_output": {
+      "intent": "TAKE_PICTURE",
+      "arguments": {}
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "Este momento merece ser inmortalizado."
+      },
+      {
+        "role": "assistant",
+        "content": "¿Quieres que haga una foto?"
+      },
+      {
+        "role": "user",
+        "content": "Sí, hazla ahora."
+      }
+    ],
+    "expected_output": {
+      "intent": "TAKE_PICTURE",
+      "arguments": {}
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "Estoy listo. Cuando quieras, toma la foto."
+      }
+    ],
+    "expected_output": {
+      "intent": "TAKE_PICTURE",
+      "arguments": {}
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "¿Podrías tomar una foto?"
+      }
+    ],
+    "expected_output": {
+      "intent": "TAKE_PICTURE",
+      "arguments": {}
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "3... 2... 1... ¡foto!"
+      }
+    ],
+    "expected_output": {
+      "intent": "TAKE_PICTURE",
+      "arguments": {}
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "Haz una captura de esto, que luego no me creen."
+      }
+    ],
+    "expected_output": {
+      "intent": "TAKE_PICTURE",
+      "arguments": {}
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "Estoy sonriendo, ¿vas a hacer la foto o no?"
+      },
+      {
+        "role": "assistant",
+        "content": "Sí, claro."
+      }
+    ],
+    "expected_output": {
+      "intent": "TAKE_PICTURE",
+      "arguments": {}
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "Este sitio es perfecto, quiero una foto."
+      },
+      {
+        "role": "assistant",
+        "content": "¿Quieres que la tome ya?"
+      },
+      {
+        "role": "user",
+        "content": "Sí, ahora mismo."
+      }
+    ],
+    "expected_output": {
+      "intent": "TAKE_PICTURE",
+      "arguments": {}
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "No me muevo hasta que dispares la cámara."
+      }
+    ],
+    "expected_output": {
+      "intent": "TAKE_PICTURE",
+      "arguments": {}
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "Hazme una foto con esta cara de tonto."
+      }
+    ],
+    "expected_output": {
+      "intent": "TAKE_PICTURE",
+      "arguments": {}
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "Espera, espera... ahora sí, toma la foto."
+      }
+    ],
+    "expected_output": {
+      "intent": "TAKE_PICTURE",
+      "arguments": {}
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "¡Cheese!"
+      }
+    ],
+    "expected_output": {
+      "intent": "TAKE_PICTURE",
+      "arguments": {}
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "¿Alguna vez has sentido que el tiempo se detiene cuando miras el cielo?"
+      }
+    ],
+    "expected_output": {
+      "intent": "UNKNOWN",
+      "arguments": {}
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "Las mariposas hoy estaban bailando entre los árboles"
+      }
+    ],
+    "expected_output": {
+      "intent": "UNKNOWN",
+      "arguments": {}
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "Hoy he pensado que las nubes son como pensamientos lentos"
+      }
+    ],
+    "expected_output": {
+      "intent": "UNKNOWN",
+      "arguments": {}
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "No sé qué decir"
+      }
+    ],
+    "expected_output": {
+      "intent": "UNKNOWN",
+      "arguments": {}
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "Jaja eso ha sido muy raro"
+      },
+      {
+        "role": "assistant",
+        "content": "¿A qué te refieres?"
+      },
+      {
+        "role": "user",
+        "content": "Nada, estaba pensando en otra cosa"
+      }
+    ],
+    "expected_output": {
+      "intent": "UNKNOWN",
+      "arguments": {}
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "Las tostadoras no deberían hablar"
+      }
+    ],
+    "expected_output": {
+      "intent": "UNKNOWN",
+      "arguments": {}
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "¿Y si el universo fuera un pez dorado?"
+      }
+    ],
+    "expected_output": {
+      "intent": "UNKNOWN",
+      "arguments": {}
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "Me ha salido un bug que no entiendo, pero creo que es culpa del universo"
+      }
+    ],
+    "expected_output": {
+      "intent": "UNKNOWN",
+      "arguments": {}
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "Estoy cansado de pensar"
+      }
+    ],
+    "expected_output": {
+      "intent": "UNKNOWN",
+      "arguments": {}
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "blablabla tralarí tralará"
+      }
+    ],
+    "expected_output": {
+      "intent": "UNKNOWN",
+      "arguments": {}
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "Creo que soñé contigo pero no recuerdo nada"
+      }
+    ],
+    "expected_output": {
+      "intent": "UNKNOWN",
+      "arguments": {}
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "¿Alguna vez has visto un espejo dentro de otro espejo?"
+      }
+    ],
+    "expected_output": {
+      "intent": "UNKNOWN",
+      "arguments": {}
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "¿Sabías que las cebras no pueden cambiar de rayas?"
+      }
+    ],
+    "expected_output": {
+      "intent": "UNKNOWN",
+      "arguments": {}
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "A veces, solo a veces, pienso que soy un personaje de un libro"
+      }
+    ],
+    "expected_output": {
+      "intent": "UNKNOWN",
+      "arguments": {}
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "Me duele la cabeza pero creo que es por pensar demasiado en si los pingüinos tienen rodillas"
+      }
+    ],
+    "expected_output": {
+      "intent": "UNKNOWN",
+      "arguments": {}
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "Hoy me crucé con alguien que parecía salido de una película antigua"
+      }
+    ],
+    "expected_output": {
+      "intent": "UNKNOWN",
+      "arguments": {}
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "Estaba intentando recordar una canción, pero solo me viene una galleta a la cabeza"
+      }
+    ],
+    "expected_output": {
+      "intent": "UNKNOWN",
+      "arguments": {}
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "Esto no tiene sentido pero tampoco me importa"
+      }
+    ],
+    "expected_output": {
+      "intent": "UNKNOWN",
+      "arguments": {}
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "¡Hoy el café sabía a triunfo!"
+      }
+    ],
+    "expected_output": {
+      "intent": "UNKNOWN",
+      "arguments": {}
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "¿Qué crees que haría un pato si le dieras un teclado?"
+      }
+    ],
+    "expected_output": {
+      "intent": "UNKNOWN",
+      "arguments": {}
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "¿Alguna vez has sentido que el tiempo se detiene cuando miras el cielo?"
+      }
+    ],
+    "expected_output": {
+      "intent": "UNKNOWN",
+      "arguments": {}
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "Las mariposas hoy estaban bailando entre los árboles"
+      }
+    ],
+    "expected_output": {
+      "intent": "UNKNOWN",
+      "arguments": {}
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "Hoy he pensado que las nubes son como pensamientos lentos"
+      }
+    ],
+    "expected_output": {
+      "intent": "UNKNOWN",
+      "arguments": {}
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "No sé qué decir"
+      }
+    ],
+    "expected_output": {
+      "intent": "UNKNOWN",
+      "arguments": {}
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "Jaja eso ha sido muy raro"
+      },
+      {
+        "role": "assistant",
+        "content": "¿A qué te refieres?"
+      },
+      {
+        "role": "user",
+        "content": "Nada, estaba pensando en otra cosa"
+      }
+    ],
+    "expected_output": {
+      "intent": "UNKNOWN",
+      "arguments": {}
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "Las tostadoras no deberían hablar"
+      }
+    ],
+    "expected_output": {
+      "intent": "UNKNOWN",
+      "arguments": {}
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "¿Y si el universo fuera un pez dorado?"
+      }
+    ],
+    "expected_output": {
+      "intent": "UNKNOWN",
+      "arguments": {}
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "Me ha salido un bug que no entiendo, pero creo que es culpa del universo"
+      }
+    ],
+    "expected_output": {
+      "intent": "UNKNOWN",
+      "arguments": {}
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "Estoy cansado de pensar"
+      }
+    ],
+    "expected_output": {
+      "intent": "UNKNOWN",
+      "arguments": {}
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "blablabla tralarí tralará"
+      }
+    ],
+    "expected_output": {
+      "intent": "UNKNOWN",
+      "arguments": {}
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "Creo que soñé contigo pero no recuerdo nada"
+      }
+    ],
+    "expected_output": {
+      "intent": "UNKNOWN",
+      "arguments": {}
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "¿Alguna vez has visto un espejo dentro de otro espejo?"
+      }
+    ],
+    "expected_output": {
+      "intent": "UNKNOWN",
+      "arguments": {}
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "¿Sabías que las cebras no pueden cambiar de rayas?"
+      }
+    ],
+    "expected_output": {
+      "intent": "UNKNOWN",
+      "arguments": {}
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "A veces, solo a veces, pienso que soy un personaje de un libro"
+      }
+    ],
+    "expected_output": {
+      "intent": "UNKNOWN",
+      "arguments": {}
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "Me duele la cabeza pero creo que es por pensar demasiado en si los pingüinos tienen rodillas"
+      }
+    ],
+    "expected_output": {
+      "intent": "UNKNOWN",
+      "arguments": {}
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "Hoy me crucé con alguien que parecía salido de una película antigua"
+      }
+    ],
+    "expected_output": {
+      "intent": "UNKNOWN",
+      "arguments": {}
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "Estaba intentando recordar una canción, pero solo me viene una galleta a la cabeza"
+      }
+    ],
+    "expected_output": {
+      "intent": "UNKNOWN",
+      "arguments": {}
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "Esto no tiene sentido pero tampoco me importa"
+      }
+    ],
+    "expected_output": {
+      "intent": "UNKNOWN",
+      "arguments": {}
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "¡Hoy el café sabía a triunfo!"
+      }
+    ],
+    "expected_output": {
+      "intent": "UNKNOWN",
+      "arguments": {}
+    }
+  },
+  {
+    "chat_history": [
+      {
+        "role": "user",
+        "content": "¿Qué crees que haría un pato si le dieras un teclado?"
+      }
+    ],
+    "expected_output": {
+      "intent": "UNKNOWN",
+      "arguments": {}
+    }
+  }
+]

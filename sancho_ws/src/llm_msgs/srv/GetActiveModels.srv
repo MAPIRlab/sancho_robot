@@ -1,0 +1,5 @@
+---
+string llm_provider
+string llm_model
+string embedding_provider
+string embedding_model

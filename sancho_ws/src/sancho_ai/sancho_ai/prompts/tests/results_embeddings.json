@@ -1,0 +1,94 @@
+{
+  "openai": {
+    "text-embedding-3-small": {
+      "total_tests": 74,
+      "intent_correct": 40,
+      "intent_wrong": 0,
+      "unknown_misclassified": 34,
+      "made_up_intent": 0,
+      "total_time_sec": 18.77837610244751
+    },
+    "text-embedding-ada-002": {
+      "total_tests": 74,
+      "intent_correct": 58,
+      "intent_wrong": 12,
+      "unknown_misclassified": 4,
+      "made_up_intent": 0,
+      "total_time_sec": 15.9206702709198
+    },
+    "text-embedding-babbage-001": {
+      "total_tests": 74,
+      "intent_correct": 40,
+      "intent_wrong": 0,
+      "unknown_misclassified": 34,
+      "made_up_intent": 0,
+      "total_time_sec": 10.030773878097534
+    },
+    "text-embedding-3-large": {
+      "total_tests": 74,
+      "intent_correct": 40,
+      "intent_wrong": 0,
+      "unknown_misclassified": 34,
+      "made_up_intent": 0,
+      "total_time_sec": 51.273014545440674
+    }
+  },
+  "qwen": {
+    "Alibaba-NLP/gte-Qwen2-7B-instruct": {
+      "total_tests": 74,
+      "intent_correct": 40,
+      "intent_wrong": 0,
+      "unknown_misclassified": 34,
+      "made_up_intent": 0,
+      "total_time_sec": 3.4963901042938232
+    }
+  },
+  "deepseek": {
+    "deepseek-ai/deepseek-coder-6.7b-instruct": {
+      "total_tests": 74,
+      "intent_correct": 33,
+      "intent_wrong": 38,
+      "unknown_misclassified": 3,
+      "made_up_intent": 0,
+      "total_time_sec": 3.458392858505249
+    }
+  },
+  "sbert": {
+    "sentence-transformers/all-MiniLM-L6-v2": {
+      "total_tests": 74,
+      "intent_correct": 43,
+      "intent_wrong": 0,
+      "unknown_misclassified": 31,
+      "made_up_intent": 0,
+      "total_time_sec": 0.39188337326049805
+    }
+  },
+  "e5": {
+    "intfloat/e5-large-v2": {
+      "total_tests": 74,
+      "intent_correct": 45,
+      "intent_wrong": 26,
+      "unknown_misclassified": 3,
+      "made_up_intent": 0,
+      "total_time_sec": 0.8052167892456055
+    }
+  },
+  "baai": {
+    "BAAI/bge-m3": {
+      "total_tests": 74,
+      "intent_correct": 42,
+      "intent_wrong": 0,
+      "unknown_misclassified": 32,
+      "made_up_intent": 0,
+      "total_time_sec": 0.8286640644073486
+    },
+    "BAAI/bge-base-en-v1.5": {
+      "total_tests": 74,
+      "intent_correct": 47,
+      "intent_wrong": 2,
+      "unknown_misclassified": 25,
+      "made_up_intent": 0,
+      "total_time_sec": 0.5011732578277588
+    }
+  }
+}

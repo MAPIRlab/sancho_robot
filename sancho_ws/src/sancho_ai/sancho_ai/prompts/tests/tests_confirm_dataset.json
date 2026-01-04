@@ -1,0 +1,26 @@
+[
+    { "user_input": "Sí", "expected_output": { "answer_said": true, "answer": "yes" } },
+    { "user_input": "Claro", "expected_output": { "answer_said": true, "answer": "yes" } },
+    { "user_input": "Eso es", "expected_output": { "answer_said": true, "answer": "yes" } },
+    { "user_input": "Exacto", "expected_output": { "answer_said": true, "answer": "yes" } },
+    { "user_input": "Así es", "expected_output": { "answer_said": true, "answer": "yes" } },
+    { "user_input": "Correcto", "expected_output": { "answer_said": true, "answer": "yes" } },
+    { "user_input": "Sí, ese soy yo", "expected_output": { "answer_said": true, "answer": "yes" } },
+    { "user_input": "Sí, me llamo así", "expected_output": { "answer_said": true, "answer": "yes" } },
+    { "user_input": "No", "expected_output": { "answer_said": true, "answer": "no" } },
+    { "user_input": "No soy yo", "expected_output": { "answer_said": true, "answer": "no" } },
+    { "user_input": "Ese no es mi nombre", "expected_output": { "answer_said": true, "answer": "no" } },
+    { "user_input": "Para nada", "expected_output": { "answer_said": true, "answer": "no" } },
+    { "user_input": "Te confundes", "expected_output": { "answer_said": true, "answer": "no" } },
+    { "user_input": "No, me llamo Pedro", "expected_output": { "answer_said": true, "answer": "no" } },
+    { "user_input": "Sí, ese es mi nombre", "expected_output": { "answer_said": true, "answer": "yes" } },
+    { "user_input": "En efecto", "expected_output": { "answer_said": true, "answer": "yes" } },
+    { "user_input": "Claro que sí", "expected_output": { "answer_said": true, "answer": "yes" } },
+    { "user_input": "No, me llamo Ana", "expected_output": { "answer_said": true, "answer": "no" } },
+    { "user_input": "Esa no soy yo", "expected_output": { "answer_said": true, "answer": "no" } },
+    { "user_input": "Obvio", "expected_output": { "answer_said": true, "answer": "yes" } },
+    { "user_input": "Me gusta mucho la ciencia", "expected_output": { "answer_said": false, "answer": "" } },
+    { "user_input": "Depende", "expected_output": { "answer_said": false, "answer": "" } },
+    { "user_input": "¿Por qué lo preguntas?", "expected_output": { "answer_said": false, "answer": "" } }
+  ]
+  

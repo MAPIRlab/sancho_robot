@@ -1,0 +1,140 @@
+<root BTCPP_format="4" main_tree_to_execute="MasterTree">
+  <BehaviorTree ID="MasterTree">
+
+    <!-- ──────────────────────────────────────────────────────────────── -->
+    <!-- Fallback global: primero intenta la misión completa, y si falla
+         (cualquiera de sus fases agota sus retries) entra en GlobalRecovery -->
+    <ReactiveFallback name="TopLevelFallback">
+
+      <!-- ─────────────── Sequence principal “MissionSequence” ─────────────── -->
+      <Sequence name="MissionSequence">
+
+        <!-- 1) Gestión de batería y localización -->
+        <Fallback name="BatteryCheck">
+          <!-- Si la batería está baja, entra en “RechargeSequence” -->
+          <Sequence name="RechargeSequence">
+            <IsBatteryLow/>
+            <!-- nav2_behavior_tree -->
+            <ComputePathToPose name="PlanToDock" goal="{dock_pose}" path="{dock_path}" planner_id="SmacHybridPlanner"/>
+            <!-- nav2_behavior_tree -->
+            <FollowPath name="DriveToDock" path="{dock_path}" controller_id="FollowPath"/>
+            <!-- nav2_behavior_tree -->
+            <DockRobot name="DockAtStation"/>
+            <!-- nav2_behavior_tree -->
+            <RetryUntilSuccessful num_attempts="5" name="WaitCharging">              <!-- BehaviorTree.CPP -->
+              <IsBatteryCharging/>
+              <!-- nav2_behavior_tree -->
+            </RetryUntilSuccessful>
+            <Inverter name="WaitFullBattery">              <!-- BehaviorTree.CPP -->
+              <IsBatteryLow/>
+              <!-- nav2_behavior_tree -->
+            </Inverter>
+            <UndockRobot name="UndockFromStation"/>
+            <!-- nav2_behavior_tree -->
+            <ReinitializeGlobalLocalization name="ReinitLocalization"/>
+            <!-- nav2_behavior_tree -->
+          </Sequence>
+          <!-- Si la batería NO está baja, saltamos inmediatamente -->
+          <!--<ForceSuccess name="BatteryOK"/>                                 BehaviorTree.CPP -->
+
+        </Fallback>
+
+        <!-- Nos aseguramos de que tenemos pose inicial -->
+        <InitialPoseReceived/>
+        <!-- nav2_behavior_tree -->
+
+        <!-- 2) Detección de grupo -->
+        <RecoveryNode number_of_retries="3" name="DetectRecovery">
+          <!-- Fase principal: esperar a tu Condition custom “IsGroupDetected” -->
+          <Sequence name="DetectPhase">
+            <IsGroupDetected/>
+            <!-- tu plugin custom -->
+            <DeactivateGroupDetectionNode/>
+            <!-- tu plugin custom -->
+          </Sequence>
+          <!-- En caso de fallo persistente: limpieza y espera -->
+          <Sequence name="DetectRecoverActions">
+            <ClearCostmapAroundRobot name="ClearLocalCM-Detect" service_name="local_costmap/clear_around_robot" />
+            <!-- nav2_behavior_tree -->
+            <Wait wait_duration="1" name="WaitBeforeRetry"/>
+            <!-- nav2_behavior_tree -->
+          </Sequence>
+        </RecoveryNode>
+
+        <!-- 3) Navegación al grupo -->
+        <RecoveryNode number_of_retries="2" name="NavigateRecovery">
+          <!-- PipelineSequence: plan global y luego control local -->
+          <PipelineSequence name="NavPipeline">
+            <RateController hz="1.0" name="LimitReplanHz">              <!-- nav2_behavior_tree -->
+              <ComputePathThroughPoses name="ComputeMultiGoalPath" goals="{group_goals}" path="{group_path}" planner_id="SmacHybridPlanner"/>
+              <!-- nav2_behavior_tree -->
+            </RateController>
+            <ClearCostmapExceptRegion name="PruneCostmap" service_name="local_costmap/clear_except" />
+            <!-- nav2_behavior_tree -->
+            <FollowPath name="DriveToGroup" path="{group_path}" controller_id="FollowPath"/>
+            <!-- nav2_behavior_tree -->
+          </PipelineSequence>
+          <!-- Recovery local: intentar planner, luego controller, luego relocalizar -->
+          <ReactiveFallback name="NavRecoveryFallback">
+            <Sequence name="PlannerRecovery">
+              <WouldAPlannerRecoveryHelp/>
+              <!-- nav2_behavior_tree -->
+              <PlannerSelector />
+              <!-- nav2_behavior_tree -->
+            </Sequence>
+            <Sequence name="ControllerRecovery">
+              <WouldAControllerRecoveryHelp/>
+              <!-- nav2_behavior_tree -->
+              <ControllerSelector/>
+              <!-- nav2_behavior_tree -->
+            </Sequence>
+            <Sequence name="LocalizationRecovery">
+              <IsStuck/>
+              <!-- nav2_behavior_tree -->
+              <ReinitializeGlobalLocalization/>
+              <!-- nav2_behavior_tree -->
+            </Sequence>
+          </ReactiveFallback>
+        </RecoveryNode>
+
+        <!-- 4) Fase de interacción social -->
+        <RecoveryNode number_of_retries="2" name="SocialRecovery">
+          <Sequence name="SocialSequence">
+            <ActivateSocialNode/>
+            <!-- tu plugin custom -->
+            <PerformSocialInteraction/>
+            <!-- tu plugin custom -->
+            <DeactivateSocialNode/>
+            <!-- tu plugin custom -->
+          </Sequence>
+          <Sequence name="SocialRecoverActions">
+            <Wait wait_duration="2" name="WaitBeforeSocialRetry"/>
+            <!-- nav2_behavior_tree -->
+            <BackUp name="BackUpFromSocial" backup_dist="0.3" backup_speed="0.1"/>
+            <!-- nav2_behavior_tree -->
+          </Sequence>
+        </RecoveryNode>
+
+        <!-- 5) Reactivar detección para el siguiente ciclo -->
+        <ReactivateGroupDetectionNode/>
+        <!-- tu plugin custom -->
+
+      </Sequence>
+
+      <!-- ─────────────── Global Recovery como última opción ─────────────── -->
+      <RoundRobin name="GlobalRecovery">
+        <ClearCostmapAroundRobot name="ClearLocalCM-Global" service_name="local_costmap/clear_around_robot" />
+        <!-- nav2_behavior_tree -->
+        <ClearEntireCostmap name="ClearGlobalCM" service_name="global_costmap/clear_entirely_global_costmap"/>
+        <!-- nav2_behavior_tree -->
+        <Spin name="SpinRecovery" spin_dist="1.57"/>
+        <!-- nav2_behavior_tree -->
+        <BackUp name="BackUpRecovery" backup_dist="0.5" backup_speed="0.2"/>
+        <!-- nav2_behavior_tree -->
+        <ReinitializeGlobalLocalization name="FinalRelocalization"/>
+        <!-- nav2_behavior_tree -->
+      </RoundRobin>
+
+    </ReactiveFallback>
+  </BehaviorTree>
+</root>

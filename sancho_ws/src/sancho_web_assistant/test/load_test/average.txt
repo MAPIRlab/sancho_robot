@@ -1,0 +1,34 @@
+
+  █ THRESHOLDS 
+
+    http_req_duration
+    ✗ 'avg <= 500' avg=24.57s
+
+    http_req_failed
+    ✗ 'rate <= 0.025' rate=3.26%
+
+
+  █ TOTAL RESULTS 
+
+    HTTP
+    http_req_duration.......................................................: avg=24.57s min=11.48ms med=25.11s max=1m0s   p(90)=44.9s p(95)=58.8s 
+      { expected_response:true }............................................: avg=23.37s min=11.48ms med=25.1s  max=59.99s p(90)=41.1s p(95)=46.23s
+    http_req_failed.........................................................: 3.26%  514 out of 15746
+    http_reqs...............................................................: 15746  125.182926/s
+
+    EXECUTION
+    iteration_duration......................................................: avg=24.57s min=12.03ms med=25.11s max=1m0s   p(90)=44.9s p(95)=58.8s 
+    iterations..............................................................: 15746  125.182926/s
+    vus.....................................................................: 10127  min=60           max=10127
+    vus_max.................................................................: 14497  min=14497        max=14497
+
+    NETWORK
+    data_received...........................................................: 3.7 GB 29 MB/s
+    data_sent...............................................................: 2.9 MB 23 kB/s
+
+
+
+
+running (2m05.8s), 00000/14497 VUs, 15746 complete and 10127 interrupted iterations
+default ✗ [========>-----------------------------] 00035/14497 VUs  2m05.8s/8m00.0s
+ERRO[0126] thresholds on metrics 'http_req_duration, http_req_failed' were crossed; at least one has abortOnFail enabled, stopping test prematurely 

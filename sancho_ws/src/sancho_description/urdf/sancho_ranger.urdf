@@ -1,0 +1,392 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- URDF para el Ranger Mini con materiales mate y un láser en verde, 
+     asegurando que cada "collision" tenga el mismo <origin> que "visual". -->
+<robot name="ranger_mini_v3">
+
+  <!-- ==================== Base Footprint (nivel del suelo) ==================== -->
+  <link name="base_footprint"/>
+
+  <joint name="base_footprint_joint" type="fixed">
+    <parent link="base_footprint"/>
+    <child link="base_link"/>
+    <origin xyz="0 0 0.325" rpy="0 0 0"/> <!-- Eleva base_link 10 cm -->
+  </joint>
+
+  <!-- ==================== base_link ==================== -->
+  <link name="base_link">
+    <inertial>
+      <origin xyz="-0.0242698272228022 -0.0030308024613212 0.0544267444673498" rpy="0 0 0" />
+      <mass value="0.162715996120322" />
+      <inertia
+        ixx="0.000723700192916944"
+        ixy="-1.55745142682799E-08"
+        ixz="-3.42378773027466E-12"
+        iyy="0.000744046536331603"
+        iyz="2.24935144207573E-07"
+        izz="2.14412578189702E-05" />
+    </inertial>
+
+    <!-- Visual -->
+    <visual>
+      <!-- Tenías rpy="3.14 0 0" en visual -->
+      <origin xyz="0 0 0.0" rpy="3.14 0 0" />
+      <geometry>
+        <mesh filename="package://sancho_description/meshes/ranger_mini3.stl" />
+      </geometry>
+      <material name="base_matte_gray">
+        <color rgba="0.5 0.5 0.5 1.0" />
+      </material>
+    </visual>
+
+    <!-- Collision: ahora coincide con el visual -->
+    <collision>
+      <origin xyz="0 0 0.0" rpy="3.14 0 0" />
+      <geometry>
+        <mesh filename="package://sancho_description/meshes/ranger_mini3.stl" />
+      </geometry>
+    </collision>
+  </link>
+
+  <!-- ==================== Frente Derecho (fr_Link) ==================== -->
+  <link name="fr_Link">
+    <inertial>
+      <origin xyz="1.8493E-05 1.2713E-06 0.043679" rpy="0 0 0" />
+      <mass value="2.2786" />
+      <inertia
+        ixx="0.0063625"
+        ixy="-1.0581E-07"
+        ixz="-4.0831E-07"
+        iyy="0.006363"
+        iyz="-3.4944E-08"
+        izz="0.010465" />
+    </inertial>
+
+    <!-- Visual -->
+    <visual>
+      <origin xyz="-0.248 -0.113 0.155" rpy="1.57 0 3.14" />
+      <geometry>
+        <mesh filename="package://sancho_description/meshes/ranger_mini_v3_wheel_right.dae" />
+      </geometry>
+      <material name="wheel_matte_gray">
+        <color rgba="0.3 0.3 0.3 1.0" />
+      </material>
+    </visual>
+
+    <!-- Collision: unificado con el visual -->
+    <collision>
+      <origin xyz="-0.248 -0.113 0.155" rpy="1.57 0 3.14" />
+      <geometry>
+        <mesh filename="package://sancho_description/meshes/ranger_mini_v3_wheel_right.dae" />
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="fr_joint" type="continuous">
+    <origin xyz="0.25 -0.19 -0.1" rpy="0 0 0" />
+    <parent link="base_link" />
+    <child link="fr_Link" />
+    <axis xyz="0 0 -1" />
+  </joint>
+
+  <!-- ==================== Frente Izquierdo (fl_Link) ==================== -->
+  <link name="fl_Link">
+    <inertial>
+      <origin xyz="-0.0017956 -9.6304E-08 0.043642" rpy="0 0 0" />
+      <mass value="2.2786" />
+      <inertia
+        ixx="0.0063695"
+        ixy="-2.1067E-08"
+        ixz="-0.00016867"
+        iyy="0.006363"
+        iyz="-1.0301E-08"
+        izz="0.010458" />
+    </inertial>
+
+    <!-- Visual -->
+    <visual>
+      <origin xyz="-0.248 0.1265 0.191" rpy="-1.57 0.0 3.14" />
+      <geometry>
+        <mesh filename="package://sancho_description/meshes/ranger_mini_v3_wheel.dae" />
+      </geometry>
+      <material name="wheel_matte_gray">
+        <color rgba="0.3 0.3 0.3 1.0" />
+      </material>
+    </visual>
+
+    <!-- Collision: unificado con el visual -->
+    <collision>
+      <origin xyz="-0.248 0.1265 0.191" rpy="-1.57 0.0 3.14" />
+      <geometry>
+        <mesh filename="package://sancho_description/meshes/ranger_mini_v3_wheel.dae" />
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="fl_joint" type="continuous">
+    <origin xyz="0.25 0.19 -0.1" rpy="3.1416 0 0" />
+    <parent link="base_link" />
+    <child link="fl_Link" />
+    <axis xyz="0.041054 0 -0.99916" />
+  </joint>
+
+  <!-- ==================== Parte Trasera Derecha (br_Link) ==================== -->
+  <link name="br_Link">
+    <inertial>
+      <origin xyz="-0.00017093 6.1255E-08 0.043678" rpy="0 0 0" />
+      <mass value="2.2786" />
+      <inertia
+        ixx="0.0063627"
+        ixy="-2.1069E-08"
+        ixz="-1.587E-05"
+        iyy="0.006363"
+        iyz="9.3201E-09"
+        izz="0.010465" />
+    </inertial>
+
+    <!-- Visual -->
+    <visual>
+      <origin xyz="-0.241 -0.11 0.155" rpy="1.57 0 3.14" />
+      <geometry>
+        <mesh filename="package://sancho_description/meshes/ranger_mini_v3_wheel_right.dae" />
+      </geometry>
+      <material name="wheel_matte_gray">
+        <color rgba="0.3 0.3 0.3 1.0" />
+      </material>
+    </visual>
+
+    <!-- Collision: unificado con el visual -->
+    <collision>
+      <origin xyz="-0.241 -0.11 0.155" rpy="1.57 0 3.14" />
+      <geometry>
+        <mesh filename="package://sancho_description/meshes/ranger_mini_v3_wheel_right.dae" />
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="br_joint" type="continuous">
+    <origin xyz="-0.25 -0.19 -0.1" rpy="0 0 0" />
+    <parent link="base_link" />
+    <child link="br_Link" />
+    <axis xyz="0.0039668 0 -0.99999" />
+  </joint>
+
+  <!-- ==================== Parte Trasera Izquierda (bl_Link) ==================== -->
+  <link name="bl_Link">
+    <inertial>
+      <origin xyz="-0.0011575 -4.8644E-06 0.043663" rpy="0 0 0" />
+      <mass value="2.2786" />
+      <inertia
+        ixx="0.0063656"
+        ixy="-8.1498E-08"
+        ixz="-0.00011049"
+        iyy="0.006363"
+        iyz="6.6847E-08"
+        izz="0.010462" />
+    </inertial>
+
+    <!-- Visual -->
+    <visual>
+      <origin xyz="-0.241 0.13 0.2" rpy="-1.57 0.0 3.14" />
+      <geometry>
+        <mesh filename="package://sancho_description/meshes/ranger_mini_v3_wheel.dae" />
+      </geometry>
+      <material name="wheel_matte_gray">
+        <color rgba="0.3 0.3 0.3 1.0" />
+      </material>
+    </visual>
+
+    <!-- Collision: unificado con el visual -->
+    <collision>
+      <origin xyz="-0.241 0.13 0.2" rpy="-1.57 0.0 3.14" />
+      <geometry>
+        <mesh filename="package://sancho_description/meshes/ranger_mini_v3_wheel.dae" />
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="bl_joint" type="continuous">
+    <origin xyz="-0.25 0.19 -0.1" rpy="3.1416 0 0" />
+    <parent link="base_link" />
+    <child link="bl_Link" />
+    <axis xyz="0.027043 0 -0.99963" />
+  </joint>
+
+  <!-- ==================== Láseres ==================== -->
+
+  <!-- Láser Frontal -->
+  <!-- Se publicará en el topic 'scan_1st' con frame_id 'laser_front' -->
+  <link name="laser_front">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="0.1"/>
+      <inertia ixx="0.001" iyy="0.001" izz="0.001" ixy="0" ixz="0" iyz="0"/>
+    </inertial>
+
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <cylinder length="0.05" radius="0.02"/>
+      </geometry>
+      <material name="laser_green">
+        <color rgba="0.0 1.0 0.0 1.0"/>
+      </material>
+    </visual>
+
+    <!-- Collision coincide con visual -->
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <cylinder length="0.05" radius="0.02"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="base_to_laser_front" type="fixed">
+    <!-- Ajusta si necesitas mover el láser frontal en X/Y/Z -->
+    <origin xyz="0.31 -0.19 0.04" rpy="0 0 -0.785398"/>
+    <parent link="base_link"/>
+    <child link="laser_front"/>
+  </joint>
+
+  <!-- Láser Trasero -->
+  <!-- Se publicará en el topic 'scan_2nd' con frame_id 'laser_back' -->
+  <link name="laser_back">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="0.1"/>
+      <inertia ixx="0.001" iyy="0.001" izz="0.001" ixy="0" ixz="0" iyz="0"/>
+    </inertial>
+
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <cylinder length="0.05" radius="0.02"/>
+      </geometry>
+      <material name="laser_green">
+        <color rgba="0.0 1.0 0.0 1.0"/>
+      </material>
+    </visual>
+
+    <!-- Collision coincide con visual -->
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <cylinder length="0.05" radius="0.02"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="base_to_laser_back" type="fixed">
+    <!-- Ubicación en la parte trasera (eje X negativo) -->
+    <origin xyz="-0.31 0.19 0.04" rpy="0 0 2.35619"/>
+    <parent link="base_link"/>
+    <child link="laser_back"/>
+  </joint>
+
+  <!-- Cámara -->
+  <link name="camera_link">
+      <visual>
+          <geometry>
+              <box size="0.05 0.05 0.05"/> <!-- Representación visual de la cámara -->
+          </geometry>
+          <material name="camera_blue">
+            <color rgba="0.0 0.0 1.0 1.0"/>
+          </material>
+      </visual>
+  </link>
+
+  <!-- Unión de la cámara con la base -->
+  <joint name="base_to_camera" type="fixed">
+      <parent link="base_link"/>
+      <child link="camera_link"/>
+      <origin xyz="0.375 0 0.68" rpy="0 0 0"/> <!-- Posición y orientación de la cámara -->
+  </joint>
+<!-- Cuadro Negro (desde el centro hasta el borde superior, hasta la cámara) -->
+<link name="body_link">
+  <visual>
+    <origin xyz="0.1 0 0.34" rpy="0 0 0"/>
+    <geometry>
+      <box size="0.4 0.32 0.7"/>
+    </geometry>
+    <material name="black_material">
+      <color rgba="0 0 0 1.0"/>
+    </material>
+  </visual>
+  <collision>
+    <origin xyz="0.1 0 0.34" rpy="0 0 0"/>
+    <geometry>
+      <box size="0.4 0.32 0.7"/>
+    </geometry>
+  </collision>
+</link>
+
+<joint name="body_link_joint" type="fixed">
+  <parent link="base_link"/>
+  <child link="body_link"/>
+  <origin xyz="0 0 0" rpy="0 0 0"/>
+</joint>
+
+<!-- Link para el eje de paneo (base de la torreta) -->
+<link name="turret_pan_link">
+  <visual>
+    <geometry>
+      <cylinder radius="0.04" length="0.08"/>
+    </geometry>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <material name="black">
+      <color rgba="0.4 0.4 0.4 1"/>
+    </material>
+  </visual>
+</link>
+
+<joint name="pan" type="revolute">
+  <parent link="body_link"/> <!-- Ahora se monta directamente sobre el cuerpo -->
+  <child link="turret_pan_link"/>
+  <origin xyz="0.22 0 0.725" rpy="0 0 0"/> <!-- Ajustado para quedar encima del cuerpo -->
+  <axis xyz="0 0 1"/>
+  <limit lower="-3.14" upper="3.14" effort="1.0" velocity="1.0"/>
+</joint>
+
+<!-- Link para la inclinación (tilt) -->
+<link name="turret_tilt_link">
+  <visual>
+    <geometry>
+      <box size="0.05 0.1 0.025"/>
+    </geometry>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <material name="gray">
+      <color rgba="0.3 0.3 0.3 1"/>
+    </material>
+  </visual>
+</link>
+
+<joint name="tilt" type="revolute">
+  <parent link="turret_pan_link"/>
+  <child link="turret_tilt_link"/>
+  <origin xyz="0 0 0.05" rpy="0 0 0"/>
+  <axis xyz="0 1 0"/>
+  <limit lower="-1.57" upper="1.57" effort="1.0" velocity="1.0"/>
+</joint>
+
+<!-- Cabeza encima de la torreta -->
+<link name="head_link">
+  <visual>
+    <origin xyz="0 0 0.05" rpy="0 0 1.57"/> <!-- Un poco más arriba de tilt -->
+    <geometry>
+      <box size="0.205 0.125 0.1"/>
+    </geometry>
+    <material name="head_gray">
+      <color rgba="0 0 0 1.0"/>
+    </material>
+  </visual>
+</link>
+
+<joint name="tilt_to_head" type="fixed">
+  <parent link="turret_tilt_link"/>
+  <child link="head_link"/>
+  <origin xyz="0 0 0" rpy="0 0 0"/>
+</joint>
+
+
+
+</robot>

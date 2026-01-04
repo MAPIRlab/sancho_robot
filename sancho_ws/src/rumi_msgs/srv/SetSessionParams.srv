@@ -1,0 +1,5 @@
+float64 timeout_seconds
+float64 time_between_detections
+---
+bool success
+string message

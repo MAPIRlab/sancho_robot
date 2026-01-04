@@ -1,0 +1,26 @@
+[
+    { "user_input": "Mi nombre es Pedro", "expected_output": { "name_said": true, "name": "Pedro" } },
+    { "user_input": "Soy Ana", "expected_output": { "name_said": true, "name": "Ana" } },
+    { "user_input": "Puedes llamarme Carlos", "expected_output": { "name_said": true, "name": "Carlos" } },
+    { "user_input": "Lucía", "expected_output": { "name_said": true, "name": "Lucía" } },
+    { "user_input": "Yo me llamo Juan", "expected_output": { "name_said": true, "name": "Juan" } },
+    { "user_input": "Mi nombre es Laura", "expected_output": { "name_said": true, "name": "Laura" } },
+    { "user_input": "Se supone que me llaman Pedro", "expected_output": { "name_said": true, "name": "Pedro" } },
+    { "user_input": "Soy María", "expected_output": { "name_said": true, "name": "María" } },
+    { "user_input": "Creo que me llamo Diego", "expected_output": { "name_said": true, "name": "Diego" } },
+    { "user_input": "Me llamo Eulogio", "expected_output": { "name_said": true, "name": "Eulogio" } },
+    { "user_input": "Eulogio", "expected_output": { "name_said": true, "name": "Eulogio" } },
+    { "user_input": "Soy Lucía", "expected_output": { "name_said": true, "name": "Lucía" } },
+    { "user_input": "Puedes llamarme Juan", "expected_output": { "name_said": true, "name": "Juan" } },
+    { "user_input": "Yo me llamo Ana", "expected_output": { "name_said": true, "name": "Ana" } },
+    { "user_input": "Mi nombre es Carlos", "expected_output": { "name_said": true, "name": "Carlos" } },
+    { "user_input": "Soy Sofía", "expected_output": { "name_said": true, "name": "Sofía" } },
+    { "user_input": "Me llamo Diego", "expected_output": { "name_said": true, "name": "Diego" } },
+    { "user_input": "Laura", "expected_output": { "name_said": true, "name": "Laura" } },
+    { "user_input": "Se supone que me llaman María", "expected_output": { "name_said": true, "name": "María" } },
+    { "user_input": "Creo que me llamo Sofía", "expected_output": { "name_said": true, "name": "Sofía" } },
+    { "user_input": "Me gusta el fútbol", "expected_output": { "name_said": false, "name": "" } },
+    { "user_input": "No quiero decirlo", "expected_output": { "name_said": false, "name": "" } },
+    { "user_input": "¿Qué quieres saber?", "expected_output": { "name_said": false, "name": "" } }
+  ]
+  
