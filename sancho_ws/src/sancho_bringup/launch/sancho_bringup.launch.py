@@ -24,24 +24,22 @@ def generate_launch_description():
         )
     )
 
-
-
     # Lanzar cámara Astra
-    astra_camera_launch = GroupAction([
-        PushRosNamespace('astra_camera'),
-        IncludeLaunchDescription(
-            XMLLaunchDescriptionSource(
-                os.path.join(get_package_share_directory('astra_camera'), 'launch', 'astra.launch.xml')
-            ),
-            launch_arguments={
-                'serial_number': "'20070830098'",
-                'camera_name': 'camera',
-                'color_fps': '15',
-                'depth_fps': '15',
-                'ir_fps': '15'
-            }.items()
-        )
-    ])
+    # astra_camera_launch = GroupAction([
+    #     PushRosNamespace('astra_camera'),
+    #     IncludeLaunchDescription(
+    #         XMLLaunchDescriptionSource(
+    #             os.path.join(get_package_share_directory('astra_camera'), 'launch', 'astra.launch.xml')
+    #         ),
+    #         launch_arguments={
+    #             'serial_number': "'20070830098'",
+    #             'camera_name': 'camera',
+    #             'color_fps': '15',
+    #             'depth_fps': '15',
+    #             'ir_fps': '15'
+    #         }.items()
+    #     )
+    # ])
 
     # Base móvil Ranger
     ranger_launch = IncludeLaunchDescription(
@@ -129,7 +127,7 @@ def generate_launch_description():
         # Base móvil y sensores
         ranger_launch,
         hokuyo_launch,
-        astra_camera_launch,
+        #astra_camera_launch,
         scan_merger_node,
         usb_cam_node,
         image_proc_node

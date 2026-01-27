@@ -1,0 +1,39 @@
+collision_monitor:
+  ros__parameters:
+    use_sim_time: False
+    base_frame_id: "base_footprint"
+    odom_frame_id: "odom"
+    cmd_vel_in_topic: "cmd_vel_raw"
+    cmd_vel_out_topic: "cmd_vel"
+    transform_tolerance: 0.1
+    source_timeout: 2.0
+    stop_pub_timeout: 0.5
+    base_shift_correction: true
+    polygons: ["FootprintApproach"]
+    FootprintApproach:
+      type: "polygon"
+      action_type: "approach"
+      footprint: "[[-0.375, -0.275], [-0.375, 0.275], [0.375, 0.275], [0.375, -0.275]]"
+      time_before_collision: 1.0
+      simulation_time_step: 0.1
+      max_points: 1
+      visualize: true
+        
+    observation_sources: ["scan_front", "scan_back", "camera_depth"]
+    scan_front:
+      type: "scan"
+      topic: "/scan_1st"
+      min_height: 0.0
+      max_height: 2.0
+
+    scan_back:
+      type: "scan"
+      topic: "/scan_2nd"
+      min_height: 0.0
+      max_height: 2.0
+
+    camera_depth:
+      type: "scan"
+      topic: "/scan_camera"
+      min_height: 0.0
+      max_height: 2.0

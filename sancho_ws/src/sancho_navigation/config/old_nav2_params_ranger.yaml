@@ -255,43 +255,6 @@ controller_server:
     plugin_lib_names:
       - "nav2_mppi_controller"
 
-controlle_server:
-  ros__parameters:
-    controller_frequency: 20.0
-    controller_plugins: ["FollowPath"]
-
-    FollowPath:
-      plugin: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
-
-      # Velocidades y límites (ajusta a tu robot)
-      desired_linear_vel: 0.35
-      max_linear_accel: 0.6
-      max_linear_decel: 0.6
-
-      # Differential: permite marcha atrás si te interesa
-      allow_reversing: true
-
-      # Lookahead (anti-atajo = mirar “no muy lejos”)
-      lookahead_dist: 0.6
-      min_lookahead_dist: 0.35
-      max_lookahead_dist: 0.9
-      use_velocity_scaled_lookahead_dist: true
-      lookahead_time: 0.0
-      use_interpolation: true
-      transform_tolerance: 0.1
-      max_robot_pose_search_dist: 0.6
-
-      # Regulación por coste/curvatura (pegarse al path y frenar en curvas)
-      use_cost_regulated_linear_velocity_scaling: true
-      cost_scaling_dist: 0.6
-      regulated_linear_scaling_min_speed: 0.1
-      regulated_linear_scaling_min_radius: 0.30   # radio giro práctico de tu diff
-
-      # Aproximación al goal y giros en sitio (diff lo hace bien)
-      use_rotate_to_heading: true
-      rotate_to_heading_lookahead: 0.35
-      approach_velocity_scaling_dist: 0.6
-
 controller_server_rclcpp_node:
   ros__parameters:
     use_sim_time: False
