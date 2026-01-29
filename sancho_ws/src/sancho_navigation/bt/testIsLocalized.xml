@@ -1,0 +1,23 @@
+<root main_tree_to_execute="MainTree">
+  <BehaviorTree ID="MainTree">
+    <RecoveryNode number_of_retries="100" name="TestLoop">
+      
+      <Fallback name="LocalizationCheck">
+        <IsLocalized max_covariance="0.10"/>
+
+        <Sequence name="AutoLocalizationSequence">
+          <ReinitializeGlobalLocalization/>
+          
+          <RetryUntilSuccessful num_attempts="8">
+            <Sequence name="SpinAndCheck">
+              <Spin spin_dist="1.57"/> 
+              <Wait wait_duration="1.0"/>
+              <IsLocalized max_covariance="0.10"/>
+            </Sequence>
+          </RetryUntilSuccessful>
+        </Sequence>
+      </Fallback>
+
+    </RecoveryNode>
+  </BehaviorTree>
+</root>

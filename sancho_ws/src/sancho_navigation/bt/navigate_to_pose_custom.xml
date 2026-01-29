@@ -39,6 +39,22 @@
 
         </Fallback>
 
+        <!-- Se intenta autolocalizar   -->
+        <Fallback name="LocalizationCheck">
+          <IsLocalized max_covariance="0.10"/>
+
+          <Sequence name="AutoLocalizationSequence">
+            <ReinitializeGlobalLocalization/>
+            
+            <RetryUntilSuccessful num_attempts="8">
+              <Sequence name="SpinAndCheck">
+                <Spin spin_dist="1.57"/> <Wait wait_duration="1.0"/>
+                <IsLocalized max_covariance="0.10"/>
+              </Sequence>
+            </RetryUntilSuccessful>
+          </Sequence>
+        </Fallback>
+
         <!-- Nos aseguramos de que tenemos pose inicial -->
         <InitialPoseReceived/>
         <!-- nav2_behavior_tree -->
