@@ -27,6 +27,7 @@ setup(
     entry_points={
         'console_scripts': [
             'roaming_node = sancho_navigation.roaming_node:main',
+            'narrow_space_manager_node = sancho_navigation.narrow_space_manager_node:main',
         ],
     },
 )
