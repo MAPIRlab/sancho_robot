@@ -5,7 +5,7 @@ from queue import Queue
 
 import rclpy
 from rclpy.lifecycle import LifecycleNode, TransitionCallbackReturn
-from rclpy.qos import QoSProfile
+from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy, HistoryPolicy
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
 
@@ -159,11 +159,18 @@ class HumanFaceManagerLifecycleNode(LifecycleNode):
             qos10, 
             callback_group=self.cb_group
         )
+
+        qos = QoSProfile(
+            reliability=ReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.VOLATILE,
+            history=HistoryPolicy.KEEP_LAST,
+            depth=10,
+        )
         self.sub_recognitions = self.create_subscription(
             FaceRecognitionArray, 
             self.face_recognitions_topic, 
             self.recognitions_callback, 
-            qos1, 
+            qos, 
             callback_group=self.cb_group
         )
 
@@ -206,9 +213,18 @@ class HumanFaceManagerLifecycleNode(LifecycleNode):
             self.destroy_subscription(self.sub_recognitions)
             self.sub_recognitions = None
 
+        try:
+            learn_future = self.set_learn_without_name_client.call_async(SetBool.Request(data=True))
+            learn_future.add_done_callback(lambda _: self.get_logger().info("Set learn without name a True completado correctamente."))
+
+            self.get_logger().info("Llamadas a servicios clear no name y set learn without name iniciadas.")    
+        except Exception as e:
+            self.get_logger().error(f"Error al llamar al servicio clear no name: {e}")
+
         return super().on_deactivate(state)
 
     def recognitions_callback(self, msg: FaceRecognitionArray):
+        self.get_logger().info("recibidooo")
         self.face_recognitions_queue.put(msg)
 
     def face_name_response_callback(self, msg: FaceNameResponse):

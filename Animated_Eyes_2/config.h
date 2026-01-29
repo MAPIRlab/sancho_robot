@@ -21,7 +21,7 @@
 #define BACKLIGHT_MAX      255
 
 // ---------- ASSETS (elige uno) ----------
-#include "data/sauron.h" // Debe aportar sclera[], iris[], polar[], upper[], lower[] y tamaños
+#include "data/normalEye.h" // Debe aportar sclera[], iris[], polar[], upper[], lower[] y tamaños
 
 // ---------- ESTRUCTURA DE eyeInfo ----------
 typedef struct {

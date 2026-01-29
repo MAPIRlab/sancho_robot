@@ -99,12 +99,15 @@ class MemoryDatabase:
     def get_all_versions(self, faceprint_id: str) -> list:
         with self._lock:
             cur = self.conn.cursor()
-            cur.execute('''
+            cur.execute(
+                '''
                 SELECT faceprint_id, version, memory_text, created_at
                 FROM memories
                 WHERE faceprint_id = ?
-                ORDER BY version DESC
-            ''', (faceprint_id))
+                ORDER BY CAST(version AS INTEGER) DESC
+                ''',
+                (faceprint_id,)
+            )
             rows = cur.fetchall()
             return [dict(r) for r in rows]
 

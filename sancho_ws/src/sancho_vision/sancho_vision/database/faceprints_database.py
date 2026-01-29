@@ -63,10 +63,11 @@ class FaceprintsDatabase:
             if id in self.faceprints:
                 del self.faceprints[id]
 
-    def reset(self):
+    def reset(self, restore_next_id=True):
         with self._lock:
-            self.next_id = 0
             self.faceprints = {}
+            if restore_next_id:
+                self.next_id = 0
 
             self.save()
 

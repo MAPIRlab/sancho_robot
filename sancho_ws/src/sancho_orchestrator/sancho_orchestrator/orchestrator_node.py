@@ -45,7 +45,7 @@ class OrchestratorNode(Node):
         group_waypoint_topic (str): Topic to receive group waypoints (default: "/group_waypoint")
         navigate_action_name (str): Name of navigation action (default: "navigate_to_pose")
         social_node_name (str): Name of social interaction node (default: "interaction_manager")
-        group_node_name (str): Name of group detection node (default: "group_waypoint_generator_node")
+        nav_waypoint_node_name (str): Name of group detection node (default: "group_waypoint_generator_node")
         navigation_node_name (str): Name of navigation node (default: "navigation_node")
 
     State Machine:
@@ -66,19 +66,19 @@ class OrchestratorNode(Node):
         # Declare parameters
         self.declare_parameter("navigation_timeout", 20.0)
         self.declare_parameter("social_timeout", 30.0)
-        self.declare_parameter("group_waypoint_topic", "/group_waypoint")
+        self.declare_parameter("nav_waypoint_topic", "/group_waypoint") #person_waypoint
         self.declare_parameter("navigate_action_name", "navigate_to_pose")
         self.declare_parameter("social_node_name", "interaction_manager")
-        self.declare_parameter("group_node_name", "group_waypoint_generator_node")
+        self.declare_parameter("nav_node_name", "group_waypoint_generator_node") #single_person_waypoint_generator_node
         self.declare_parameter("navigation_node_name", "navigation_node")
 
         # Load params
         self.navigation_timeout = self.get_parameter("navigation_timeout").value
         self.social_timeout = self.get_parameter("social_timeout").value
-        self.waypoint_topic = self.get_parameter("group_waypoint_topic").value
+        self.waypoint_topic = self.get_parameter("nav_waypoint_topic").value
         self.navigate_action = self.get_parameter("navigate_action_name").value
         self.social_node = self.get_parameter("social_node_name").value
-        self.group_node = self.get_parameter("group_node_name").value
+        self.nav_waypoint_node = self.get_parameter("nav_node_name").value
         self.interaction_active = False
 
         # Initial state
@@ -103,7 +103,7 @@ class OrchestratorNode(Node):
 
         # Activate group detection on startup
         self._change_node_state(
-            self.group_node,
+            self.nav_waypoint_node,
             Transition.TRANSITION_ACTIVATE,
             on_done=lambda ok: self.get_logger().info("Detección de grupos activada"),
         )
@@ -147,7 +147,7 @@ class OrchestratorNode(Node):
         self.get_logger().info("Waypoint recibido. Desactivando detección de grupos...")
         # First, deactivate group detection, then navigate
         self._change_node_state(
-            self.group_node,
+            self.nav_waypoint_node,
             Transition.TRANSITION_DEACTIVATE,
             on_done=lambda success: self._after_group_off(success, msg),
         )
@@ -333,7 +333,7 @@ class OrchestratorNode(Node):
         self._set_state(OrchestratorState.BUSCANDO)
         self.interaction_active = False
         self._change_node_state(
-            self.group_node,
+            self.nav_waypoint_node,
             Transition.TRANSITION_ACTIVATE,
             on_done=lambda ok: self._set_state(OrchestratorState.BUSCANDO),
         )

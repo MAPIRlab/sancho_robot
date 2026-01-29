@@ -144,7 +144,7 @@ class ComplexClassifier:
     def delete_all(self):
         '''Resets database to its original state'''
 
-        self.db.reset()
+        self.db.reset(restore_next_id=False)
     
         result = 1
         message = "La base de datos ha sido restablecida a por defecto"

@@ -179,7 +179,9 @@ def wrap_polar_to_cartesian(polar_tex, out_w=IRIS_WIDTH, out_h=IRIS_HEIGHT):
 
 def process(input_path):
     input_path = Path(input_path)
-    out_dir = Path("./iris_out_data")
+
+    #Create output directory in input file's parent
+    out_dir = input_path.parent / "iris_out_data"
     out_dir.mkdir(parents=True, exist_ok=True)
 
     # 1) Load/resize to 112x112
@@ -212,6 +214,6 @@ def process(input_path):
     }
 
 # Demo run using the synthetic iris we created earlier:
-demo_input = "/home/mapir/sancho_robot/Animated_Eyes_2/eye_gen/irisNORMAL.png"  # this was created in a prior step
+demo_input = "/home/mapir/sancho_robot/Animated_Eyes_2/normal_eye_files/iris2.png"  # this was created in a prior step
 outputs = process(demo_input)
 outputs

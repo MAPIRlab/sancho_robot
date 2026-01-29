@@ -14,7 +14,7 @@ class MicrophoneCapturerNode(Node):
     def __init__(self):
         super().__init__("microphone_capturer")
         
-        self.declare_parameter("device_name", "xvf3800")
+        self.declare_parameter("device_name", "orbbec") #xvf3800
         self.declare_parameter("chunk_size", 1024)
 
         self.publisher_stereo = self.create_publisher(ChunkStereo, "sancho_audio/microphone/stereo", 10)

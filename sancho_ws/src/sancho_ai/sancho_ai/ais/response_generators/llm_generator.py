@@ -84,7 +84,7 @@ class LLMGenerator(ResponseGenerator):
             return "Lo siento, no te he entendido", "sad", provider_used, model_used
         
         LogManager.info(f"LLM for Unknown Prompt:\n{response}")
-        response_json = SemanticResultPrompt.extract_json_from_code_block(response) # Gemini usually puts the response in ```json block
+        response_json = UnknownPrompt.extract_json_from_code_block(response) # Gemini usually puts the response in ```json block
         if not response_json:
             LogManager.error(f"No JSON format found.")
 
@@ -94,7 +94,7 @@ class LLMGenerator(ResponseGenerator):
             else:
                 return "Lo siento, no te he entendido", "neutral", provider_used, model_used
 
-        response = SemanticResultPrompt.try_json_loads(response_json)
+        response = UnknownPrompt.try_json_loads(response_json)
         if not response:
             LogManager.error(f"Error on JSON loads.")
             return "Lo siento, no te he entendido", "neutral", provider_used, model_used

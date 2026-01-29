@@ -51,14 +51,26 @@ def generate_launch_description():
         emulate_tty=True,
     )
 
-    configurator_node = Node(
-        package='sancho_lifecycle_utils',
-        executable='node_configurator',
-        name='node_configurator',
+    auto_activator_face_node = Node(
+        package='nav2_lifecycle_manager',
+        executable='lifecycle_manager',
+        name='node_auto_activator_face',
         output='screen',
         parameters=[{
-            'activate': activate_bool,   # <- ahora viene del argumento del launch
-            'node_names': ['face_detector', 'face_recognizer', 'face_manager']
+            "autostart": True,
+            'node_names': ['face_detector', 'face_recognizer', 'face_manager'],
+            "bond_timeout": 0.0,  
+            "attempt_to_restart": True,  # Reintenta activar si un nodo falla
+        }],
+    )
+    
+    face_manager_congigurator_node = Node(
+        package='sancho_lifecycle_utils',
+        executable='node_configurator',
+        name='face_manager_lifecycle_configurator',
+        output='screen',
+        parameters=[{
+            'node_names': ['face_manager'],
         }],
     )
 
@@ -116,22 +128,19 @@ def generate_launch_description():
             executable='api_rest',
             name='api_rest',
             parameters=[{
-                "apis": f"['{API_LIST.FACEPRINTS}', '{API_LIST.SESSIONS}', '{API_LIST.MEMORIES}']"
+                "apis": f"['{API_LIST.FACEPRINTS}', '{API_LIST.SESSIONS}', '{API_LIST.MEMORIES}', '{API_LIST.STT_MODELS}', '{API_LIST.TTS_MODELS}', '{API_LIST.LLM_MODELS}']"
             }],
             output='screen',
             prefix="xterm -hold -e",
             emulate_tty=True,
         ),
-
         gui,
 
-        # --------------------
-        #  AGRUPO TODOS LOS NODOS
-        # --------------------
         GroupAction([
             face_detector_node,
             face_recognizer_node,
             face_manager_node,
-            configurator_node,
+            auto_activator_face_node,
+            #face_manager_congigurator_node
         ]),
     ])

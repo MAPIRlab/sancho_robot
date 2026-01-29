@@ -1,10 +1,3 @@
-"""Interaction Manager Node.
-
-This module manages the interaction flow of a robot with users by coordinating
-various modules such as face detection, recognition, tracking, and audio playback.
-"""
-
-import json
 import math
 import os
 import threading
@@ -16,16 +9,19 @@ from ament_index_python.packages import get_package_share_directory
 from geometry_msgs.msg import PoseStamped
 from lifecycle_msgs.msg import Transition, State
 from lifecycle_msgs.srv import ChangeState, GetState
-from rclpy.action import ActionClient
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.lifecycle import LifecycleNode, TransitionCallbackReturn
 from rclpy.qos import QoSProfile, ReliabilityPolicy
-from sancho_msgs.action import PlayAudio
 from sancho_msgs.msg import FaceDetectionArray, FaceRecognitionArray
 from sancho_msgs.srv import GetCentralFaceCluster, SocialState, GreetPeople
 from std_msgs.msg import Float32, Int16
+from std_srvs.srv import Trigger
 from tf_transformations import quaternion_from_euler
+
+def clip(value: float, min_value: float, max_value: float) -> float:
+    """Clamp value to the inclusive range [min_value, max_value]."""
+    return max(min_value, min(value, max_value))
 
 
 # ============================================================================
@@ -41,22 +37,12 @@ class SocialStateEnum(IntEnum):
 
 class ModuleNames:
     """Names of managed modules."""
-    FACE_DETECTOR = "/human_face_detector"
-    FACE_RECOGNIZER = "/human_face_recognizer"
-    FACE_TRACKER = "/human_face_tracker"
-    FACE_MANAGER = "/human_face_manager"
-    AUDIO_PLAYER = "/audio_player"
+    FACE_DETECTOR = "/face_detector"
+    FACE_RECOGNIZER = "/face_recognizer"
+    FACE_MANAGER = "/face_manager"
     CENTRAL_FACE_CLUSTER = "/central_faces_cluster_node"
+    # FACE_TRACKER = "/human_face_tracker"
     ASSISTANT_HELPER = "/assistant_helper"  # Placeholder for future lifecycle integration
-
-
-class AssistantHelperState(IntEnum):
-    """Assistant helper internal state replicated from assistant helper node."""
-
-    NAME = 0
-    SPEAKING = 1
-    COMMAND = 2
-    ASKING = 3
 
 
 class IMState:
@@ -76,69 +62,6 @@ class IMState:
 
 
 class InteractionManager(LifecycleNode):
-    """Manages the interaction flow of a robot with a user by coordinating various modules
-    such as face detection, face tracking, audio processing, and head movement.
-
-    This class implements a ROS 2 LifecycleNode, allowing it to be managed (configured,
-    activated, deactivated, cleaned up) by a lifecycle manager. It operates as a state
-    machine, transitioning through different states to achieve a complete interaction
-    sequence: detecting a user, orienting towards them, playing an audio message,
-    and then returning to an idle state.
-
-    Key functionalities:
-    -   **State Machine:** Controls the interaction logic through a series of defined states.
-    -   **Module Management:** Manages the lifecycle (activation/deactivation) of external
-        ROS 2 nodes (e.g., face detector, face tracker, audio player).
-    -   **Face Detection & Selection:** Subscribes to face detection messages and selects
-        the "best" face based on confidence and size thresholds.
-    -   **Sound Source Localization (TDOA):** Subscribes to TDOA (Time Difference of Arrival)
-        angle data to orient the robot's head towards a sound source as a fallback mechanism.
-    -   **Head Movement:** Publishes `PoseStamped` messages to control the robot's head
-        orientation.
-    -   **Audio Playback:** Uses a ROS 2 action client to request playback of pre-recorded
-        audio messages.
-    -   **Social State Reporting:** Communicates the status of the social interaction (ready,
-        finished, error) via a ROS 2 service client.
-
-    Parameters
-    ----------
-        -   `face_size_threshold`: Minimum relative width of a face to be considered valid.
-        -   `face_confidence_threshold`: Minimum confidence score for a face detection.
-        -   `max_face_attempts`: Number of attempts to find a face before fallback.
-        -   `tdoa_angle_limit`: Maximum absolute TDOA angle to consider for head rotation.
-        -   `rotation_speed`: (Not directly used in this snippet, but declared) Speed for head rotation.
-        -   `rotation_duration`: (Not directly used in this snippet, but declared) Duration for head rotation.
-        -   `head_movement_topic`: Topic for publishing head movement commands.
-        -   `audio_angle_topic`: Topic for TDOA angle subscription.
-        -   `lifecycle_timeout`: Default timeout for lifecycle service calls.
-        -   `tdoa_timeout`: Timeout for waiting for a TDOA message.
-        -   `fallback_max_attempts`: Maximum attempts for fallback mechanisms.
-        -   `fallback_retry_backoff`: Exponential backoff factor for retries.
-        -   `face_detection_topic`: Topic for face detection messages.
-
-    Subscriptions:
-        -   `face_detection_topic` (sensor_interfaces/msg/FaceArray): Receives face detections.
-        -   `audio_angle_topic` (std_msgs/msg/Float32): Receives TDOA angle.
-
-    Publishers:
-        -   `head_movement_topic` (geometry_msgs/msg/PoseStamped): Publishes head orientation goals.
-
-    Action Clients:
-        -   `/play_audio` (sancho_interfaces/action/PlayAudio): To request audio playback.
-
-    Service Clients:
-        -   `{module_name}/change_state` (lifecycle_msgs/srv/ChangeState): To manage lifecycle of modules.
-        -   `/social_state` (sancho_interfaces/srv/SocialState): To report social interaction status.
-
-    The interaction flow typically involves:
-    1.  Activating the face detector.
-    2.  Searching for a face.
-    3.  If no face is found, falling back to TDOA to locate a sound source.
-    4.  Tracking the face (or orienting via TDOA) and playing an audio message.
-    5.  Deactivating all modules and returning to an idle state.
-
-    """
-
     def __init__(self):
 
         super().__init__("interaction_manager")
@@ -159,7 +82,7 @@ class InteractionManager(LifecycleNode):
         self.declare_parameter("rotation_speed", 0.3)
         self.declare_parameter("rotation_duration", 2.0)
         self.declare_parameter("head_movement_topic", "/head_goal")
-        self.declare_parameter("audio_angle_topic", "/audio/angle")
+        self.declare_parameter("audio_angle_topic", "/sancho_audio/doa")
         self.declare_parameter("lifecycle_timeout", 5.0)
         self.declare_parameter("tdoa_timeout", 5.0)
         self.declare_parameter("fallback_max_attempts", 3)
@@ -170,33 +93,36 @@ class InteractionManager(LifecycleNode):
             "central_face_cluster_service",
             "/central_faces_cluster_node/get_central_cluster",
         )
-        self.declare_parameter("assistant_helper_service", "assistant/greet_people")
+        self.declare_parameter("assistant_helper_greet_service_name", "assistant/greet_people")
+        self.declare_parameter("assistant_finished_service_name", "assistant_finished")
         self.declare_parameter("assistant_helper_mode_topic", "sancho_audio/assistant_helper/mode")
         self.declare_parameter("assistant_helper_question_id", 1)
         self.declare_parameter("assistant_helper_timeout", 60.0)
         self.declare_parameter("assistant_helper_service_timeout", 10.0)
+        self.declare_parameter("scan_angles", [0.0, 45.0, -45.0, 0.0])  # Scan pattern
+        self.declare_parameter("min_faces_for_direct_interaction", 1)  # Min faces needed to skip TDOA
+        self.declare_parameter("max_fallback_search_cycles", 3)  # Max fallback->search cycles before giving up
+        self.declare_parameter("max_tdoa_wait_attempts", 3)  # Max attempts to wait for TDOA angle before giving up
         
         # Módulos gestionados directamente por este nodo
         self.modules = [
-            ModuleNames.FACE_TRACKER,
-            ModuleNames.AUDIO_PLAYER,
+            # ModuleNames.FACE_TRACKER,
+            ModuleNames.FACE_MANAGER,
+
         ]
         # Módulos externos que deben estar activos antes de continuar (no se activan aquí)
         self.required_external_modules = [
             ModuleNames.FACE_DETECTOR,
             ModuleNames.FACE_RECOGNIZER,
-            ModuleNames.FACE_MANAGER,
         ]
         self.module_clients = {}
         self.required_module_state_clients = {}
         self.active_modules = set()
         self.central_cluster_client = None
         self.assistant_helper_client = None
-        self.assistant_mode_sub = None
-        self.assistant_helper_state = AssistantHelperState.NAME
-        self.assistant_helper_last_state_change = None
+        self.assistant_finished_service = None
         self.assistant_helper_interaction_started = False
-        self.assistant_helper_detected_activity = False
+        self.assistant_helper_interaction_finished = False
         self.assistant_helper_start_time: Optional[float] = None
         self.assistant_helper_deadline: Optional[float] = None
         self.assistant_helper_target_ids: list[str] = []
@@ -219,6 +145,10 @@ class InteractionManager(LifecycleNode):
         self.tdoa_angle = None
         self.attempt = 0
         self.best_face = None
+        self.faces_detected_during_scan = False  # Track if we saw any valid faces during scanning
+        self.scan_positions = []  # Positions to scan: [0, 45, -45, 0] for example
+        self.fallback_search_attempts = 0  # Track number of fallback->search cycles
+        self.tdoa_wait_attempts = 0  # Track TDOA angle wait attempts within a fallback cycle
 
         # Máquina de estados
         self.current_state: IMState | None = None
@@ -227,6 +157,14 @@ class InteractionManager(LifecycleNode):
         self.transition_to(IdleState)
 
         self.get_logger().info("InteractionManager (sync) creado")
+
+    def _assistant_finished_cb(self, request, response):
+        """Callback for the service that assistant_helper calls when it's done."""
+        self.get_logger().info("Assistant helper ha notificado su finalización.")
+        self.assistant_helper_interaction_finished = True
+        response.success = True
+        response.message = "Notificación de finalización recibida."
+        return response
 
     def transition_to(self, state_cls: type[IMState]) -> None:
         """Change current state."""
@@ -258,11 +196,16 @@ class InteractionManager(LifecycleNode):
         self.fallback_max_attempts = self.get_parameter("fallback_max_attempts").value
         self.backoff_factor = self.get_parameter("fallback_retry_backoff").value
         self.central_cluster_service_name = self.get_parameter("central_face_cluster_service").value
-        self.assistant_helper_service_name = self.get_parameter("assistant_helper_service").value
+        self.assistant_helper_greet_service_name = self.get_parameter("assistant_helper_greet_service_name").value
+        self.assistant_finished_service_name = self.get_parameter("assistant_finished_service_name").value
         self.assistant_helper_mode_topic = self.get_parameter("assistant_helper_mode_topic").value
         self.assistant_helper_question_id = int(self.get_parameter("assistant_helper_question_id").value)
         self.assistant_helper_timeout = float(self.get_parameter("assistant_helper_timeout").value)
         self.assistant_helper_service_timeout = float(self.get_parameter("assistant_helper_service_timeout").value)
+        self.scan_angles = self.get_parameter("scan_angles").value
+        self.min_faces_for_direct_interaction = int(self.get_parameter("min_faces_for_direct_interaction").value)
+        self.max_fallback_search_cycles = int(self.get_parameter("max_fallback_search_cycles").value)
+        self.max_tdoa_wait_attempts = int(self.get_parameter("max_tdoa_wait_attempts").value)
 
         self.get_logger().info("Parámetros configurados: ")
         # Crear clients de ciclo de vida para cada módulo
@@ -290,49 +233,27 @@ class InteractionManager(LifecycleNode):
                     f"Servicio {module}/get_state no disponible durante configure; se comprobará más adelante."
                 )
 
-        # Gestionar el lifecycle del face cluster (ya no opcional)
-        cluster_client = self.create_client(
-            ChangeState,
-            f"{ModuleNames.CENTRAL_FACE_CLUSTER}/change_state",
-            callback_group=self.life_cb,
-        )
-
-        timeout_sec = 10.0  # o el valor que tú quieras
-
-        if not cluster_client.wait_for_service(timeout_sec=timeout_sec):
-            self.get_logger().error(
-                f"No se pudo conectar con el servicio {ModuleNames.CENTRAL_FACE_CLUSTER} "
-                f"en {timeout_sec} segundos. Abortando."
+        # Gestionar el lifecycle de módulos adicionales (face cluster y assistant helper)
+       
+        timeout_sec = 10.0
+        for module in self.modules:
+            cli = self.create_client(
+                ChangeState,
+                f"{module}/change_state",
+                callback_group=self.life_cb,
             )
-            return TransitionCallbackReturn.FAILURE
-        else:
-            self.module_clients[ModuleNames.CENTRAL_FACE_CLUSTER] = cluster_client
-            self.get_logger().info(
-                "Cliente de lifecycle para central_face_cluster listo"
-            )
-
-
-        assistant_helper_client = self.create_client(
-            ChangeState,
-            f"{ModuleNames.ASSISTANT_HELPER}/change_state",
-            callback_group=self.life_cb,
-        )
-
-        # Tiempo máximo de espera (puedes parametrizarlo)
-        timeout_sec = 10.0  # Ejemplo: 10 segundos
-
-        if not assistant_helper_client.wait_for_service(timeout_sec=timeout_sec):
-            # Fallar explícitamente
-            self.get_logger().error(
-                f"No se pudo conectar con el servicio {ModuleNames.ASSISTANT_HELPER} "
-                f"en {timeout_sec} segundos. Abortando."
-            )
-            return TransitionCallbackReturn.FAILURE
-        else:
-            self.module_clients[ModuleNames.ASSISTANT_HELPER] = assistant_helper_client
-            self.get_logger().info(
-                "Cliente de lifecycle para assistant_helper listo"
-            )
+            
+            if not cli.wait_for_service(timeout_sec=timeout_sec):
+                self.get_logger().error(
+                    f"No se pudo conectar con el servicio {module} "
+                    f"en {timeout_sec} segundos. Abortando."
+                )
+                return TransitionCallbackReturn.FAILURE
+            else:
+                self.module_clients[module] = cli
+                self.get_logger().info(
+                    f"Cliente de lifecycle para {module} listo"
+                )
 
         # Publisher de head_movement_pub (lifecycle)
         self.head_movement_pub = self.create_lifecycle_publisher(
@@ -345,7 +266,8 @@ class InteractionManager(LifecycleNode):
         self.social_state_client = self.create_client(
             SocialState, "/social_state", callback_group=self.life_cb
         )
-
+        
+        # Cliente central_face_cluster =================
         self.central_cluster_client = self.create_client(
             GetCentralFaceCluster,
             self.central_cluster_service_name,
@@ -358,17 +280,28 @@ class InteractionManager(LifecycleNode):
         else:
             self.get_logger().info("Cliente de GetCentralFaceCluster listo")
 
-        self.assistant_helper_client = self.create_client(
+
+        # Cliente greet_people del assistant helper =================
+        self.assistant_helper_greet_client = self.create_client(
             GreetPeople,
-            self.assistant_helper_service_name,
+            self.assistant_helper_greet_service_name,
             callback_group=self.io_cb,
         )
-        if not self.assistant_helper_client.wait_for_service(timeout_sec=2.0):
+        if not self.assistant_helper_greet_client.wait_for_service(timeout_sec=2.0):
             self.get_logger().warn(
-                f"Servicio {self.assistant_helper_service_name} no disponible durante configure; "
+                f"Servicio {self.assistant_helper_greet_service_name} no disponible durante configure; "
                 "se reintentará antes de lanzar la interacción. "
                 "TODO: sincronizar con el servicio real del assistant helper."
             )
+        
+        # Servicio para que el assistant helper notifique que ha terminado
+        self.assistant_finished_service = self.create_service(
+            Trigger,
+            self.assistant_finished_service_name,
+            self._assistant_finished_cb,
+            callback_group=self.io_cb,
+        )
+        self.get_logger().info(f"Servicio {self.assistant_finished_service_name} listo.")
 
         self.get_logger().info("InteractionManager configurado")
         return super().on_configure(state)
@@ -395,14 +328,6 @@ class InteractionManager(LifecycleNode):
             callback_group=self.io_cb,
         )
 
-        self.assistant_mode_sub = self.create_subscription(
-            Int16,
-            self.assistant_helper_mode_topic,
-            callback=self._assistant_mode_cb,
-            qos_profile=self.control_qos,
-            callback_group=self.io_cb,
-        )
-
         # Iniciar máquina de estados en primer estado útil
         self.transition_to(ActivateFaceDetectorState)
         self.main_timer = self.create_timer(0.1, self._run_state)
@@ -414,15 +339,15 @@ class InteractionManager(LifecycleNode):
             self.main_timer.cancel()
             self.main_timer = None
         # Destruir subscriptions
+
+        self.deactivate_all_modules()
+
         if self.face_sub:
             self.destroy_subscription(self.face_sub)
             self.face_sub = None
         if self.tdoa_sub:
             self.destroy_subscription(self.tdoa_sub)
             self.tdoa_sub = None
-        if self.assistant_mode_sub:
-            self.destroy_subscription(self.assistant_mode_sub)
-            self.assistant_mode_sub = None
         self.face_msgs = None
         self.tdoa_angle = None
 
@@ -440,9 +365,6 @@ class InteractionManager(LifecycleNode):
         if self.tdoa_sub:
             self.destroy_subscription(self.tdoa_sub)
             self.tdoa_sub = None
-        if self.assistant_mode_sub:
-            self.destroy_subscription(self.assistant_mode_sub)
-            self.assistant_mode_sub = None
         # Publisher y clients
         if self.head_movement_pub:
             self.destroy_lifecycle_publisher(self.head_movement_pub)
@@ -459,6 +381,9 @@ class InteractionManager(LifecycleNode):
         if self.assistant_helper_client:
             self.destroy_client(self.assistant_helper_client)
             self.assistant_helper_client = None
+        if self.assistant_finished_service:
+            self.destroy_service(self.assistant_finished_service)
+            self.assistant_finished_service = None
 
         return super().on_cleanup(state)
 
@@ -471,27 +396,7 @@ class InteractionManager(LifecycleNode):
 
     def _tdoa_cb(self, msg: Float32):
         """Callback for TDOA angle messages."""
-        self.tdoa_angle = msg.data
-
-    def _assistant_mode_cb(self, msg: Int16):
-        """Track assistant helper state transitions."""
-        value = msg.data
-        try:
-            state = AssistantHelperState(value)
-        except ValueError:
-            self.get_logger().warn(
-                f"Estado de assistant helper desconocido recibido: {value}"
-            )
-            return
-
-        if self.assistant_helper_state != state:
-            self.get_logger().debug(f"Assistant helper state -> {state.name}")
-        self.assistant_helper_state = state
-        self.assistant_helper_last_state_change = (
-            self.get_clock().now().nanoseconds / 1e9
-        )
-        if state != AssistantHelperState.NAME:
-            self.assistant_helper_detected_activity = True
+        self.tdoa_angle = None if math.isnan(msg.data) else msg.data
 
     # ------------------------------------------------------------
     # Lifecycle management utilities
@@ -598,7 +503,7 @@ class InteractionManager(LifecycleNode):
 
         return True
 
-    def activate_face_detection_pipeline(self) -> bool:
+    def check_active_face_detection_pipeline(self) -> bool:
         """Verify detector, recognizer, and manager are already active (no activation here)."""
         all_active = True
         for module in self.required_external_modules:
@@ -628,11 +533,9 @@ class InteractionManager(LifecycleNode):
     def reset_assistant_helper_context(self) -> None:
         """Reset assistant helper tracking state."""
         self.assistant_helper_interaction_started = False
-        self.assistant_helper_detected_activity = False
+        self.assistant_helper_interaction_finished = False
         self.assistant_helper_start_time = None
         self.assistant_helper_deadline = None
-        self.assistant_helper_last_state_change = None
-        self.assistant_helper_state = AssistantHelperState.NAME
         self.assistant_helper_target_ids.clear()
         self.assistant_helper_target_names.clear()
         self.assistant_helper_cluster_center = None
@@ -706,40 +609,6 @@ class InteractionManager(LifecycleNode):
         )
         return True
 
-    def ensure_assistant_helper_ready(self) -> bool:
-        """Ensure the assistant helper node is running before we interact with it."""
-        if ModuleNames.ASSISTANT_HELPER in self.module_clients:
-            self.get_logger().info("Activando assistant helper vía lifecycle...")
-            if not self.activate_module(ModuleNames.ASSISTANT_HELPER):
-                self.get_logger().error(
-                    "Fallo al activar el assistant helper mediante lifecycle."
-                )
-                return False
-        else:
-            self.get_logger().info(
-                "Assistant helper sin lifecycle; se asume que el orquestador ya lo lanzó (placeholder)."
-            )
-
-        if self.assistant_helper_last_state_change is None:
-            self.get_logger().info(
-                "Esperando una actualización del estado del assistant helper..."
-            )
-            start_time = self.get_clock().now().nanoseconds / 1e9
-            timeout = self.assistant_helper_service_timeout
-            while (
-                self.assistant_helper_last_state_change is None
-                and (self.get_clock().now().nanoseconds / 1e9 - start_time) < timeout
-                and rclpy.ok()
-            ):
-                rclpy.spin_once(self, timeout_sec=0.1)
-
-            if self.assistant_helper_last_state_change is None:
-                self.get_logger().warn(
-                    "No se recibió confirmación de estado del assistant helper; continuando de todos modos."
-                )
-
-        return True
-
     def start_assistant_interaction(self) -> bool:
         """Trigger the assistant helper service with the detected user information."""
         if not self.assistant_helper_target_names:
@@ -748,18 +617,17 @@ class InteractionManager(LifecycleNode):
             )
             return False
 
-        if self.assistant_helper_client is None:
+        if self.assistant_helper_greet_client is None:
             self.get_logger().warn(
                 "Cliente de servicio del assistant helper no inicializado. "
-                "TODO: conectar con el servicio real cuando esté disponible."
             )
             return False
 
-        if not self.assistant_helper_client.wait_for_service(
+        if not self.assistant_helper_greet_client.wait_for_service(
             timeout_sec=self.assistant_helper_service_timeout
         ):
             self.get_logger().error(
-                f"Servicio {self.assistant_helper_service_name} no disponible al iniciar la interacción."
+                f"Servicio {self.assistant_helper_greet_service_name} no disponible al iniciar la interacción."
             )
             return False
 
@@ -767,20 +635,20 @@ class InteractionManager(LifecycleNode):
         req.ids = self.assistant_helper_target_ids
         req.names = self.assistant_helper_target_names
 
-        future = self.assistant_helper_client.call_async(req)
+        future = self.assistant_helper_greet_client.call_async(req)
         done_evt = threading.Event()
         future.add_done_callback(lambda _: done_evt.set())
 
         if not done_evt.wait(self.assistant_helper_service_timeout):
             self.get_logger().error(
-                f"Timeout esperando respuesta del servicio {self.assistant_helper_service_name}"
+                f"Timeout esperando respuesta del servicio {self.assistant_helper_greet_service_name}"
             )
             return False
         
         response = future.result()
         if response is None:
             self.get_logger().error(
-                f"Respuesta vacía al llamar {self.assistant_helper_service_name}"
+                f"Respuesta vacía al llamar {self.assistant_helper_greet_service_name}"
             )
             return False
 
@@ -889,7 +757,23 @@ class InteractionManager(LifecycleNode):
             self.wait_timer.cancel()
             self.wait_timer = None
         self.main_timer = self.create_timer(0.1, self._run_state)
+        # Stay in SearchFaceState to continue scanning
+
+    def _on_tdoa_oriented_complete(self):
+        """Callback when TDOA orientation is complete, return to SearchFaceState for full scan."""
+        if self.wait_timer:
+            self.wait_timer.cancel()
+            self.wait_timer = None
+        self.main_timer = self.create_timer(0.1, self._run_state)
         self.transition_to(SearchFaceState)
+
+    def _on_tdoa_scan_ready(self):
+        """Callback when TDOA orientation is complete and ready to start scanning."""
+        if self.wait_timer:
+            self.wait_timer.cancel()
+            self.wait_timer = None
+        self.main_timer = self.create_timer(0.1, self._run_state)
+        # Stay in FallbackTdoaState, now in scanning phase
 
     
 
@@ -910,9 +794,25 @@ class InteractionManager(LifecycleNode):
                     best = f
         return best
 
+    def _has_valid_faces(self):
+        """Check if there are any valid faces in current detection messages."""
+        if not self.face_msgs:
+            return False
+        
+        self.get_logger().info(f"Se han recibido este numero de caras: {len(self.face_msgs)}")
+        for f in self.face_msgs:
+            if (
+                f.confidence >= self.face_confidence_threshold
+                and f.width >= self.face_size_threshold
+            ):
+                return True
+        return False
+
     def _rotate_head(self, angle: float):
         # Convertir ángulo de grados a radianes
         angle_pan = math.radians(angle)
+        # Clipping angle to limit -100 to 100 degrees
+        angle_pan = max(min(angle_pan, math.radians(100.0)), math.radians(-100.0))
         angle_tilt = math.radians(30.0)  # Cabeza no inclina hacia arriba/abajo
         # Convertir a quaternion para rotación en Z
         q = quaternion_from_euler(0.0, -angle_tilt, angle_pan)
@@ -948,10 +848,15 @@ class ActivateFaceDetectorState(IMState):
     
     def execute(self) -> None:
         mgr = self.manager
-        if mgr.activate_face_detection_pipeline():
+        if mgr.check_active_face_detection_pipeline():
             mgr.get_logger().info("Pipeline de detección facial listo")
+            # Reset scan variables
             mgr.attempt = 0
             mgr.tdoa_attempts = 0
+            mgr.faces_detected_during_scan = False
+            mgr.scan_positions = []
+            mgr.fallback_search_attempts = 0
+            mgr.tdoa_wait_attempts = 0
             mgr.transition_to(SearchFaceState)
         else:
             mgr.get_logger().error("El pipeline de detección facial no está listo")
@@ -960,108 +865,168 @@ class ActivateFaceDetectorState(IMState):
 
 
 class SearchFaceState(IMState):
-    """State to search for a face in detection messages."""
+    """State to search for faces by scanning multiple positions."""
     
     def enter(self) -> None:
-        self.manager.get_logger().info("Searching for face...")
+        mgr = self.manager
+        if mgr.fallback_search_attempts > 0:
+            mgr.get_logger().info(
+                f"Iniciando escaneo de caras (intento post-fallback {mgr.fallback_search_attempts}/{mgr.max_fallback_search_cycles})..."
+            )
+        else:
+            mgr.get_logger().info("Iniciando escaneo inicial de caras...")
+        
+        mgr.scan_positions = list(mgr.scan_angles)
+        mgr.faces_detected_during_scan = False
+        mgr.attempt = 0
     
     def execute(self) -> None:
         mgr = self.manager
-        mgr.best_face = mgr._select_best_face()
         
-        if mgr.best_face:
-            mgr.get_logger().info("Face found! Proceeding to tracking...")
-            mgr.transition_to(StartAssistantHelperState)
-        elif mgr.attempt < mgr.max_attempts:
-            # Calculate rotation angle for scanning
-            angle = (
-                0.0
-                if mgr.attempt == mgr.max_attempts - 1
-                else (45.0 if mgr.attempt % 2 == 0 else -45.0)
+        # Check if we found valid faces at current position
+        if mgr._has_valid_faces():
+            mgr.faces_detected_during_scan = True
+            mgr.get_logger().info(f"Caras válidas detectadas en posición {mgr.attempt}")
+        
+        # Check if scan is complete
+        if mgr.attempt >= len(mgr.scan_positions):
+            if mgr.faces_detected_during_scan:
+                mgr.get_logger().info(
+                    f"Escaneo completo. Se detectaron caras válidas. "
+                    "Procediendo a iniciar assistant helper..."
+                )
+                mgr.transition_to(StartAssistantHelperState)
+            else:
+                mgr.get_logger().warn(
+                    "Escaneo completo sin detectar caras válidas. "
+                    "Cambiando a fallback TDOA..."
+                )
+                mgr.transition_to(FallbackTdoaState)
+            return
+        
+        # Move to next scan position
+        angle = mgr.scan_positions[mgr.attempt]
+        mgr._rotate_head(angle)
+        mgr.get_logger().info(
+            f"Escaneando posición {mgr.attempt + 1}/{len(mgr.scan_positions)}: {angle}°"
+        )
+        mgr.attempt += 1
+        
+        # Wait for rotation to complete and detection to update
+        if mgr.main_timer:
+            mgr.main_timer.cancel()
+            mgr.main_timer = None
+        mgr.wait_timer = mgr.create_timer(
+            mgr.rotation_duration, mgr._on_wait_complete, callback_group=mgr.io_cb
+        )
+
+
+class FallbackTdoaState(IMState):
+    """State to use TDOA (Time Difference of Arrival) as fallback for face detection.
+    Orients head towards sound source, then returns to SearchFaceState for full scan."""
+    
+    def enter(self) -> None:
+        mgr = self.manager
+        mgr.get_logger().info(
+            f"Entrando en modo fallback TDOA (ciclo {mgr.fallback_search_attempts + 1}/{mgr.max_fallback_search_cycles})..."
+        )
+        mgr.tdoa_angle = None  # Reset TDOA angle for fresh reading
+        mgr.tdoa_wait_attempts = 0  # Reset wait attempts counter
+        self._tdoa_oriented = False
+    
+    def execute(self) -> None:
+        mgr = self.manager
+        
+        # Check if we've exhausted fallback cycles
+        if mgr.fallback_search_attempts >= mgr.max_fallback_search_cycles:
+            mgr.get_logger().error(
+                f"Se agotaron todos los ciclos de fallback ({mgr.max_fallback_search_cycles}). "
+                "Finalizando interacción."
             )
-            mgr._rotate_head(angle)
-            mgr.attempt += 1
+            mgr.fail_social_service_call()
+            mgr.transition_to(DeactivateAllState)
+            return
+        
+        # If already oriented, shouldn't happen but safeguard
+        if self._tdoa_oriented:
+            return
+        
+        # Try to get TDOA angle
+        angle = mgr.tdoa_angle
+        if angle is None:
+            # Check if we've exceeded max wait attempts
+            if mgr.tdoa_wait_attempts >= mgr.max_tdoa_wait_attempts:
+                mgr.get_logger().error(
+                    f"No se recibió ángulo TDOA válido después de {mgr.max_tdoa_wait_attempts} intentos. "
+                    "Finalizando interacción."
+                )
+                mgr.fail_social_service_call()
+                mgr.transition_to(DeactivateAllState)
+                return
+            
+            mgr.tdoa_wait_attempts += 1
             mgr.get_logger().info(
-                f"No valid face detected. Attempt {mgr.attempt}/{mgr.max_attempts}, "
-                f"rotating head to {angle}°"
+                f"Esperando datos de TDOA (ángulo de voz)... "
+                f"Intento {mgr.tdoa_wait_attempts}/{mgr.max_tdoa_wait_attempts}"
             )
-            # Wait for rotation to complete
+            # Wait for TDOA data with timeout
             if mgr.main_timer:
                 mgr.main_timer.cancel()
                 mgr.main_timer = None
             mgr.wait_timer = mgr.create_timer(
-                mgr.rotation_duration, mgr._on_wait_complete, callback_group=mgr.io_cb
+                mgr.tdoa_timeout,
+                mgr._on_tdoa_wait_complete,
+                callback_group=mgr.io_cb,
             )
-        else:
+            return
+        
+        # Check angle validity
+        if abs(angle) > mgr.tdoa_angle_limit:
             mgr.get_logger().warn(
-                f"Max attempts ({mgr.max_attempts}) reached without detecting face. "
-                "Falling back to TDOA..."
+                f"TDOA angle {angle:.1f}° excede el límite de {mgr.tdoa_angle_limit}°. "
+                "Reintentando..."
             )
-            mgr.transition_to(FallbackTdoaState)
-            mgr.tdoa_angle = None
-            mgr.tdoa_attempts = 0
-
-
-class FallbackTdoaState(IMState):
-    """State to use TDOA (Time Difference of Arrival) as fallback for face detection."""
-    
-    def enter(self) -> None:
-        self.manager.get_logger().info("Entering TDOA fallback mode...")
-    
-    def execute(self) -> None:
-        mgr = self.manager
-        
-        if mgr.tdoa_attempts < mgr.fallback_max_attempts:
-            # First check if we found a face
-            mgr.best_face = mgr._select_best_face()
-            if mgr.best_face:
-                mgr.get_logger().info("Face found during TDOA fallback!")
-                mgr.transition_to(StartAssistantHelperState)
+            mgr.tdoa_angle = None  # Reset for next attempt
+            
+            # Check if we've exceeded max wait attempts for invalid angles
+            if mgr.tdoa_wait_attempts >= mgr.max_tdoa_wait_attempts:
+                mgr.get_logger().error(
+                    f"No se recibió ángulo TDOA válido después de {mgr.max_tdoa_wait_attempts} intentos. "
+                    "Finalizando interacción."
+                )
+                mgr.fail_social_service_call()
+                mgr.transition_to(DeactivateAllState)
                 return
             
-            # Try TDOA
-            angle = mgr.tdoa_angle
-            if angle is None:
-                mgr.get_logger().warn(
-                    f"No TDOA data received. Attempt {mgr.tdoa_attempts + 1}/"
-                    f"{mgr.fallback_max_attempts}"
-                )
-                mgr.tdoa_attempts += 1
-                if mgr.main_timer:
-                    mgr.main_timer.cancel()
-                    mgr.main_timer = None
-                mgr.wait_timer = mgr.create_timer(
-                    mgr.tdoa_timeout,
-                    mgr._on_tdoa_wait_complete,
-                    callback_group=mgr.io_cb,
-                )
-                return
-            
-            # Check angle validity
-            if abs(angle) <= mgr.tdoa_angle_limit:
-                mgr.get_logger().info(f"Rotating head to TDOA angle: {angle:.1f}°")
-                mgr._rotate_head(angle)
-                mgr.tdoa_attempts += 1
-                if mgr.main_timer:
-                    mgr.main_timer.cancel()
-                    mgr.main_timer = None
-                mgr.wait_timer = mgr.create_timer(
-                    mgr.tdoa_timeout,
-                    mgr._on_tdoa_wait_complete,
-                    callback_group=mgr.io_cb,
-                )
-                return
-            else:
-                mgr.get_logger().warn(
-                    f"TDOA angle {angle:.1f}° exceeds limit of {mgr.tdoa_angle_limit}°"
-                )
+            mgr.tdoa_wait_attempts += 1
+            if mgr.main_timer:
+                mgr.main_timer.cancel()
+                mgr.main_timer = None
+            mgr.wait_timer = mgr.create_timer(
+                mgr.tdoa_timeout,
+                mgr._on_tdoa_wait_complete,
+                callback_group=mgr.io_cb,
+            )
+            return
         
-        # All attempts exhausted
-        mgr.get_logger().error(
-            "Failed to detect person after all TDOA attempts. Ending interaction."
+        # Valid TDOA angle - orient head and then go back to SearchFaceState
+        mgr.get_logger().info(
+            f"Orientando cabeza hacia TDOA angle: {angle:.1f}°. "
+            f"Luego se realizará escaneo completo (ciclo {mgr.fallback_search_attempts + 1})."
         )
-        mgr.fail_social_service_call()
-        mgr.transition_to(DeactivateAllState)
+        mgr._rotate_head(angle)
+        self._tdoa_oriented = True
+        mgr.fallback_search_attempts += 1
+        
+        # Wait for rotation, then return to SearchFaceState
+        if mgr.main_timer:
+            mgr.main_timer.cancel()
+            mgr.main_timer = None
+        mgr.wait_timer = mgr.create_timer(
+            mgr.rotation_duration,
+            mgr._on_tdoa_oriented_complete,
+            callback_group=mgr.io_cb,
+        )
 
 
 class StartAssistantHelperState(IMState):
@@ -1081,27 +1046,21 @@ class StartAssistantHelperState(IMState):
             mgr.transition_to(WaitAssistantHelperState)
             return
 
-        if not mgr.ensure_central_face_cluster_ready():
-            mgr.fail_social_service_call()
-            mgr.transition_to(DeactivateAllState)
-            return
+        # if not mgr.ensure_central_face_cluster_ready():
+        #     mgr.fail_social_service_call()
+        #     mgr.transition_to(DeactivateAllState)
+        #     return
 
-        if not mgr.activate_face_tracking():
-            mgr.get_logger().error("Failed to activate face tracker")
-            mgr.fail_social_service_call()
-            mgr.transition_to(DeactivateAllState)
-            return
+        # if not mgr.activate_face_tracking():
+        #     mgr.get_logger().error("Failed to activate face tracker")
+        #     mgr.fail_social_service_call()
+        #     mgr.transition_to(DeactivateAllState)
+        #     return
 
         if not mgr.fetch_central_face_cluster():
             mgr.get_logger().error(
                 "No se pudo obtener el cluster central para preparar assistant helper"
             )
-            mgr.fail_social_service_call()
-            mgr.transition_to(DeactivateAllState)
-            return
-
-        if not mgr.ensure_assistant_helper_ready():
-            mgr.get_logger().error("Assistant helper no pudo iniciarse")
             mgr.fail_social_service_call()
             mgr.transition_to(DeactivateAllState)
             return
@@ -1125,40 +1084,27 @@ class WaitAssistantHelperState(IMState):
         self.manager.get_logger().info(
             "Esperando a que assistant helper finalice la interacción..."
         )
-        self._warned_no_activity = False
 
     def execute(self) -> None:
         mgr = self.manager
         now_sec = mgr.get_clock().now().nanoseconds / 1e9
 
-        if not mgr.assistant_helper_interaction_started:
+        # Si el asistente ya ha llamado al servicio de finalización
+        if mgr.assistant_helper_interaction_finished:
+            mgr.get_logger().info("Assistant helper completó la interacción (notificado por servicio).")
+            mgr.success_social_service_call()
+            mgr.transition_to(DeactivateAllState)
             return
 
+        # Comprobar si se ha superado el tiempo de espera
         if (
             mgr.assistant_helper_deadline is not None
             and now_sec >= mgr.assistant_helper_deadline
         ):
-            mgr.get_logger().error("Assistant helper no respondió a tiempo")
+            mgr.get_logger().error("Timeout: Assistant helper no finalizó a tiempo.")
             mgr.fail_social_service_call()
             mgr.transition_to(DeactivateAllState)
             return
-
-        if mgr.assistant_helper_detected_activity:
-            if mgr.assistant_helper_state == AssistantHelperState.NAME:
-                mgr.get_logger().info("Assistant helper completó la interacción")
-                mgr.success_social_service_call()
-                mgr.transition_to(DeactivateAllState)
-                return
-        else:
-            if (
-                mgr.assistant_helper_start_time is not None
-                and now_sec - mgr.assistant_helper_start_time > 5.0
-                and not self._warned_no_activity
-            ):
-                mgr.get_logger().warn(
-                    "Aún no se detecta actividad de assistant helper tras 5s"
-                )
-                self._warned_no_activity = True
 
 
 class DeactivateAllState(IMState):
@@ -1171,12 +1117,7 @@ class DeactivateAllState(IMState):
         mgr = self.manager
         
         # Cancel main timer
-        if mgr.main_timer:
-            mgr.main_timer.cancel()
-            mgr.main_timer = None
-        
-        # Deactivate all modules
-        mgr.deactivate_all_modules()
+        mgr.trigger_deactivate()
         
         # Transition to done state
         mgr.transition_to(DoneState)

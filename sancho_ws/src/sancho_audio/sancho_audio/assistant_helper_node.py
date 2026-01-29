@@ -32,14 +32,14 @@ class HELPER_STATE(int, Enum):
     ASKING = 3
 
 
-class AssistantHelperNode(Node):
+class AssistantHelperNode(Node): # Poner una variable para esperar X chunks antes de decidir que ya ha terminado de hablar
 
     def __init__(self, assistant_helper: "AssistantHelper"):
         super().__init__("assistant_helper")
 
         self.assistant_helper = assistant_helper
 
-        self.declare_parameter("active", False)
+        self.declare_parameter("active", True)
         self.is_active = bool(self.get_parameter("active").value)
 
         self.face_recog_list = []
@@ -116,7 +116,7 @@ class AssistantHelperNode(Node):
     
     def set_active_service(self, request, response):
         self.is_active = request.data
-        self.get_logger().info(f"ESTADO DE ASSISTANT HELPER CAMBIADO A {self.is_active}")
+        self.get_logger().info(f">>> ESTADO DE ASSISTANT HELPER CAMBIADO A {self.is_active}")
 
         response.success = True
 
@@ -134,7 +134,7 @@ class AssistantHelper:
 
         self.sample_rate = -1 # Will set on mic callbacks
         self.helper_chunk_size = 0.5
-        self.intensity_threshold = 1400
+        self.intensity_threshold = 900
         self.timeout_seconds = 5
 
         self.hotword_detection_time = 0
@@ -149,7 +149,11 @@ class AssistantHelper:
         self.node = AssistantHelperNode(self)
 
     def spin(self):
-        while self.node.is_active and rclpy.ok():
+        while True:
+            self.node.get_logger().debug(f"Helper State: {self.helper_state.name}, Audio State: {self.audio_state.name}")
+            if not self.node.is_active:
+                pass
+
             while not self.node.chunk_queue.empty(): # Combine audio chunks
                 [new_audio, self.sample_rate] = self.node.chunk_queue.get()
 
@@ -230,8 +234,8 @@ class AssistantHelper:
 
     def process_audio_command(self, audio):
         self.node.get_logger().info(f"Transcribing {len(self.audio) / self.sample_rate}s chunk...")
-
-        rec = self.stt_request(list(map(int, audio)), self.sample_rate)                
+        rec = self.stt_request(list(map(int, audio)), self.sample_rate)   
+                     
         if rec:
             if rec.lower().strip() == self.name.lower(): # Si escucha Sancho otra vez, reinicia el timer y eso
                 self.hotword_detection_time = time.time()

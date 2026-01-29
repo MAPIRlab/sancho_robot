@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 import os
 
 from launch import LaunchDescription
@@ -14,6 +13,16 @@ def generate_launch_description():
         package='sancho_audio',
         executable='microphone',
         name='microphone',
+        output='screen',
+        prefix=prefix_cmd,
+        emulate_tty=True,
+    )
+
+    face_node = Node(
+        namespace='',
+        package='sancho_emotions',
+        executable='face_node',
+        name='face_node',
         output='screen',
         prefix=prefix_cmd,
         emulate_tty=True,
@@ -64,6 +73,7 @@ def generate_launch_description():
         # --------------------
         GroupAction([
             microphone_node,
+            face_node,
             audio_doa_node,
             audio_doa_overlay_node,
             configurator_node
