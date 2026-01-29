@@ -1,14 +1,18 @@
+# =====================
+# CONTROLLER SERVER (local)
+# =====================
 controller_server:
   ros__parameters:
     use_sim_time: False
     controller_frequency: 20.0
 
-    # Minimum velocity thresholds
+    # Subimos umbral mínimo para publicar omega y evitamos invertir por ruido
     min_x_velocity_threshold: 0.05
     min_y_velocity_threshold: 0.05
     min_theta_velocity_threshold: 0.15   
 
-    failure_tolerance: 0.8               
+    # No declares fallo tan pronto ante dudas al inicio del giro
+    failure_tolerance: 0.8               # antes 0.3
 
     progress_checker_plugin: "progress_checker"
     goal_checker_plugins: ["general_goal_checker"]
@@ -30,13 +34,14 @@ controller_server:
       plugin: "nav2_rotation_shim_controller::RotationShimController"
       primary_controller: "nav2_mppi_controller::MPPIController"
 
-      # --- ROTATION SHIM ---
-      angular_dist_threshold: 1.20 # Radians
-      angular_disengage_threshold: 0.40
-      rotate_to_heading_angular_vel: 1.0
-      max_angular_accel: 3.0
-      simulate_ahead_time: 0.0
-      rotate_to_goal_heading: true
+      # --- ANTI-OSCILACIÓN EN ROTATION SHIM ---
+      # Engancha el modo rotación con margen y no lo suelta hasta estar bien alineado
+      angular_dist_threshold: 1.20         # antes 1.00
+      angular_disengage_threshold: 0.40    # antes 0.95 (¡histeresis grande!)
+      rotate_to_heading_angular_vel: 1.0   # antes 1.0 (menos sobrepaso)
+      max_angular_accel: 3.0               # antes 3.0 (menos vaivén)
+      simulate_ahead_time: 0.0             # antes 1.0 (no “adivinar” la pose futura)
+      rotate_to_goal_heading: true        # evita decidir yaw final aquí; hazlo con Spin
 
       # --- MPPI ---
       time_steps: 56
@@ -61,7 +66,7 @@ controller_server:
       transform_tolerance: 0.1
       temperature: 0.5
       gamma: 0.015
-      motion_model: "DiffDrive" # Changed from Ackermann to fix blocking
+      motion_model: "Ackermann"
       visualize: true
       retry_attempt_limit: 3
 
@@ -69,7 +74,8 @@ controller_server:
         trajectory_step: 5
         time_step: 3
 
-      # AckermannConstraints removed as we are using DiffDrive
+      AckermannConstraints:
+        min_turning_r: 0.4764
 
       critics:
          - "ConstraintCritic"
@@ -121,7 +127,7 @@ controller_server:
       PreferForwardCritic:
         enabled: true
         cost_power: 1
-        cost_weight: 3.0
+        cost_weight: 3.0   # antes 5.0: menos sesgo que puede “pelearse” con el giro
 
       CostCritic:
         enabled: true
@@ -136,26 +142,186 @@ controller_server:
       VelocityDeadbandCritic:
         enabled: true
         cost_power: 1
-        cost_weight: 20.0
-        deadband_velocities: [0.00, 0.00, 0.15]
+        cost_weight: 20.0  # antes 30.0
+        deadband_velocities: [0.02, 0.00, 0.15]  # antes 0.1
 
     velocity_smoother:
       plugin: "nav2_velocity_smoother::VelocitySmoother"
       smoothing_frequency: 20.0
       scale_velocities: false
-      feedback: "CLOSED_LOOP"
+      # Usa CLOSED_LOOP si tu odometría es buena; ayuda a amortiguar inversión de signo
+      feedback: "CLOSED_LOOP"             # antes OPEN_LOOP
       max_velocity: [0.4, 0.0, 1.0]
-      min_velocity: [0.05, 0.0, 0.15]
-      max_accel: [0.5, 0.0, 1.0]
-      max_decel: [-0.5, 0.0, -1.0]
-      deadband_velocity: [0.02, 0.0, 0.15]
+      min_velocity: [0.05, 0.0, 0.15]     # antes 0.1
+      max_accel: [0.3, 0.0, 0.5]
+      max_decel: [-0.4, 0.0, -0.5]
+      deadband_velocity: [0.02, 0.0, 0.15]  # antes 0.1
       velocity_timeout: 1.0
 
+    plugin_lib_names:
+      - "nav2_mppi_controller"
+
+# controller_server:
+#   ros__parameters:
+#     use_sim_time: False
+#     controller_frequency: 20.0
+
+#     # Minimum velocity thresholds
+#     min_x_velocity_threshold: 0.05
+#     min_y_velocity_threshold: 0.05
+#     min_theta_velocity_threshold: 0.15   
+
+#     failure_tolerance: 0.8               
+
+#     progress_checker_plugin: "progress_checker"
+#     goal_checker_plugins: ["general_goal_checker"]
+#     smoother_plugins: ["velocity_smoother"]
+#     controller_plugins: ["FollowPath"]
+
+#     progress_checker:
+#       plugin: "nav2_controller::SimpleProgressChecker"
+#       required_movement_radius: 0.2
+#       movement_time_allowance: 20.0
+
+#     general_goal_checker:
+#       stateful: True
+#       plugin: "nav2_controller::SimpleGoalChecker"
+#       xy_goal_tolerance: 0.2
+#       yaw_goal_tolerance: 1.0
+
+#     FollowPath:
+#       plugin: "nav2_rotation_shim_controller::RotationShimController"
+#       primary_controller: "nav2_mppi_controller::MPPIController"
+
+#       # --- ROTATION SHIM ---
+#       angular_dist_threshold: 1.20 # Radians
+#       angular_disengage_threshold: 0.40
+#       rotate_to_heading_angular_vel: 1.0
+#       max_angular_accel: 3.0
+#       simulate_ahead_time: 0.0
+#       rotate_to_goal_heading: true
+
+#       # --- MPPI ---
+#       time_steps: 56
+#       model_dt: 0.05
+#       batch_size: 2000
+#       vx_std: 0.2
+#       vy_std: 0.0 # Should change if onmni
+#       wz_std: 0.4
+
+#       vx_max: 0.4
+#       vx_min: 0.0
+#       vy_max: 0.0 # Changed from 0.0 to 0.2 to allow for some lateral movement
+#       vy_min: 0.0 # Changed from 0.0 to -0.2 to allow for some lateral movement
+#       wz_max: 1.0
+
+#       ax_max: 0.5
+#       ax_min: -0.5
+#       az_max: 1.0
+
+#       iteration_count: 1
+#       prune_distance: 1.7
+#       transform_tolerance: 0.1
+#       temperature: 0.5
+#       gamma: 0.015
+#       motion_model: "Ackermann"
+#       visualize: true
+#       retry_attempt_limit: 3
+
+#       TrajectoryVisualizer:
+#         trajectory_step: 5
+#         time_step: 3
+
+#       # AckermannConstraints removed as we are using DiffDrive
+
+#     critics:
+#         - "ConstraintCritic"
+#         - "CostCritic"
+#         - "GoalCritic"
+#         - "PathAlignCritic"
+#         - "PathFollowCritic"
+#         - "PathAngleCritic"
+#         - "PreferForwardCritic"
+#         - "VelocityDeadbandCritic"
+
+#     ConstraintCritic:
+#       enabled: true
+#       cost_power: 1
+#       cost_weight: 5.0 # Ligeramente aumentado para asegurar que respeta los límites vx/vy
+
+#     GoalCritic:
+#       enabled: true
+#       cost_power: 1
+#       cost_weight: 8.0 # Aumentado para que tenga más "ganas" de llegar al final
+#       threshold_to_consider: 1.4
+
+#     PathAlignCritic:
+#       enabled: true # ACTIVADO: Esto obliga al robot a orientar el frontal con la ruta
+#       cost_power: 1
+#       cost_weight: 12.0 # Peso alto para evitar que se desplace lateralmente (que no "deslice")
+#       max_path_occupancy_ratio: 0.05
+#       trajectory_point_step: 4
+#       threshold_to_consider: 0.5
+#       offset_from_furthest: 20
+#       use_path_orientations: false
+
+#     PathFollowCritic:
+#       enabled: true
+#       cost_power: 1
+#       cost_weight: 5.0
+#       offset_from_furthest: 5
+#       threshold_to_consider: 1.4
+
+#     PathAngleCritic:
+#       enabled: true
+#       cost_power: 1
+#       cost_weight: 3.0 # Subido un poco para penalizar ángulos de avance forzados
+#       offset_from_furthest: 4
+#       threshold_to_consider: 0.5
+#       max_angle_to_furthest: 1.0
+#       forward_preference: true
+
+#     PreferForwardCritic:
+#       enabled: true
+#       cost_power: 1
+#       cost_weight: 10.0 # MUY IMPORTANTE: Penaliza ir hacia atrás o de lado, forzando modo Ackermann
+
+#     CostCritic:
+#       enabled: true
+#       cost_power: 1
+#       cost_weight: 4.0
+#       critical_cost: 250.0 # Reducido ligeramente para dar margen de maniobra cerca de obstáculos
+#       consider_footprint: true
+#       collision_cost: 1000.0 # Bajado de 1M: Evita que un solo pixel de ruido bloquee todo el sistema
+#       near_goal_distance: 1.0
+#       trajectory_point_step: 2
+
+#     VelocityDeadbandCritic:
+#       enabled: true
+#       cost_power: 1
+#       cost_weight: 5.0 # BAJADO de 20.0: Un peso tan alto mataba cualquier intento de movimiento lento
+#       deadband_velocities: [0.02, 0.02, 0.05] # Umbrales reducidos para un arranque más suave
+
+#     velocity_smoother:
+#       plugin: "nav2_velocity_smoother::VelocitySmoother"
+#       smoothing_frequency: 20.0
+#       scale_velocities: false
+#       feedback: "CLOSED_LOOP"
+#       max_velocity: [0.4, 0.2, 1.0]
+#       min_velocity: [0.05, 0.0, 0.15]
+#       max_accel: [0.3, 0.2, 0.5]
+#       max_decel: [-0.5, -0.2, -0.5]
+#       deadband_velocity: [0.02, 0.02, 0.15]
+#       velocity_timeout: 1.0
+
+# =====================
+# LOCAL COSTMAP
+# =====================
 local_costmap:
   local_costmap:
     ros__parameters:
-      use_sim_time: False
-      global_frame: "odom"
+      use_sim_time: False          # Robot real
+      global_frame: "odom"         # Típico para local costmap
       robot_base_frame: "base_footprint"
       resolution: 0.05
       transform_tolerance: 0.2
@@ -164,6 +330,7 @@ local_costmap:
       width: 5
       height: 5
 
+      # Frecuencias del local costmap
       update_frequency: 20.0
       publish_frequency: 10.0
 
@@ -178,8 +345,8 @@ local_costmap:
       voxel_layer:
         plugin: "nav2_costmap_2d::VoxelLayer"
         enabled: true
-        voxel_decay: 0.5
-        decay_model: 0
+        voxel_decay: 0.5         # Obstáculos desaparecen rápido
+        decay_model: 0           # 0: Tiempo fijo
         voxel_size: 0.05
         z_voxels: 10
         max_obstacle_height: 2.0
@@ -187,7 +354,7 @@ local_costmap:
         observation_sources: "camera_depth"
         publish_voxel_map: true
         camera_depth:
-          topic: "/astra_camera/camera/depth/points"
+          topic: "/scan_camera"     #"/astra_camera/camera/depth/points"
           data_type: "PointCloud2"
           marking: true
           clearing: true
@@ -196,6 +363,8 @@ local_costmap:
           min_obstacle_height: 0.1
           max_obstacle_height: 1.8
 
+
+      # Obstacle layer local
       obstacle_layer:
         plugin: "nav2_costmap_2d::ObstacleLayer"
         enabled: True
@@ -217,12 +386,95 @@ local_costmap:
           max_obstacle_height: 2.0
           clearing: True
           marking: True
-        # Camera removed from here as it is in voxel_layer
+        camera_depth:
+          topic: "/scan_camera"
+          clearing: True
+          marking: True
+          min_obstacle_height: 0.1
+          max_obstacle_height: 1.8
 
+      # Inflation layer local
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         enabled: true
-        inflation_radius: 0.35 # Kept at 0.35m as requested
-        cost_scaling_factor: 3.0
+        inflation_radius: 0.55       # Mucho mayor que el radio inscrito (~0.275 m)
+        cost_scaling_factor: 10.0    # Coste decrece de forma gradual
         inflate_unknown: true
         inflate_around_unknown: true
+
+
+# local_costmap:
+#   local_costmap:
+#     ros__parameters:
+#       use_sim_time: False
+#       global_frame: "odom"
+#       robot_base_frame: "base_footprint"
+#       resolution: 0.05
+#       transform_tolerance: 0.2
+
+#       rolling_window: true
+#       width: 5
+#       height: 5
+
+#       update_frequency: 20.0
+#       publish_frequency: 10.0
+
+#       footprint: "[[-0.375, -0.275], [-0.375, 0.275], [0.375, 0.275], [0.375, -0.275]]"
+#       footprint_padding: 0.03
+
+#       plugins:
+#         - "voxel_layer"
+#         - "obstacle_layer"
+#         - "inflation_layer"
+
+#       voxel_layer:
+#         plugin: "nav2_costmap_2d::VoxelLayer"
+#         enabled: true
+#         voxel_decay: 0.5
+#         decay_model: 0
+#         voxel_size: 0.05
+#         z_voxels: 10
+#         max_obstacle_height: 2.0
+#         mark_threshold: 0
+#         observation_sources: "camera_depth"
+#         publish_voxel_map: true
+#         camera_depth:
+#           topic: "/astra_camera/camera/depth/points"
+#           data_type: "PointCloud2"
+#           marking: true
+#           clearing: true
+#           obstacle_range: 5.0
+#           raytrace_range: 5.5
+#           min_obstacle_height: 0.1
+#           max_obstacle_height: 1.8
+
+#       obstacle_layer:
+#         plugin: "nav2_costmap_2d::ObstacleLayer"
+#         enabled: True
+#         footprint_clearing_enabled: true
+#         max_obstacle_height: 2.0
+#         combination_method: 1
+#         observation_sources: "laser_front laser_back"
+#         observation_persistence: 0.2
+#         obstacle_range: 5.0
+#         raytrace_range: 5.5
+
+#         laser_front:
+#           topic: "/scan_1st"
+#           max_obstacle_height: 2.0
+#           clearing: True
+#           marking: True
+#         laser_back:
+#           topic: "/scan_2nd"
+#           max_obstacle_height: 2.0
+#           clearing: True
+#           marking: True
+#         # Camera removed from here as it is in voxel_layer
+
+#       inflation_layer:
+#         plugin: "nav2_costmap_2d::InflationLayer"
+#         enabled: true
+#         inflation_radius: 0.35 # Kept at 0.35m as requested
+#         cost_scaling_factor: 3.0
+#         inflate_unknown: true
+#         inflate_around_unknown: true

@@ -28,11 +28,11 @@ def generate_launch_description():
     behavior_params_path = os.path.join(pkg_share, "config", "behavior_params.yaml")
     collision_monitor_params_path = os.path.join(pkg_share, "config", "collision_monitor_params.yaml")
 
+    nav2_params_path = os.path.join(pkg_share, "config", "old_nav2_params_ranger.yaml")
     depthimage_to_laserscan_params = os.path.join(pkg_share,"config","depthimage_to_laserscan_params.yaml")
 
     lifecycle_nodes = [
         "map_server",
-        "map_server_localization",
         "amcl",
         "planner_server",
         "controller_server",
@@ -97,7 +97,6 @@ def generate_launch_description():
         actions=[
             SetParameter(name="use_sim_time", value=use_sim_time),
             
-            # --- Collision Monitor ---
             Node(
                 package="nav2_collision_monitor",
                 executable="collision_monitor",
@@ -119,24 +118,13 @@ def generate_launch_description():
                 emulate_tty=True,
                 respawn=use_respawn,
             ),
-            Node(
-                package="nav2_map_server",
-                executable="map_server",
-                name="map_server_localization",
-                parameters=[configured_localization_params],
-                remappings=[("/map", "/localization_map")],
-                output="screen",
-                prefix=prefix_cmd,
-                emulate_tty=True,
-                respawn=use_respawn,
-            ),
             
             # --- AMCL ---
             Node(
                 package="nav2_amcl",
                 executable="amcl",
                 name="amcl",
-                parameters=[localization_params_path], # AMCL params are static
+                parameters=[localization_params_path],
                 output="screen",
                 prefix=prefix_cmd,
                 emulate_tty=True,
@@ -161,7 +149,7 @@ def generate_launch_description():
                 executable="controller_server",
                 name="controller_server",
                 parameters=[controller_params_path],
-                remappings=[("cmd_vel", "cmd_vel")],
+                remappings=[("cmd_vel", "cmd_vel_raw")],
                 output="screen",
                 prefix=prefix_cmd,
                 emulate_tty=True,

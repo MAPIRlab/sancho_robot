@@ -12,11 +12,11 @@ planner_server:
       max_planning_time: 1.0
       downsample_costmap: true
       downsampling_factor: 2
-      cost_travel_multiplier: 2.0
+      cost_travel_multiplier: 3.0 # Prioritize paths with lower cost
       use_final_approach_orientation: false
       smooth_path: true
       smoother:
-        max_iterations: 800
+        max_iterations: 1000
         w_smooth: 0.35
         w_data: 0.20
         tolerance: 1.0e-10
@@ -78,8 +78,8 @@ global_costmap:
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         enabled: true
-        inflation_radius: 0.5 # Kept at 0.5m as requested
-        cost_scaling_factor: 3.0
+        inflation_radius: 0.75
+        cost_scaling_factor: 10.0
         inflate_unknown: true
         inflate_around_unknown: true
       
