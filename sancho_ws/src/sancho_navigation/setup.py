@@ -17,7 +17,7 @@ setup(
         (os.path.join("share", package_name, "config"), glob("config/*")),
         (os.path.join("share", package_name, "maps"), glob("maps/*")),
     ],
-    install_requires=['setuptools'],
+    install_requires=['setuptools', 'numpy', 'cvxopt'],
     zip_safe=True,
     maintainer='antbaena',
     maintainer_email='antbaena@uma.es',
@@ -27,7 +27,7 @@ setup(
     entry_points={
         'console_scripts': [
             'roaming_node = sancho_navigation.roaming_node:main',
-            'narrow_space_manager_node = sancho_navigation.narrow_space_manager_node:main',
+            'sancho_cbf_node = sancho_navigation.sancho_cbf_node:main',
         ],
     },
 )

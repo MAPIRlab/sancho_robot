@@ -36,6 +36,8 @@
         <Sequence>
           <BackUp backup_dist="0.30" backup_speed="0.10" />
           <Wait wait_duration="2.0" name="WaitRecovery"/>
+          <ClearEntireCostmap name="ClearGlobalCostmap-Subtree" service_name="global_costmap/clear_entirely_global_costmap"/>
+          <ClearEntireCostmap name="ClearLocalCostmap-Subtree" service_name="local_costmap/clear_entirely_local_costmap"/>
         </Sequence>
         <!-- <RoundRobin name="RecoveryActions">
           <Wait wait_duration="2.0" name="WaitRecovery"/>

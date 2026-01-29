@@ -89,7 +89,7 @@ def generate_launch_description():
     # Common remappings
     remappings = [
         ("cmd_vel_in", "cmd_vel_raw"),
-        ("cmd_vel_out", "cmd_vel"),
+        ("cmd_vel_out", "cmd_vel_nav2"),
     ]
 
     # Grupo de nodos
