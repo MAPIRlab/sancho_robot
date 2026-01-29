@@ -51,7 +51,7 @@ bt_navigator:
       - nav2_planner_selector_bt_node
       - nav2_controller_selector_bt_node
       - nav2_goal_checker_selector_bt_node
-      #- "sancho_bt_plugins" # Nodo personalizado para autolocalización
+      - "sancho_bt_plugins" # Nodo personalizado para autolocalización
 
 behavior_server:
   ros__parameters:

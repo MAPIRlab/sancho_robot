@@ -82,7 +82,7 @@ def generate_launch_description():
 
     declare_bt_xml_cmd = DeclareLaunchArgument(
         'default_bt_xml_filename',
-        default_value=os.path.join(pkg_share, 'bt', 'testBT.xml'),
+        default_value=os.path.join(pkg_share, 'bt', 'testIsLocalized.xml'),
         description='Full path to the behavior tree xml file to use'
     )
 
