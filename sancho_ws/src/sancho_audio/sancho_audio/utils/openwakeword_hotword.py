@@ -69,9 +69,10 @@ class OpenWakeWordHotword(ModelHotword):
                 self.consec_hits += 1
                 if self.consec_hits >= self.frames_needed:
                     self.consec_hits = 0
-                    fired = True
-
                     self.buffer = np.array([], dtype=np.int16) # Limpiar buffer para evitar re-disparo
+                    self.model.reset() # Limpia el estado interno del modelo para evitar re-disparos
+                
+                    fired = True
                     break
             else:
                 self.consec_hits = 0

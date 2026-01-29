@@ -23,27 +23,6 @@ from visualization_msgs.msg import Marker, MarkerArray
 
 
 class PersonWaypointGeneratorNode(LifecycleNode):
-    """Nodo lifecycle que genera waypoints de navegación alrededor de UNA persona.
-
-    Suscripciones:
-        person_topic (PoseStamped): Pose de la persona detectada (en cualquier frame)
-
-    Publicaciones:
-        waypoint_goal_topic (PoseStamped): Objetivo de navegación en 'map'
-        waypoint_marker_topic (MarkerArray): Marcadores RViz
-
-    Parámetros
-    ----------
-    person_topic (str, '/detected_person')
-    waypoint_goal_topic (str, '/person_waypoint')
-    stand_off_distance (float, 1.5): distancia deseada a la persona
-    goal_update_threshold (float, 0.15): Δ mínima respecto a histórico para publicar
-    robot_frame (str, 'base_link')
-    tf_lookup_timeout (float, 0.1)
-    goal_history_size (int, 5)
-    waypoint_marker_topic (str, '/person_waypoint_marker_array')
-    waypoint_marker_lifetime (float, 1.0)
-    """
 
     def __init__(self):
         super().__init__("person_waypoint_generator_lifecycle")
@@ -52,7 +31,7 @@ class PersonWaypointGeneratorNode(LifecycleNode):
         # Parámetros
         self.declare_parameter("person_topic", "/detected_person")
         self.declare_parameter("waypoint_goal_topic", "/person_waypoint")
-        self.declare_parameter("stand_off_distance", 0.1)
+        self.declare_parameter("stand_off_distance", 0.3)
         self.declare_parameter("goal_update_threshold", 0.15)
         self.declare_parameter("robot_frame", "base_link")
         self.declare_parameter("tf_lookup_timeout", 0.1)

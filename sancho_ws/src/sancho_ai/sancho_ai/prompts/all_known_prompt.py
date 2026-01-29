@@ -33,7 +33,7 @@ Now generate your short Spanish greeting for the whole group. Return only the JS
 """
 
 class AllKnownPrompt(Prompt):
-    def __init__(self, known_targets: list[str]):
+    def __init__(self, known_targets: list[str], ):
         self.known_targets = known_targets
 
     def get_prompt_system(self):

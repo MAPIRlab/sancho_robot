@@ -52,16 +52,39 @@ def generate_launch_description():
         }]
     )
 
-    # ---- ESTE NODO va con ASSISTANT_HELPER_VENV
+    # assistant_helper = Node(
+    #     package='sancho_audio',
+    #     executable='assistant_helper',
+    #     name='assistant_helper',
+    #     output='screen',
+    #     emulate_tty=True,
+    #     prefix=prefix_cmd,
+    #     parameters=[{ 'active': True }] # Ponerlo aa false para que el orquestador lo llame
+    # )
+
+    # # ---- ESTE NODO va con ASSISTANT_HELPER_VENV
     assistant_helper = Node(
         package='sancho_audio',
         executable=os.path.join(ASSISTANT_HELPER_VENV, "bin", "python"),
-        arguments=['-m', 'sancho_audio.assistant_helper_node'],  # <-- tu módulo exacto
+        arguments=['-m', 'sancho_audio.assistant_helper_lifecycle_node'],  # <-- tu módulo exacto
         name='assistant_helper',
         output='screen',
         emulate_tty=True,
         prefix=prefix_cmd,
-        parameters=[{ 'active': True }]
+        parameters=[{ 'active': True }] # Ponerlo aa false para que el orquestador lo llame
+    )
+
+    auto_activator_helper_node = Node(
+        package='nav2_lifecycle_manager',
+        executable='lifecycle_manager',
+        name='node_auto_activator_face',
+        output='screen',
+        parameters=[{
+            "autostart": True,
+            'node_names': ['assistant_helper'],
+            "bond_timeout": 0.0,  
+            "attempt_to_restart": True,  # Reintenta activar si un nodo falla
+        }],
     )
 
     assistant = Node(
@@ -97,6 +120,7 @@ def generate_launch_description():
             default_value='xterm -hold -e' if os.environ.get('DISPLAY') else '',
             description='Prefijo para lanzar nodos en terminal (p.ej.: “xterm -hold -e”)'
         ),
+        auto_activator_helper_node, # cuando se quiere que funcione desde el inicio
         GroupAction([
             llm,
             tts,

@@ -29,7 +29,7 @@ class CentralFacesClusterNode(Node):
         # Parámetros
         self.declare_parameter('input_topic', '/face_recognitions')
         self.declare_parameter('eps_default', 60.0)             # píxeles (para DBSCAN)
-        self.declare_parameter('min_samples_default', 2)
+        self.declare_parameter('min_samples_default', 1)
         self.declare_parameter('marker_ns', 'faces')
         self.declare_parameter('marker_lifetime', 0.3)          # seg
         self.declare_parameter('head_frame', 'camera_link')
@@ -62,6 +62,7 @@ class CentralFacesClusterNode(Node):
         centers: List[Tuple[float, float]] = []
         ids: List[str] = []
         names: List[str] = []
+        self.get_logger().info(f'Recibido FaceRecognitionArray con {len(msg.detections)} detecciones')
 
         n = min(len(msg.detections), len(msg.recognitions))
         for i in range(n):
@@ -82,6 +83,7 @@ class CentralFacesClusterNode(Node):
             self._last_centers = centers
             self._last_ids = ids
             self._last_names = names
+            self.get_logger().info(f'Actualizados datos de {len(centers)} caras reconocidas con ids: {ids} y names: {names}')
 
         try:
             self._publish_markers(msg, centers, ids)  # visualización
@@ -92,13 +94,15 @@ class CentralFacesClusterNode(Node):
     # Servicio: calcula clúster central (en píxeles)
     # -------------------------------------
     def _on_srv(self, request: GetCentralFaceCluster.Request, response: GetCentralFaceCluster.Response):
+        self.get_logger().info('Servicio get_central_cluster solicitado')
         with self._lock:
             msg = self._last_msg
             centers = list(self._last_centers)
             ids = list(self._last_ids)
             names = list(self._last_names)
-
+            
         if msg is None or len(centers) == 0:
+            self.get_logger().info('No hay caras reconocidas para clusterizar')
             response.cluster_center = Point(x=float('nan'), y=float('nan'), z=0.0)
             response.ids = []
             response.names = []
@@ -122,8 +126,9 @@ class CentralFacesClusterNode(Node):
             if lbl == -1:
                 continue
             clusters.setdefault(lbl, []).append(idx)
-
+        
         if not clusters:
+            self.get_logger().warn('No se han encontrado clústeres de caras reconocidas')
             response.cluster_center = Point(x=float('nan'), y=float('nan'), z=0.0)
             response.ids = []
             response.names = []

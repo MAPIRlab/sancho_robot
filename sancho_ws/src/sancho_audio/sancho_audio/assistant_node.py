@@ -8,6 +8,7 @@ from enum import Enum
 from queue import Queue
 
 from std_msgs.msg import String, Int16, Bool, Empty
+from std_srvs.srv import SetBool
 from hri_msgs.srv import SanchoPrompt, TriggerUserInteraction
 from sancho_msgs.msg import InputTTS, QuestionTTS, UserTranscription
 from sancho_msgs.srv import GreetPeople
@@ -166,7 +167,7 @@ class Assistant:
         self.play_tts(text)
 
         self._activate_lifecycle_node("assistant_helper") # Activar assistant helper
-        self._activate_lifecycle_node("human_face_manager") # Activar human face manager
+        self._activate_lifecycle_node("face_manager") # Activar human face manager
 
     def sancho_prompt_greet_request(self, args_json, mode):
         sancho_prompt_request = SanchoPrompt.Request()

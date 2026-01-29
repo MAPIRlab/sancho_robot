@@ -129,7 +129,10 @@ class SanchoAINode(Node):
 
         # Update chat history
         chat_history.append({"role": "user", "content": text, "id": display_user_id, "name": display_user_name})
-        chat_history.append({"role": "assistant", "content": value["text"]})
+        chat_history.append({"role": "assistant", "content": value["text"]}) # El llm no respeta (lo que pone abajo)
+        # hacer que en el chat history tmb se guarde la emocion y lo que haga falta y en los unknown prompt formatear el chat history para eso
+        # en cada prompt system se formatea como mejor convenga
+
         # Antes guardaba esto asi porque el LLM repetia mejor le hecho de poner response y emotion asi en JSON, si no fallaba mas
         # Lo comento de momento y si resulta que vuelve a fallar mas pues vuelvo a ese formato y ya veo como lo hago
         #chat_history.append({"role": "assistant", "content": json.dumps({"response": value["text"], "emotion": value["emotion"]})})
