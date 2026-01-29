@@ -77,7 +77,6 @@ class NarrowSpaceManager(Node):
             mppi_params.append(self.make_param('FollowPath.PathAlignCritic.weight', 10.0))
             costmap_params.append(self.make_param('inflation_layer.inflation_radius', self.base_inflation))
 
-        # Enviar cambios
         self.send_params(self.controller_client, mppi_params)
         self.send_params(self.costmap_client, costmap_params)
 
