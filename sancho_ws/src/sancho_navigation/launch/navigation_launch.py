@@ -149,7 +149,7 @@ def generate_launch_description():
                 executable="controller_server",
                 name="controller_server",
                 parameters=[controller_params_path],
-                remappings=[("cmd_vel", "cmd_vel_raw")],
+                remappings=[("cmd_vel", "cmd_vel")],
                 output="screen",
                 prefix=prefix_cmd,
                 emulate_tty=True,
