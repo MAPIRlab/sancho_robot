@@ -99,5 +99,5 @@ class SanchoCBF(Node):
 
 def main():
     rclpy.init()
-    rclpy.spin(SanchoDualLidarCBF())
+    rclpy.spin(SanchoCBF())
     rclpy.shutdown()
