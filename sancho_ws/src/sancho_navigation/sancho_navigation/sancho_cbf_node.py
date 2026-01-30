@@ -1,5 +1,6 @@
 import rclpy
 from rclpy.node import Node
+from rclpy.qos import QoSProfile, ReliabilityPolicy
 from geometry_msgs.msg import Twist
 from sensor_msgs.msg import LaserScan
 import numpy as np
@@ -15,67 +16,72 @@ class SanchoCBF(Node):
         self.d_safe = 0.30      # Distancia de seguridad crítica
         self.gamma = 15.0       # Agresividad de la barrera de Ames
         self.lookahead = 0.45   # Horizonte de predicción frontal
+
+        qos_profile = QoSProfile(depth=10, reliability=ReliabilityPolicy.BEST_EFFORT)
         
         # Suscripciones
-        self.create_subscription(LaserScan, '/scan_merged', self.scan_cb, 10)
-        self.create_subscription(Twist, '/cmd_vel_nav2', self.nav_cb, 10)
-        self.pub = self.create_publisher(Twist, '/cmd_vel', 10)
+        self.create_subscription(LaserScan, '/scan_1st', self.scan_cb_1, qos_profile)
+        self.create_subscription(LaserScan, '/scan_2nd', self.scan_cb_2, qos_profile)
+        self.create_subscription(Twist, '/cmd_vel_nav2', self.nav_cb, qos_profile)
+        self.pub = self.create_publisher(Twist, '/cmd_vel', qos_profile)
         
-        self.points_xyz = None # Nube de puntos local
+        self.lidar_points = {'1st': None, '2nd': None} # Nube de puntos local
 
-    def scan_cb(self, msg):
-        # Convertimos el scan (polares) a puntos Cartesianos locales [x, y]
+    def process_scan(self, msg):
+        """ Convierte LaserScan a coordenadas cartesianas locales """
         ranges = np.array(msg.ranges)
         angles = np.linspace(msg.angle_min, msg.angle_max, len(ranges))
         
-        # Filtramos lecturas válidas
-        mask = (ranges > 0.05) & (ranges < 3.0)
+        # Filtro de seguridad: descartar ceros e infinitos
+        mask = (ranges > msg.range_min) & (ranges < 4.0) # Miramos hasta 4m
         r = ranges[mask]
         a = angles[mask]
         
-        # Transformación a coordenadas del robot (x adelante, y izquierda)
-        self.points_xyz = np.column_stack((r * np.cos(a), r * np.sin(a)))
+        # Convertir a XY (Asumiendo que los frames laser_front/back están bien en el TF)
+        # Si no tienes transformadas activas, aquí proyectamos relativo al sensor
+        return np.column_stack((r * np.cos(a), r * np.sin(a)))
+
+    def scan_cb_1(self, msg):
+        self.lidar_points['1st'] = self.process_scan(msg)
+
+    def scan_cb_2(self, msg):
+        self.lidar_points['2nd'] = self.process_scan(msg)
 
     def nav_cb(self, msg_nav2):
-        if self.points_xyz is None:
+        # Unimos todos los puntos disponibles
+        all_pts = [p for p in self.lidar_points.values() if p is not None]
+        if not all_pts:
             self.pub.publish(msg_nav2)
             return
+        
+        combined_points = np.vstack(all_pts)
 
-        # Puntos críticos del footprint de Sancho
+        # Puntos de control del robot
         check_points = [
             (0.0, 0.0),             # Centro
-            (self.lookahead, 0.0),  # Frente
-            (0.25, 0.22),           # Esquina Delantera Izq
-            (0.25, -0.22)           # Esquina Delantera Der
+            (self.lookahead, 0.0),  # Predicción frontal
+            (0.25, 0.22), (0.25, -0.22), # Esquinas delanteras
+            (-0.25, 0.22), (-0.25, -0.22) # Esquinas traseras
         ]
 
-        # QP: u = [vx, vy, w]
-        P = matrix(np.diag([1.0, 1.2, 0.8])) 
+        # QP: [vx, vy, w]
+        P = matrix(np.diag([1.0, 1.2, 0.8]))
         q = matrix(-np.array([msg_nav2.linear.x, 0.0, msg_nav2.angular.z], dtype=float))
 
-        G_list = []
-        h_list = []
+        G_list, h_list = [], []
 
-        # Para cada punto del robot, buscamos el obstáculo más cercano en el scan
         for px, py in check_points:
-            # Calculamos distancias de este punto de control a TODOS los puntos del LiDAR
-            # dist = sqrt((x_obs - px)^2 + (y_obs - py)^2)
-            dx = self.points_xyz[:, 0] - px
-            dy = self.points_xyz[:, 1] - py
-            distances = np.sqrt(dx**2 + dy**2)
+            # Distancia de este punto del robot a TODOS los puntos de AMBOS lidars
+            dx = combined_points[:, 0] - px
+            dy = combined_points[:, 1] - py
+            dist_sq = dx**2 + dy**2
+            min_idx = np.argmin(dist_sq)
+            d_min = np.sqrt(dist_sq[min_idx])
             
-            min_idx = np.argmin(distances)
-            d_min = distances[min_idx]
-            
-            # h(x) para este punto específico
             h_val = d_min - self.d_safe
-            
-            # Gradiente
             nx = -dx[min_idx] / d_min
             ny = -dy[min_idx] / d_min
 
-            # Restricción de Ames: dot(h) >= -gamma * h^3
-            # nx*vx + ny*vy >= -gamma * h^3  =>  -nx*vx - ny*vy <= gamma * h^3
             G_list.append([-nx, -ny, 0.0])
             h_list.append(self.gamma * (h_val**3))
 
@@ -85,16 +91,13 @@ class SanchoCBF(Node):
         try:
             sol = solvers.qp(P, q, G, h_vec)
             u = sol['x']
-            
             safe_msg = Twist()
-            safe_msg.linear.x = float(u[0])
-            safe_msg.linear.y = float(u[1]) 
-            safe_msg.angular.z = float(u[2])
+            safe_msg.linear.x, safe_msg.linear.y, safe_msg.angular.z = float(u[0]), float(u[1]), float(u[2])
             self.pub.publish(safe_msg)
         except:
             self.pub.publish(Twist())
 
 def main():
     rclpy.init()
-    rclpy.spin(SanchoCBF())
+    rclpy.spin(SanchoDualLidarCBF())
     rclpy.shutdown()
