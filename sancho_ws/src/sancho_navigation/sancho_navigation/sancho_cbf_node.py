@@ -16,6 +16,7 @@ class SanchoCBFNode(Node):
         # Parámetros de la Barrera
         self.d_safe = 0.30  # Distancia mínima (radio robot + margen)
         self.gamma = 1.5    # Agresividad de la barrera
+        self.lookahead = 0.2 # Distancia hacia adelante para "ver" el peligro
         
         self.create_subscription(OccupancyGrid, '/local_costmap/costmap', self.costmap_callback, 10)
         self.create_subscription(Twist, '/cmd_vel_nav2', self.nav2_callback, 10)
@@ -25,6 +26,7 @@ class SanchoCBFNode(Node):
         #self.costmap = None
         self.resolution = 0.05
         self.edf = None
+        self.last_v = 0.0 # Para control de aceleración
 
 
 #    def costmap_callback(self, msg):
@@ -37,24 +39,32 @@ class SanchoCBFNode(Node):
         self.resolution = msg.info.resolution
         
         # Convertir a binario: 1 si es libre, 0 si es obstáculo
-        shape = np.array(msg.data).reshape((msg.info.height, msg.info.width))
-        binary_map = np.where(shape < 50, 1, 0)
+        grid = np.array(msg.data).reshape((msg.info.height, msg.info.width))
+        binary_map = np.where(grid < 50, 1, 0)
 
         # Transformada de Distancia Euclídea
         self.edf = distance_transform_edt(binary_map) * self.resolution
 
     
-    def get_edf_cbf(self):
+    def get_edf_cbf(self, current_v):
         h, w = self.edf.shape
         cy, cx = h // 2, w // 2 # Posición del robot (centro del mapa local)
         
         # h(x) es la distancia leída directamente del EDF en la posición del robot
-        dist_actual = self.edf[cy, cx]
-        h_x = dist_actual - self.d_safe
+        # dist_actual = self.edf[cy, cx]
+        look_idx = int((self.lookahead + abs(current_v) * 0.2)/ self.resolution)
+        target_y = cy + look_idx
+
+        target_y = np.clip(target_y, 1, h-2)
+        target_x = np.clip(cx, 1, w-2)
+        
+        h_x = self.edf[target_y, target_x] - self.d_safe
         
         # Gradiente: miramos la pendiente de la distancia alrededor del robot
-        gx = (self.edf[cy, cx+1] - self.edf[cy, cx-1]) / (2 * self.res)
-        gy = (self.edf[cy+1, cx] - self.edf[cy-1, cx]) / (2 * self.res)
+        gx = (self.edf[target_y, target_x+1] - self.edf[target_y, target_x-1]) / (2 * self.resolution)
+        # gy = (self.edf[target_y+1, target_x] - self.edf[target_y-1, target_x]) / (2 * self.resolution)
+
+        return h_x, gx
 
 #    def get_barrier_data(self):
 #        h, w = self.costmap.shape
@@ -86,7 +96,7 @@ class SanchoCBFNode(Node):
             self.pub.publish(msg_nav2)
             return
 
-        h_x, nx, ny = self.get_edf_cbf()
+        h_x, nx = self.get_edf_cbf(msg_nav2.linear.x)
 
         # --- OPTIMIZACIÓN CUADRÁTICA (QP) ---
         # Queremos min 1/2 * |v - v_nav2|^2
@@ -102,16 +112,28 @@ class SanchoCBFNode(Node):
         try:
             sol = solvers.qp(P, q, G, h)
             v_optimal = sol['x']
+
+            a_max = 0.5 * 0.05
+            v_final = np.clip(float(v_optimal[0]), self.last_v - a_max, self.last_v + a_max)
+            self.last_v = v_final
             
             safe_msg = Twist()
-            safe_msg.linear.x = float(v_optimal[0])
+            safe_msg.linear.x = v_final
             safe_msg.angular.z = float(v_optimal[1])
             
             self.pub.publish(safe_msg)
         except:
-            self.pub.publish(Twist())
+            safe_msg = Twist()
+            safe_msg.linear.x = self.last_v * 0.5 
+            self.last_v = safe_msg.linear.x
+            self.pub.publish(safe_msg)
 
 def main():
     rclpy.init()
-    rclpy.spin(SanchoCBFNode())
+    node = SanchoCBFNode()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    node.destroy_node()
     rclpy.shutdown()
