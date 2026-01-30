@@ -8,83 +8,88 @@ from scipy.ndimage import distance_transform_edt
 
 solvers.options['show_progress'] = False
 
-class SanchoSafetyFilter(Node):
+class SanchoCBF(Node):
     def __init__(self):
-        super().__init__('sancho_safety_filter')
+        super().__init__('sancho_cbf')
         
-        # --- PARÁMETROS ---
-        self.d_safe = 0.29      # Radio del robot + margen mínimo (2-3 cm)
-        self.gamma = 10.0       # Aumentado para que no frene tan pronto (Ames alpha)
-        self.lookahead = 0.05   # Punto de mira muy cercano para no ser conservador
-        self.R_min = 0.45       # Radio de giro mínimo
+        # --- PARÁMETROS DE DISEÑO ---
+        self.d_safe = 0.30      # Margen de seguridad
+        self.gamma = 15.0       # Agresividad de la barrera de control
+        self.lookahead = 0.45   # Horizonte de "visión" para abrirse
         
-        self.create_subscription(OccupancyGrid, '/local_costmap/costmap', self.costmap_callback, 10)
-        self.create_subscription(Twist, '/cmd_vel_nav2', self.nav_callback, 10)
+        self.create_subscription(OccupancyGrid, '/local_costmap/costmap', self.map_cb, 10)
+        self.create_subscription(Twist, '/cmd_vel_nav2', self.nav_cb, 10)
         self.pub = self.create_publisher(Twist, '/cmd_vel', 10)
         
         self.edf = None
-        self.resolution = 0.05
+        self.res = 0.05
 
-    def costmap_callback(self, msg):
-        self.resolution = msg.info.resolution
+    def map_cb(self, msg):
+        self.res = msg.info.resolution
         grid = np.array(msg.data).reshape((msg.info.height, msg.info.width))
-        # Binarización: 1 libre, 0 obstáculo
         binary_map = np.where(grid < 50, 1, 0)
-        self.edf = distance_transform_edt(binary_map) * self.resolution
+        self.edf = distance_transform_edt(binary_map) * self.res
 
-    def get_barrier_constraints(self, v_deseada):
-        h, w = self.edf.shape
-        cy, cx = h // 2, w // 2
+    def get_constraints(self, x_m, y_m):
+        """ Obtiene h(x) y gradiente en coordenadas relativas al robot """
+        h_map, w_map = self.edf.shape
+        idx_x = int(w_map // 2 + x_m / self.res)
+        idx_y = int(h_map // 2 + y_m / self.res)
         
-        look_idx = int(self.lookahead / self.resolution)
-        target_y = np.clip(cy + look_idx, 1, h-2)
-        target_x = cx
+        idx_x = np.clip(idx_x, 1, w_map - 2)
+        idx_y = np.clip(idx_y, 1, h_map - 2)
         
-        h_x = self.edf[target_y, target_x] - self.d_safe
+        h_x = self.edf[idx_y, idx_x] - self.d_safe
+        nx = (self.edf[idx_y + 1, idx_x] - self.edf[idx_y - 1, idx_x]) / (2 * self.res)
+        ny = (self.edf[idx_y, idx_x + 1] - self.edf[idx_y, idx_x - 1]) / (2 * self.res)
         
-        # Gradiente
-        nx = (self.edf[target_y + 1, target_x] - self.edf[target_y - 1, target_x]) / (2 * self.resolution)
-        
-        return h_x, nx
+        return h_x, nx, ny
 
-    def nav_callback(self, msg_nav2):
+    def nav_cb(self, msg_nav2):
         if self.edf is None:
             self.pub.publish(msg_nav2)
             return
 
-        h_x, nx = self.get_barrier_constraints(msg_nav2.linear.x)
+        # Puntos de control: Centro, Frente y Esquinas
+        check_points = [
+            (0.0, 0.0),             # Centro del robot
+            (self.lookahead, 0.0),  # Punto de anticipación frontal
+            (0.25, 0.20),           # Esquina delantera izq
+            (0.25, -0.20)           # Esquina delantera der
+        ]
 
-        # --- QP SOLVER ---
-        P = matrix(np.eye(2, dtype=float))
-        q = matrix(-np.array([msg_nav2.linear.x, msg_nav2.angular.z], dtype=float))
+        # Matriz de costes
+        P = matrix(np.diag([1.0, 1.5, 0.8])) 
+        q = matrix(-np.array([msg_nav2.linear.x, 0.0, msg_nav2.angular.z], dtype=float))
 
-        # Restricción CBF
-        G_list = [[-nx, 0.0]]
-        h_list = [self.gamma * (h_x**3)]
+        G_list = []
+        h_list = []
 
-        if abs(msg_nav2.linear.x) > 0.02:
-            G_list.append([-1.0/self.R_min, 1.0])
-            G_list.append([-1.0/self.R_min, -1.0])
-            h_list.extend([0.0, 0.0])
+        for px, py in check_points:
+            h_val, nx, ny = self.get_constraints(px, py)
+            
+            # Condición de Ames: nx*vx + ny*vy >= -gamma * h^3
+            # Invertimos para el solver G*u <= h:
+            G_list.append([-nx, -ny, 0.0]) 
+            h_list.append(self.gamma * (h_val**3))
 
         G = matrix(np.array(G_list, dtype=float))
-        h_val = matrix(np.array(h_list, dtype=float))
+        h_vec = matrix(np.array(h_list, dtype=float))
 
         try:
-            sol = solvers.qp(P, q, G, h_val)
+            sol = solvers.qp(P, q, G, h_vec)
+            u = sol['x']
             
             safe_msg = Twist()
-            safe_msg.linear.x = float(sol['x'][0])
-            safe_msg.angular.z = float(sol['x'][1])
-            
-            self.get_logger().info(f"h_x: {h_x:.2f} | V_in: {msg_nav2.linear.x:.2f} | V_out: {safe_msg.linear.x:.2f}")
+            safe_msg.linear.x = float(u[0])
+            safe_msg.linear.y = float(u[1])
+            safe_msg.angular.z = float(u[2])
             
             self.pub.publish(safe_msg)
-
         except:
             self.pub.publish(Twist())
 
 def main():
     rclpy.init()
-    rclpy.spin(SanchoSafetyFilter())
+    rclpy.spin(SanchoCBF())
     rclpy.shutdown()
