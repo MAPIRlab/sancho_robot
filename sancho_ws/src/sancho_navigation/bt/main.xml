@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<root BTCPP_format="3"
+      main_tree_to_execute="MainTree">
+  <include path="./auto_loc.xml"/>
+  <include path="./nav_to_pose.xml"/>
+
+  <BehaviorTree ID="MainTree">
+    <Sequence>
+      <SubTree ID="Autolocalization"/>
+      <SubTree ID="Nav2Pose"/>
+    </Sequence>
+  </BehaviorTree>
+
+</root>

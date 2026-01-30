@@ -7,20 +7,20 @@ namespace sancho_bt_plugins
 IsLocalized::IsLocalized(const std::string & name, const BT::NodeConfiguration & config)
 : BT::ConditionNode(name, config)
 {
-  // 1. Obtener el nodo ROS del Blackboard
+  // Obtener el nodo ROS del Blackboard
   if (!config.blackboard->get("node", node_)) {
     // Si no hay nodo, imprimimos error a consola estándar porque no tenemos logger de ROS
     std::cerr << "[IsLocalized] ERROR: No se encontró 'node' en el blackboard." << std::endl;
     return;
   }
 
-  // 2. Obtener el nombre del topic (o usar default)
+  // Obtener el nombre del topic (o usar default)
   std::string topic;
   if (!getInput("topic", topic)) {
     topic = "/amcl_pose";
   }
 
-  // 3. Crear suscripción con QoS de SensorData (mejor rendimiento para sensores)
+  // Crear suscripción al topic de la pose con covarianza
   // Usamos this->mutex_ para proteger la escritura en last_pose_
   subscription_ = node_->create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>(
     topic,
@@ -59,13 +59,8 @@ BT::NodeStatus IsLocalized::tick()
                        last_pose_->pose.covariance[7] +
                        last_pose_->pose.covariance[35];
 
-  // Mensaje de log cada 1s
-  RCLCPP_INFO_THROTTLE(node_->get_logger(), *node_->get_clock(), 1000, 
-      "IsLocalized Check -> Covarianza Actual: %.4f / Umbral: %.4f | Estado: %s", 
-      current_cov, 
-      max_cov,
-      (current_cov < max_cov) ? "OK (Success)" : "ALTA (Failure)");
   std::cout << "IsLocalized Check -> Covarianza Actual: " << current_cov << " / Umbral: " << max_cov << " | Estado: " << (current_cov < max_cov ? "OK (Success)" : "ALTA (Failure)") << std::endl;
+  
   if (current_cov < max_cov) {
     return BT::NodeStatus::SUCCESS;
   } else {
@@ -83,8 +78,7 @@ extern "C" {
   
   void BT_RegisterNodesFromPlugin(BT::BehaviorTreeFactory& factory)
   {
-    std::cout << "\n\n[!!!] LIBRERIA SANCHO_BT_PLUGINS CARGADA CON EXITO [!!!]\n\n" << std::endl;
-    // Registramos tu nodo con el nombre que usas en el XML
+    std::cout << "\n[*] LIBRERIA SANCHO_BT_PLUGINS CARGADA CON EXITO\n" << std::endl;
     factory.registerNodeType<sancho_bt_plugins::IsLocalized>("IsLocalized");
   }
 
