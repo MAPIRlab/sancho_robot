@@ -1,10 +1,9 @@
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
-from nav_msgs.msg import OccupancyGrid
+from sensor_msgs.msg import LaserScan
 import numpy as np
 from cvxopt import matrix, solvers
-from scipy.ndimage import distance_transform_edt
 
 solvers.options['show_progress'] = False
 
@@ -12,65 +11,72 @@ class SanchoCBF(Node):
     def __init__(self):
         super().__init__('sancho_cbf')
         
-        # --- PARÁMETROS DE DISEÑO ---
-        self.d_safe = 0.30      # Margen de seguridad
-        self.gamma = 15.0       # Agresividad de la barrera de control
-        self.lookahead = 0.45   # Horizonte de "visión" para abrirse
+        # Parámetros 
+        self.d_safe = 0.30      # Distancia de seguridad crítica
+        self.gamma = 15.0       # Agresividad de la barrera de Ames
+        self.lookahead = 0.45   # Horizonte de predicción frontal
         
-        self.create_subscription(OccupancyGrid, '/local_costmap/costmap', self.map_cb, 10)
+        # Suscripciones
+        self.create_subscription(LaserScan, '/scan_merged', self.scan_cb, 10)
         self.create_subscription(Twist, '/cmd_vel_nav2', self.nav_cb, 10)
         self.pub = self.create_publisher(Twist, '/cmd_vel', 10)
         
-        self.edf = None
-        self.res = 0.05
+        self.points_xyz = None # Nube de puntos local
 
-    def map_cb(self, msg):
-        self.res = msg.info.resolution
-        grid = np.array(msg.data).reshape((msg.info.height, msg.info.width))
-        binary_map = np.where(grid < 50, 1, 0)
-        self.edf = distance_transform_edt(binary_map) * self.res
-
-    def get_constraints(self, x_m, y_m):
-        """ Obtiene h(x) y gradiente en coordenadas relativas al robot """
-        h_map, w_map = self.edf.shape
-        idx_x = int(w_map // 2 + x_m / self.res)
-        idx_y = int(h_map // 2 + y_m / self.res)
+    def scan_cb(self, msg):
+        # Convertimos el scan (polares) a puntos Cartesianos locales [x, y]
+        ranges = np.array(msg.ranges)
+        angles = np.linspace(msg.angle_min, msg.angle_max, len(ranges))
         
-        idx_x = np.clip(idx_x, 1, w_map - 2)
-        idx_y = np.clip(idx_y, 1, h_map - 2)
+        # Filtramos lecturas válidas
+        mask = (ranges > 0.05) & (ranges < 3.0)
+        r = ranges[mask]
+        a = angles[mask]
         
-        h_x = self.edf[idx_y, idx_x] - self.d_safe
-        nx = (self.edf[idx_y + 1, idx_x] - self.edf[idx_y - 1, idx_x]) / (2 * self.res)
-        ny = (self.edf[idx_y, idx_x + 1] - self.edf[idx_y, idx_x - 1]) / (2 * self.res)
-        
-        return h_x, nx, ny
+        # Transformación a coordenadas del robot (x adelante, y izquierda)
+        self.points_xyz = np.column_stack((r * np.cos(a), r * np.sin(a)))
 
     def nav_cb(self, msg_nav2):
-        if self.edf is None:
+        if self.points_xyz is None:
             self.pub.publish(msg_nav2)
             return
 
-        # Puntos de control: Centro, Frente y Esquinas
+        # Puntos críticos del footprint de Sancho
         check_points = [
-            (0.0, 0.0),             # Centro del robot
-            (self.lookahead, 0.0),  # Punto de anticipación frontal
-            (0.25, 0.20),           # Esquina delantera izq
-            (0.25, -0.20)           # Esquina delantera der
+            (0.0, 0.0),             # Centro
+            (self.lookahead, 0.0),  # Frente
+            (0.25, 0.22),           # Esquina Delantera Izq
+            (0.25, -0.22)           # Esquina Delantera Der
         ]
 
-        # Matriz de costes
-        P = matrix(np.diag([1.0, 1.5, 0.8])) 
+        # QP: u = [vx, vy, w]
+        P = matrix(np.diag([1.0, 1.2, 0.8])) 
         q = matrix(-np.array([msg_nav2.linear.x, 0.0, msg_nav2.angular.z], dtype=float))
 
         G_list = []
         h_list = []
 
+        # Para cada punto del robot, buscamos el obstáculo más cercano en el scan
         for px, py in check_points:
-            h_val, nx, ny = self.get_constraints(px, py)
+            # Calculamos distancias de este punto de control a TODOS los puntos del LiDAR
+            # dist = sqrt((x_obs - px)^2 + (y_obs - py)^2)
+            dx = self.points_xyz[:, 0] - px
+            dy = self.points_xyz[:, 1] - py
+            distances = np.sqrt(dx**2 + dy**2)
             
-            # Condición de Ames: nx*vx + ny*vy >= -gamma * h^3
-            # Invertimos para el solver G*u <= h:
-            G_list.append([-nx, -ny, 0.0]) 
+            min_idx = np.argmin(distances)
+            d_min = distances[min_idx]
+            
+            # h(x) para este punto específico
+            h_val = d_min - self.d_safe
+            
+            # Gradiente
+            nx = -dx[min_idx] / d_min
+            ny = -dy[min_idx] / d_min
+
+            # Restricción de Ames: dot(h) >= -gamma * h^3
+            # nx*vx + ny*vy >= -gamma * h^3  =>  -nx*vx - ny*vy <= gamma * h^3
+            G_list.append([-nx, -ny, 0.0])
             h_list.append(self.gamma * (h_val**3))
 
         G = matrix(np.array(G_list, dtype=float))
@@ -82,9 +88,8 @@ class SanchoCBF(Node):
             
             safe_msg = Twist()
             safe_msg.linear.x = float(u[0])
-            safe_msg.linear.y = float(u[1])
+            safe_msg.linear.y = float(u[1]) 
             safe_msg.angular.z = float(u[2])
-            
             self.pub.publish(safe_msg)
         except:
             self.pub.publish(Twist())
