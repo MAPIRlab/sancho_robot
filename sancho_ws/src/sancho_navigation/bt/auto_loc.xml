@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
+<?xml version="1.0"?>
 <root BTCPP_format="3"
       main_tree_to_execute="AutoLocalization">
   <BehaviorTree ID="AutoLocalization">
@@ -11,9 +11,8 @@
         <RetryUntilSuccessful num_attempts="10">
           <Sequence>
             <Spin spin_dist="3.14"
-                  time_allowance=""
-                  server_name=""
-                  server_timeout=""/>
+                  time_allowance="10.0"/>
+            <Wait wait_duration="5.0"/>
             <IsLocalized max_covariance="0.1"
                          topic="/amcl_pose"/>
           </Sequence>

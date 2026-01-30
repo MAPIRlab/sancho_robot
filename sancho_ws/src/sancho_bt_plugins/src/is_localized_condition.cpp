@@ -14,6 +14,9 @@ IsLocalized::IsLocalized(const std::string & name, const BT::NodeConfiguration &
     return;
   }
 
+  std::cout << "[IsLocalized] Constructor called for node: " << name << std::endl;
+
+
   // Obtener el nombre del topic (o usar default)
   std::string topic;
   if (!getInput("topic", topic)) {
@@ -41,11 +44,14 @@ BT::PortsList IsLocalized::providedPorts()
 
 BT::NodeStatus IsLocalized::tick()
 {
+  std::cout << "[IsLocalized] TICK" << std::endl;
+
   // Bloqueamos el mutex para leer de forma segura
   std::lock_guard<std::mutex> lock(mutex_);
 
   if (!last_pose_) {
     // Aún no hemos recibido datos
+    std::cout << "[IsLocalized] No pose data received yet." << std::endl;
     return BT::NodeStatus::FAILURE;
   }
 
@@ -59,6 +65,7 @@ BT::NodeStatus IsLocalized::tick()
                        last_pose_->pose.covariance[7] +
                        last_pose_->pose.covariance[35];
 
+  // Loggeamos la covarianza
   std::cout << "IsLocalized Check -> Covarianza Actual: " << current_cov << " / Umbral: " << max_cov << " | Estado: " << (current_cov < max_cov ? "OK (Success)" : "ALTA (Failure)") << std::endl;
   
   if (current_cov < max_cov) {

@@ -15,14 +15,10 @@
           <RecoveryNode name="ComputePathToPose"
                         number_of_retries="1">
             <ComputePathToPose goal="{goal}"
-                               start=""
                                planner_id="{selected_planner}"
-                               server_name=""
-                               server_timeout=""
                                path="{path}"/>
             <ClearEntireCostmap name="ClearGlobalCostmap-Context"
-                                service_name="global_costmap/clear_entirely_global_costmap"
-                                server_timeout=""/>
+                                service_name="global_costmap/clear_entirely_global_costmap"/>
           </RecoveryNode>
         </RateController>
         <ReactiveSequence name="MonitorAndFollowPath">
@@ -31,25 +27,17 @@
                                 length_factor="2.0">
             <RetryUntilSuccessful num_attempts="1">
               <Sequence name="CancelingControlAndWait">
-                <CancelControl name="ControlCancel"
-                               server_name=""
-                               server_timeout=""/>
-                <Wait wait_duration="5.0"
-                      server_name=""
-                      server_timeout=""/>
+                <CancelControl name="ControlCancel"/>
+                <Wait wait_duration="5.0"/>
               </Sequence>
             </RetryUntilSuccessful>
           </PathLongerOnApproach>
           <RecoveryNode name="FollowPath"
                         number_of_retries="1">
             <FollowPath controller_id="{selected_controller}"
-                        path="{path}"
-                        goal_checker_id=""
-                        server_name=""
-                        server_timeout=""/>
+                        path="{path}"/>
             <ClearEntireCostmap name="ClearLocalCostmap-Context"
-                                service_name="local_costmap/clear_entirely_local_costmap"
-                                server_timeout=""/>
+                                service_name="local_costmap/clear_entirely_local_costmap"/>
           </RecoveryNode>
         </ReactiveSequence>
       </PipelineSequence>
@@ -58,24 +46,14 @@
         <RoundRobin name="RecoveryActions">
           <Sequence name="ClearingActions">
             <ClearEntireCostmap name="ClearLocalCostmap-Subtree"
-                                service_name="local_costmap/clear_entirely_local_costmap"
-                                server_timeout=""/>
+                                service_name="local_costmap/clear_entirely_local_costmap"/>
             <ClearEntireCostmap name="ClearGlobalCostmap-Subtree"
-                                service_name="global_costmap/clear_entirely_global_costmap"
-                                server_timeout=""/>
+                                service_name="global_costmap/clear_entirely_global_costmap"/>
           </Sequence>
-          <Spin spin_dist="1.57"
-                time_allowance=""
-                server_name=""
-                server_timeout=""/>
-          <Wait wait_duration="5.0"
-                server_name=""
-                server_timeout=""/>
+          <Spin spin_dist="1.57"/>
+          <Wait wait_duration="5.0"/>
           <BackUp backup_dist="0.30"
-                  backup_speed="0.15"
-                  time_allowance=""
-                  server_name=""
-                  server_timeout=""/>
+                  backup_speed="0.15"/>
         </RoundRobin>
       </ReactiveFallback>
     </RecoveryNode>
