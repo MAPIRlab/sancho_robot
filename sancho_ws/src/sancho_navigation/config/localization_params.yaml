@@ -5,8 +5,8 @@ amcl:
     base_frame_id: "base_footprint"
     scan_topic: "/scan_merged"
     map_topic: "/map"
-    min_particles: 1000
-    max_particles: 8000
+    min_particles: 5000
+    max_particles: 30000
     alpha1: 0.2
     alpha2: 0.2
     alpha3: 0.2

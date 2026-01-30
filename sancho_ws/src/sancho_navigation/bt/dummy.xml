@@ -1,0 +1,11 @@
+<root main_tree_to_execute="MainTree">
+  <BehaviorTree ID="MainTree">
+
+    <RetryUntilSuccessful num_attempts="-1">
+      <Spin
+        spin_dist="-1.785"
+        time_allowance="5"/>
+    </RetryUntilSuccessful>
+
+  </BehaviorTree>
+</root>

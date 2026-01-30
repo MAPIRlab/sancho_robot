@@ -65,7 +65,7 @@ BT::NodeStatus IsLocalized::tick()
       current_cov, 
       max_cov,
       (current_cov < max_cov) ? "OK (Success)" : "ALTA (Failure)");
-
+  std::cout << "IsLocalized Check -> Covarianza Actual: " << current_cov << " / Umbral: " << max_cov << " | Estado: " << (current_cov < max_cov ? "OK (Success)" : "ALTA (Failure)") << std::endl;
   if (current_cov < max_cov) {
     return BT::NodeStatus::SUCCESS;
   } else {
@@ -75,9 +75,17 @@ BT::NodeStatus IsLocalized::tick()
 
 }  // namespace sancho_bt_plugins
 
-// --- REGISTRO DEL PLUGIN ---
-// Esto permite que el BT Navigator encuentre tu clase "IsLocalized"
-BT_REGISTER_NODES(factory)
-{
-  factory.registerNodeType<sancho_bt_plugins::IsLocalized>("IsLocalized");
+// --- REGISTRO DEL PLUGIN (FORMA MANUAL Y ROBUSTA) ---
+
+// Usamos extern "C" para que el compilador no cambie el nombre de la función
+// y Nav2 pueda encontrar el símbolo "BT_RegisterNodesFromPlugin"
+extern "C" {
+  
+  void BT_RegisterNodesFromPlugin(BT::BehaviorTreeFactory& factory)
+  {
+    std::cout << "\n\n[!!!] LIBRERIA SANCHO_BT_PLUGINS CARGADA CON EXITO [!!!]\n\n" << std::endl;
+    // Registramos tu nodo con el nombre que usas en el XML
+    factory.registerNodeType<sancho_bt_plugins::IsLocalized>("IsLocalized");
+  }
+
 }
