@@ -22,8 +22,8 @@ class SanchoCBF(Node):
         # Suscripciones
         self.create_subscription(LaserScan, '/scan_1st', self.scan_cb_1, qos_profile)
         self.create_subscription(LaserScan, '/scan_2nd', self.scan_cb_2, qos_profile)
-        self.create_subscription(Twist, '/cmd_vel_nav2', self.nav_cb, qos_profile)
-        self.pub = self.create_publisher(Twist, '/cmd_vel', qos_profile)
+        self.create_subscription(Twist, '/cmd_vel_nav2', self.nav_cb, 10)
+        self.pub = self.create_publisher(Twist, '/cmd_vel', 10)
         
         self.lidar_points = {'1st': None, '2nd': None} # Nube de puntos local
 
