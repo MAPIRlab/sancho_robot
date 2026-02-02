@@ -37,7 +37,7 @@ controller_server:
       # --- ANTI-OSCILACIÓN EN ROTATION SHIM ---
       # Engancha el modo rotación con margen y no lo suelta hasta estar bien alineado
       angular_dist_threshold: 1.20         # antes 1.00
-      angular_disengage_threshold: 0.40    # antes 0.95 (¡histeresis grande!)
+      angular_disengage_threshold: 0.20    # antes 0.95 (¡histeresis grande!)
       rotate_to_heading_angular_vel: 1.0   # antes 1.0 (menos sobrepaso)
       max_angular_accel: 3.0               # antes 3.0 (menos vaivén)
       simulate_ahead_time: 0.0             # antes 1.0 (no “adivinar” la pose futura)

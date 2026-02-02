@@ -28,6 +28,7 @@ setup(
         'console_scripts': [
             'roaming_node = sancho_navigation.roaming_node:main',
             'sancho_cbf_node = sancho_navigation.sancho_cbf_node:main',
+            'semantic_scan_filter = sancho_navigation.semantic_scan_filter:main',
         ],
     },
 )
