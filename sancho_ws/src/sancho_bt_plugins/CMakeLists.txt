@@ -1,12 +1,6 @@
 cmake_minimum_required(VERSION 3.8)
 project(sancho_bt_plugins)
 
-# Nav2 Humble requiere C++17
-if(NOT CMAKE_CXX_STANDARD)
-  set(CMAKE_CXX_STANDARD 17)
-  set(CMAKE_CXX_STANDARD_REQUIRED ON)
-endif()
-
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
@@ -23,17 +17,14 @@ add_library(sancho_bt_plugins SHARED
   src/is_localized_condition.cpp
 )
 
-# --- AÑADIDO IMPORTANTE: Evitar que el linker elimine símbolos ---
-if(UNIX)
-  # Evita que se oculten los símbolos del plugin
-  target_compile_options(sancho_bt_plugins PRIVATE -fvisibility=default)
-endif()
-
 # 3. Incluir directorios de cabecera
 target_include_directories(sancho_bt_plugins PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
 )
+
+# Definición importante para registrar correctamente nodos custom
+target_compile_definitions(sancho_bt_plugins PRIVATE BT_PLUGIN_EXPORT)
 
 # 4. Vincular librerías (Linker)
 ament_target_dependencies(sancho_bt_plugins

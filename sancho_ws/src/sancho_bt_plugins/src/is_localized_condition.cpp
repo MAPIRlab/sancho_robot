@@ -1,5 +1,4 @@
 #include "sancho_bt_plugins/is_localized_condition.hpp"
-#include "behaviortree_cpp_v3/bt_factory.h"
 
 namespace sancho_bt_plugins
 {
@@ -9,13 +8,9 @@ IsLocalized::IsLocalized(const std::string & name, const BT::NodeConfiguration &
 {
   // Obtener el nodo ROS del Blackboard
   if (!config.blackboard->get("node", node_)) {
-    // Si no hay nodo, imprimimos error a consola estándar porque no tenemos logger de ROS
-    std::cerr << "[IsLocalized] ERROR: No se encontró 'node' en el blackboard." << std::endl;
+    std::cerr << "[IsLocalized] ERROR: Couldn't find 'node' in blackboard." << std::endl;
     return;
   }
-
-  std::cout << "[IsLocalized] Constructor called for node: " << name << std::endl;
-
 
   // Obtener el nombre del topic (o usar default)
   std::string topic;
@@ -23,31 +18,50 @@ IsLocalized::IsLocalized(const std::string & name, const BT::NodeConfiguration &
     topic = "/amcl_pose";
   }
 
+  // Crear Callback Group que NO se asocia automáticamente al nodo (false)
+  callback_group_ = node_->create_callback_group(
+    rclcpp::CallbackGroupType::MutuallyExclusive, 
+    false); // <--- IMPORTANTE: false
+
+  // Añadir el grupo a NUESTRO ejecutor local
+  callback_group_executor_.add_callback_group(
+    callback_group_, 
+    node_->get_node_base_interface());
+
+  // Configurar las opciones de suscripción para usar ese grupo
+  rclcpp::SubscriptionOptions sub_options;
+  sub_options.callback_group = callback_group_;
+
   // Crear suscripción al topic de la pose con covarianza
-  // Usamos this->mutex_ para proteger la escritura en last_pose_
+  rclcpp::QoS qos_profile(10);
+  qos_profile.reliability(rclcpp::ReliabilityPolicy::Reliable);
+  qos_profile.durability(rclcpp::DurabilityPolicy::Volatile);
+
   subscription_ = node_->create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>(
     topic,
-    rclcpp::SensorDataQoS(),
-    [this](const geometry_msgs::msg::PoseWithCovarianceStamped::SharedPtr msg) {
-      std::lock_guard<std::mutex> lock(mutex_);
-      last_pose_ = msg;
-    });
+    qos_profile,
+    std::bind(&IsLocalized::poseCallback, this, std::placeholders::_1),
+    sub_options
+  );
+}
+
+void IsLocalized::poseCallback(const geometry_msgs::msg::PoseWithCovarianceStamped::SharedPtr msg)
+{
+  std::cout << "[IsLocalized] Pose received" << std::endl;
+  last_pose_ = msg;
 }
 
 BT::PortsList IsLocalized::providedPorts()
 {
   return {
-    BT::InputPort<double>("max_covariance", 0.10, "Umbral máximo de incertidumbre (x+y+yaw)"),
-    BT::InputPort<std::string>("topic", "/amcl_pose", "Topic de pose con covarianza")
+    BT::InputPort<double>("max_covariance", 0.10, "Maximun pose cavariance allowed (x+y+yaw)"),
+    BT::InputPort<std::string>("topic", "/amcl_pose", "Pose with covariance topic")
   };
 }
 
 BT::NodeStatus IsLocalized::tick()
 {
-  std::cout << "[IsLocalized] TICK" << std::endl;
-
-  // Bloqueamos el mutex para leer de forma segura
-  std::lock_guard<std::mutex> lock(mutex_);
+  callback_group_executor_.spin_some(std::chrono::milliseconds(10));
 
   if (!last_pose_) {
     // Aún no hemos recibido datos
@@ -66,27 +80,18 @@ BT::NodeStatus IsLocalized::tick()
                        last_pose_->pose.covariance[35];
 
   // Loggeamos la covarianza
-  std::cout << "IsLocalized Check -> Covarianza Actual: " << current_cov << " / Umbral: " << max_cov << " | Estado: " << (current_cov < max_cov ? "OK (Success)" : "ALTA (Failure)") << std::endl;
+  std::cout << "[IsLocalized] Current Covariance: " << current_cov << " / Max Covariance: " << max_cov << " | State: " << (current_cov < max_cov ? "OK (Success)" : "ALTA (Failure)") << std::endl;
   
-  if (current_cov < max_cov) {
-    return BT::NodeStatus::SUCCESS;
-  } else {
-    return BT::NodeStatus::FAILURE;
-  }
+  return (current_cov < max_cov)? BT::NodeStatus::SUCCESS : BT::NodeStatus::FAILURE;
 }
 
 }  // namespace sancho_bt_plugins
 
-// --- REGISTRO DEL PLUGIN (FORMA MANUAL Y ROBUSTA) ---
+// --- REGISTRO DEL PLUGIN ---
+#include "behaviortree_cpp_v3/bt_factory.h"
 
-// Usamos extern "C" para que el compilador no cambie el nombre de la función
-// y Nav2 pueda encontrar el símbolo "BT_RegisterNodesFromPlugin"
-extern "C" {
-  
-  void BT_RegisterNodesFromPlugin(BT::BehaviorTreeFactory& factory)
-  {
-    std::cout << "\n[*] LIBRERIA SANCHO_BT_PLUGINS CARGADA CON EXITO\n" << std::endl;
-    factory.registerNodeType<sancho_bt_plugins::IsLocalized>("IsLocalized");
-  }
-
+BT_REGISTER_NODES(factory)
+{
+  std::cout << "[IsLocalized] Library loaded" << std::endl;
+  factory.registerNodeType<sancho_bt_plugins::IsLocalized>("IsLocalized");
 }

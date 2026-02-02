@@ -82,7 +82,7 @@ def generate_launch_description():
 
     declare_bt_xml_cmd = DeclareLaunchArgument(
         'default_nav_to_pose_bt_xml',
-        default_value=os.path.join(pkg_share, 'bt', 'auto_loc.xml'),
+        default_value=os.path.join(pkg_share, 'bt', 'main.xml'),
         description='Full path to the behavior tree xml file to use'
     )
 
