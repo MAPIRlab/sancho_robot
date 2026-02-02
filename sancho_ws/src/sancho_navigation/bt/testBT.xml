@@ -6,50 +6,42 @@
         <PlannerSelector selected_planner="{selected_planner}" default_planner="GridBased" topic_name="planner_selector"/>
         
         <RateController hz="1.0">
-          <RecoveryNode number_of_retries="1" name="ComputePathToPose">
+          <RecoveryNode number_of_retries="3" name="ComputePathToPose">
             <ComputePathToPose goal="{goal}" path="{path}" planner_id="{selected_planner}" />
             <ClearEntireCostmap name="ClearGlobalCostmap-Context" service_name="global_costmap/clear_entirely_global_costmap"/>
           </RecoveryNode>
         </RateController>
 
         <ReactiveSequence name="MonitorAndFollowPath">
-          <!-- <PathLongerOnApproach path="{path}" prox_len="3.0" length_factor="4.0">
-            <RetryUntilSuccessful num_attempts="1">
-              <Sequence name="CancelingControlAndWait">
-                <CancelControl name="ControlCancel"/>
-                <Wait wait_duration="3.0"/>
-              </Sequence>
-            </RetryUntilSuccessful>
-          </PathLongerOnApproach> -->
-
-          <RecoveryNode number_of_retries="2" name="FollowPath">
-            <RetryUntilSuccessful num_attempts="3">
-              <FollowPath path="{path}" controller_id="{selected_controller}"/>
-            </RetryUntilSuccessful>
-            <ClearEntireCostmap name="ClearLocalCostmap-Context" service_name="local_costmap/clear_entirely_local_costmap"/>
-          </RecoveryNode>
+          <Inverter>
+            <IsStuck/>
+          </Inverter>
+          <Sequence name="PathFollowingWithTruncation">
+            <TruncatePath distance="1.0" input_path="{path}" output_path="{truncated_path}"/>
+            <RecoveryNode number_of_retries="4" name="FollowPath">
+              <FollowPath path="{truncated_path}" controller_id="{selected_controller}"/>
+              <ClearEntireCostmap name="ClearLocalCostmap-Context" service_name="local_costmap/clear_entirely_local_costmap"/>
+            </RecoveryNode>
+          </Sequence>
         </ReactiveSequence>
       </PipelineSequence>
 
       <ReactiveFallback name="RecoveryFallback">
         <GoalUpdated/>
-        <Sequence>
-          <BackUp backup_dist="0.30" backup_speed="0.10" />
-          <Wait wait_duration="2.0" name="WaitRecovery"/>
-          <ClearEntireCostmap name="ClearGlobalCostmap-Subtree" service_name="global_costmap/clear_entirely_global_costmap"/>
-          <ClearEntireCostmap name="ClearLocalCostmap-Subtree" service_name="local_costmap/clear_entirely_local_costmap"/>
-        </Sequence>
-        <!-- <RoundRobin name="RecoveryActions">
-          <Wait wait_duration="2.0" name="WaitRecovery"/>
-          
+        <RoundRobin name="RecoveryActions">
           <Sequence name="ClearingActions">
             <ClearEntireCostmap name="ClearLocalCostmap-Subtree" service_name="local_costmap/clear_entirely_local_costmap"/>
             <ClearEntireCostmap name="ClearGlobalCostmap-Subtree" service_name="global_costmap/clear_entirely_global_costmap"/>
+            <Wait wait_duration="1.0" name="WaitAfterClear"/>
           </Sequence>
-          
-          <Spin spin_dist="0.78"/> 
-          <BackUp backup_dist="0.30" backup_speed="0.10"/>
-        </RoundRobin> -->
+          <Spin spin_dist="1.57" name="SpinRecovery"/>
+          <Wait wait_duration="5.0" name="WaitRecovery"/>
+          <BackUp backup_dist="0.15" backup_speed="0.05" name="BackUpRecovery"/>
+          <Sequence name="RelocalizationRecovery">
+            <ReinitializeGlobalLocalization name="ReinitLocalization"/>
+            <Wait wait_duration="2.0" name="WaitAfterReinit"/>
+          </Sequence>
+        </RoundRobin>
       </ReactiveFallback>
     </RecoveryNode>
   </BehaviorTree>
