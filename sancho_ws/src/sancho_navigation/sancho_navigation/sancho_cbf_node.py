@@ -15,11 +15,11 @@ class SanchoCBF(Node):
         super().__init__('sancho_cbf')
         
         # Declare Parameters
-        self.declare_parameter('d_safe', 0.20)  # Reduced for closer following
-        self.declare_parameter('gamma_cbf', 5.0)  # Linear gain for smoother response
-        self.declare_parameter('gamma_adapt', 0.05)
-        self.declare_parameter('hopfield_eta', 0.005) # Increased learning rate for solver
-        self.declare_parameter('hopfield_rho', 150.0)
+        self.declare_parameter('d_safe', 0.20)  
+        self.declare_parameter('gamma_cbf', 1.5)  # Reduced for fluid movement
+        self.declare_parameter('gamma_adapt', 0.01) # Reduced for stability
+        self.declare_parameter('hopfield_eta', 0.001) # Lowered for smoother convergence
+        self.declare_parameter('hopfield_rho', 50.0) # Lowered penalty for softer constraints
         self.declare_parameter('min_turning_radius', 0.4764)
         
         # ROS 2 Parameters
@@ -72,35 +72,30 @@ class SanchoCBF(Node):
             (0.375, 0.275), (0.375, -0.275),   # Front corners
             (0.0, 0.275),   (0.0, -0.275),     # Sides
             (-0.375, 0.275), (-0.375, -0.275), # Back corners
-            (0.45, 0.0)                        # Virtual Front bumper
+            (0.40, 0.0)                        # Virtual Front bumper (retracted)
         ]
         
         # ACKERMANN MODEL: u = [v, omega]
         u_nom = np.array([msg_nav2.linear.x, msg_nav2.angular.z])
         
         # QP objective: minimize ||u - u_nom||^2
-        # We weigh rotational changes less to keep orientation stable
-        Q_qp = np.diag([1.0, 0.5])
+        # Softened weights to allow fluid path deviations
+        Q_qp = np.diag([2.0, 4.0]) 
         c_qp = -Q_qp @ u_nom
         G_list, h_list = [], []
         
         # 1. ACKERMANN STEERING CONSTRAINTS: |omega| <= |v|/R_min
-        # Linearized around v_nom to keep it a standard QP
-        v_abs_base = max(abs(u_nom[0]), 0.1) 
+        # We allow a small epsilon to avoid issues at zero velocity
+        v_limit = max(abs(u_nom[0]), 0.05) 
         k_max = 1.0 / self.r_min
+        w_max_limit = v_limit * k_max
         
-        # G @ u <= h  =>  [ -k_max,  1 ] * [v, w] <= 0
-        #                 [ -k_max, -1 ] * [v, w] <= 0
-        if u_nom[0] >= 0:
-            G_list.append(np.array([-k_max, 1.0]))
-            h_list.append(0.0)
-            G_list.append(np.array([-k_max, -1.0]))
-            h_list.append(0.0)
-        else:
-            G_list.append(np.array([k_max, 1.0]))
-            h_list.append(0.0)
-            G_list.append(np.array([k_max, -1.0]))
-            h_list.append(0.0)
+        # G @ u <= h  =>  [ 0,  1 ] * [v, w] <= w_max_limit
+        #                 [ 0, -1 ] * [v, w] <= w_max_limit
+        G_list.append(np.array([0.0, 1.0]))
+        h_list.append(w_max_limit)
+        G_list.append(np.array([0.0, -1.0]))
+        h_list.append(w_max_limit)
 
         # 2. CBF SAFETY CONSTRAINTS
         dot_theta_hat_sum = 0.0
@@ -111,31 +106,30 @@ class SanchoCBF(Node):
             min_idx = np.argmin(dist_sq)
             d_min = np.sqrt(dist_sq[min_idx])
             
-            # Normal vector from obstacle to point on robot (in robot frame)
+            # CBF activation threshold: 2.0 * d_safe is a good transition zone
+            if d_min > 0.4:
+                continue
+                
             nx = -dx[min_idx] / d_min
             ny = -dy[min_idx] / d_min
             
-            # Control Lie derivative Lg_h for Ackermann:
-            # point velocity: [v - omega*py, omega*px]
-            # dot_d = nx * (v - omega*py) + ny * (omega*px)
-            # dot_d = [nx] * v + [ny*px - nx*py] * omega
+            # Control Lie derivative Lg_h for Ackermann
             Lg_h = np.array([nx, ny*px - nx*py])
             
-            # Adaptive CBF: h_val = d - d_safe
             h_val = d_min - self.d_safe
             
-            # Adaptive constraint: Lg_h * u >= -gamma * h - LDelta_h * theta_hat
-            # We assume uncertainty affects linear velocity
+            # Cubic barrier: -gamma * h^3 makes the repulsion force practically ZERO
+            # when safe, but rises SHARPLY near the boundary.
             LDelta_h = nx * u_nom[0]
-            rhs = -self.gamma_cbf * h_val - LDelta_h * self.theta_hat
+            rhs = -self.gamma_cbf * (h_val**3) - LDelta_h * self.theta_hat
             
             G_list.append(-Lg_h)
             h_list.append(-rhs)
             
             dot_theta_hat_sum += self.gamma_adapt * LDelta_h * h_val
 
-        # Update parameter estimate
-        self.theta_hat += dot_theta_hat_sum * 0.05 
+        # Update parameter estimate (small gain to avoid oscillation)
+        self.theta_hat += dot_theta_hat_sum * 0.01 
         
         # Solve with Hopfield Solver
         solver = HopfieldQPSolver(Q_qp, c_qp, G=np.array(G_list), h=np.array(h_list))
