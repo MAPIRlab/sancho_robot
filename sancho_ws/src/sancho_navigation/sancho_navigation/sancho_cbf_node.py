@@ -53,7 +53,7 @@ class SanchoCBF(Node):
         ranges = np.array(msg.ranges)
         angles = np.linspace(msg.angle_min, msg.angle_max, len(ranges))
         mask = (ranges > 0.05) & (ranges < 3.5)
-        pts = np.column_stack((ranges[mask]*np.cos(angles), ranges[mask]*np.sin(angles)))
+        pts = np.column_stack((ranges[mask]*np.cos(angles[mask]), ranges[mask]*np.sin(angles[mask])))
         self.lidar_points[lidar_id] = pts
 
     def nav_cb(self, msg_nav2):
