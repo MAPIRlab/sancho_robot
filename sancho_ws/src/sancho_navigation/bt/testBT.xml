@@ -2,7 +2,7 @@
   <BehaviorTree ID="MainTree">
     <RecoveryNode number_of_retries="6" name="NavigateRecovery">
       <PipelineSequence name="NavigateWithReplanning">
-        <ControllerSelector selected_controller="{selected_controller}" default_controller="GeneralMPPI" topic_name="controller_selector"/>
+        <ControllerSelector selected_controller="GeneralMPPI" default_controller="GeneralMPPI" topic_name="controller_selector"/>
         <PlannerSelector selected_planner="{selected_planner}" default_planner="GridBased" topic_name="planner_selector"/>
         
         <RateController hz="1.0">
@@ -18,8 +18,8 @@
           </Inverter>
           <Sequence name="PathFollowingWithTruncation">
             <TruncatePath distance="1.0" input_path="{path}" output_path="{truncated_path}"/>
-            <RecoveryNode number_of_retries="4" name="FollowPath">
-              <FollowPath path="{truncated_path}" controller_id="{selected_controller}"/>
+            <RecoveryNode number_of_retries="4" name="GeneralMPPI">
+              <FollowPath path="{truncated_path}" controller_id="GeneralMPPI"/>
               <ClearEntireCostmap name="ClearLocalCostmap-Context" service_name="local_costmap/clear_entirely_local_costmap"/>
             </RecoveryNode>
           </Sequence>

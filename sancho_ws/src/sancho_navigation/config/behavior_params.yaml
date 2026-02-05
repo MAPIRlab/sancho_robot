@@ -5,7 +5,7 @@ bt_navigator:
     robot_base_frame: base_footprint
     odom_topic: /odom
     bt_loop_duration: 50
-    default_server_timeout: 10
+    default_server_timeout: 5000
     enable_groot_monitoring: True
     groot_zmq_publisher_port: 1666
     groot_zmq_server_port: 1667
@@ -13,9 +13,9 @@ bt_navigator:
     # This should be overwritten by launch file argument, but providing a safe default relative to share dir logic is hard in YAML.
     # We will rely on the launch file to provide 'default_nav_to_pose_bt_xml' via param substitution.
     # If strictly needed here for fallback, we would keep it, but stripped of user path.
-    # default_nav_to_pose_bt_xml: "..." 
-    #default_nav_to_pose_bt_xml: "home/mapir/sancho_ws/src/sancho_navigation/bt/testIsLocalized.xml"
-    
+    # default_nav_to_pose_bt_xml: "home/mapir/sancho_robot/sancho_ws/src/sancho_navigation/bt/dummy.xml"
+    default_nav_to_pose_bt_xml: ""
+
     plugin_lib_names:
       - nav2_compute_path_to_pose_action_bt_node
       # - nav2_smac_planner
@@ -51,7 +51,7 @@ bt_navigator:
       - nav2_planner_selector_bt_node
       - nav2_controller_selector_bt_node
       - nav2_goal_checker_selector_bt_node
-      #- "sancho_bt_plugins" # Nodo personalizado para autolocalización
+      - sancho_bt_plugins # Nodo personalizado para autolocalización
 
 behavior_server:
   ros__parameters:
