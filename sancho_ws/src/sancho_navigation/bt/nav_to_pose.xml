@@ -6,7 +6,7 @@
                   number_of_retries="6">
       <PipelineSequence name="NavigateWithReplanning">
         <ControllerSelector topic_name="controller_selector"
-                            default_controller="FollowPath"
+                            default_controller="GeneralMPPI"
                             selected_controller="{selected_controller}"/>
         <PlannerSelector topic_name="planner_selector"
                          default_planner="GridBased"
@@ -28,12 +28,12 @@
             <RetryUntilSuccessful num_attempts="1">
               <Sequence name="CancelingControlAndWait">
                 <CancelControl name="ControlCancel"/>
-                <Wait wait_duration="5.0"/>
+                <Wait wait_duration="3.0"/>
               </Sequence>
             </RetryUntilSuccessful>
           </PathLongerOnApproach>
           <RecoveryNode name="FollowPath"
-                        number_of_retries="1">
+                        number_of_retries="6">
             <FollowPath controller_id="{selected_controller}"
                         path="{path}"/>
             <ClearEntireCostmap name="ClearLocalCostmap-Context"
@@ -41,6 +41,7 @@
           </RecoveryNode>
         </ReactiveSequence>
       </PipelineSequence>
+
       <ReactiveFallback name="RecoveryFallback">
         <GoalUpdated/>
         <RoundRobin name="RecoveryActions">
@@ -50,8 +51,8 @@
             <ClearEntireCostmap name="ClearGlobalCostmap-Subtree"
                                 service_name="global_costmap/clear_entirely_global_costmap"/>
           </Sequence>
-          <Spin spin_dist="1.57"/>
-          <Wait wait_duration="5.0"/>
+          <Spin spin_dist="0.5"/>
+          <Wait wait_duration="3.0"/>
           <BackUp backup_dist="0.30"
                   backup_speed="0.15"/>
         </RoundRobin>

@@ -30,7 +30,7 @@ global_costmap:
       global_frame: "map"
       track_unknown_space: false
       robot_base_frame: "base_footprint"
-      resolution: 0.025
+      resolution: 0.01
       downsample_costmap: false
 
       footprint_padding: 0.03
