@@ -17,6 +17,13 @@
         </Sequence>
       </Fallback>
 
+      <Sequence name="ClearingActions">
+        <ClearEntireCostmap name="ClearLocalCostmap-Subtree"
+                            service_name="local_costmap/clear_entirely_local_costmap"/>
+        <ClearEntireCostmap name="ClearGlobalCostmap-Subtree"
+                            service_name="global_costmap/clear_entirely_global_costmap"/>
+      </Sequence>
+
       <RecoveryNode name="NavigateRecovery" number_of_retries="6">
         <PipelineSequence name="NavigateWithReplanning">
           <ControllerSelector topic_name="controller_selector"
