@@ -12,7 +12,7 @@ from hri_msgs.srv import Detection
 
 from .hri_bridge import HRIBridge
 from .detectors import load_detector, BaseDetector
-
+from .trackers import load_tracker, BaseTracker
 
 class HumanFaceDetectorLifecycleNode(LifecycleNode):
     def __init__(self):
@@ -22,6 +22,7 @@ class HumanFaceDetectorLifecycleNode(LifecycleNode):
             ("image_topic", "/sancho_camera/image_raw"),
             ("detections_topic", "/face_detections"),
             ("detector_name", "dlib_frontal"),
+            ("tracker_name", "sort"),
             ("show_metrics", False),
             ("processing_rate", 10.0)
         ])
@@ -29,6 +30,7 @@ class HumanFaceDetectorLifecycleNode(LifecycleNode):
         self.bridge = HRIBridge()
 
         self.detector = None
+        self.tracker = None
 
         self.sub_camera = None
         self.pub_dets = None
@@ -41,14 +43,18 @@ class HumanFaceDetectorLifecycleNode(LifecycleNode):
         self.image_topic = self.get_parameter("image_topic").value
         self.detections_topic = self.get_parameter("detections_topic").value
         self.detector_name = self.get_parameter("detector_name").value
+        self.tracker_name = self.get_parameter("tracker_name").value
         self.show_metrics = self.get_parameter("show_metrics").value
         self.processing_rate = self.get_parameter("processing_rate").value
 
         try:
             self.detector: BaseDetector = load_detector(self.detector_name)
             self.get_logger().info(f"Detector seleccionado: {self.detector_name}")
+
+            self.tracker: BaseTracker = load_tracker(self.tracker_name)
+            self.get_logger().info(f"Tracker seleccionado: {self.tracker_name}")
         except Exception as e:
-            self.get_logger().error(f"Error cargando el detector: {e}")
+            self.get_logger().error(f"Error cargando el detector/tracker: {e}")
             return TransitionCallbackReturn.FAILURE
 
         qos = QoSProfile(depth=1)
@@ -100,26 +106,31 @@ class HumanFaceDetectorLifecycleNode(LifecycleNode):
         if msg is None:
             return
 
+        # (x,y,w,h), confidence
         positions, confidences = self.detect(msg)
 
+        # [[x1,y1,x2,y2,id,score], ...]
+        tracked_faces = self.tracker.update(positions, confidences, image=msg)
+
+        # Crear mensaje
         msg_array = FaceDetectionArray()
         msg_array.header = Header()
         msg_array.header.stamp = msg.header.stamp
         msg_array.header.frame_id = msg.header.frame_id
         msg_array.image = msg  # <-- añadimos la imagen original
 
-        for (x, y, w, h), confidence in zip(positions, confidences):
+        for x1, y1, x2, y2, id, score in tracked_faces:
             detection = FaceDetection()
-            
-            detection.corner = Point(x=float(x), y=float(y), z=0.0)
-            detection.width = float(w)
-            detection.height = float(h)
-            detection.confidence = float(confidence)
+            detection.corner = Point(x=float(x1), y=float(y1), z=0.0)
+            detection.width = float(x2-x1)
+            detection.height = float(y2-y1)
+            detection.confidence = float(score)
             msg_array.detections.append(detection)
 
         self.get_logger().info("No se han detectado caras" if len(msg_array.detections) == 0 else 
             f"Se han detectado {len(msg_array.detections)} caras")
 
+        # Publicar
         self.pub_dets.publish(msg_array)
 
     def detection_service(self, request, response):
