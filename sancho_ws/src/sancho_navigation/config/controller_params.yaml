@@ -17,7 +17,7 @@ controller_server:
     progress_checker_plugin: "progress_checker"
     goal_checker_plugins: ["general_goal_checker"]
     smoother_plugins: ["velocity_smoother"]
-    controller_plugins: ["FollowPath"]
+    controller_plugins: ["GeneralMPPI", "TightRPP"]
 
     progress_checker:
       plugin: "nav2_controller::SimpleProgressChecker"
@@ -30,23 +30,24 @@ controller_server:
       xy_goal_tolerance: 0.2
       yaw_goal_tolerance: 1.0
 
-    FollowPath:
+    GeneralMPPI:
       plugin: "nav2_rotation_shim_controller::RotationShimController"
       primary_controller: "nav2_mppi_controller::MPPIController"
 
-      # --- ANTI-OSCILACIÓN EN ROTATION SHIM ---
+      # --- PARAMETROS SHIM ---
       # Engancha el modo rotación con margen y no lo suelta hasta estar bien alineado
-      angular_dist_threshold: 1.20         # antes 1.00
-      angular_disengage_threshold: 0.40    # antes 0.95 (¡histeresis grande!)
-      rotate_to_heading_angular_vel: 1.0   # antes 1.0 (menos sobrepaso)
-      max_angular_accel: 3.0               # antes 3.0 (menos vaivén)
-      simulate_ahead_time: 0.0             # antes 1.0 (no “adivinar” la pose futura)
-      rotate_to_goal_heading: true        # evita decidir yaw final aquí; hazlo con Spin
+      angular_dist_threshold: 1.20         
+      angular_disengage_threshold: 0.20    
+      rotate_to_heading_angular_vel: 1.0   
+      max_angular_accel: 3.0               
+      simulate_ahead_time: 0.0             
+      rotate_to_goal_heading: true        
 
       # --- MPPI ---
       time_steps: 56
       model_dt: 0.05
       batch_size: 2000
+
       vx_std: 0.2
       vy_std: 0.0
       wz_std: 0.4
@@ -135,7 +136,7 @@ controller_server:
         cost_weight: 3.81
         critical_cost: 300.0
         consider_footprint: true
-        collision_cost: 1000000.0
+        collision_cost: 1000.0
         near_goal_distance: 1.0
         trajectory_point_step: 2
 
@@ -145,6 +146,30 @@ controller_server:
         cost_weight: 20.0  # antes 30.0
         deadband_velocities: [0.02, 0.00, 0.15]  # antes 0.1
 
+    TightRPP:
+      plugin: "nav2_rotation_shim_controller::RotationShimController"
+      primary_controller: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
+      
+      # --- Parámetros del SHIM  ---
+      angular_dist_threshold: 0.5  # Se activa con menos error para asegurar alineación perfecta
+      angular_disengage_threshold: 0.05
+      rotate_to_heading_angular_vel: 1.0 # Rotación más lenta y precisa
+      max_angular_accel: 2.0
+      simulate_ahead_time: 0.0
+      rotate_to_goal_heading: true
+
+      # --- Parámetros de Regulated Pure Pursuit ---
+      desired_linear_vel: 0.15
+      lookahead_dist: 0.4
+      min_lookahead_dist: 0.3
+      max_lookahead_dist: 0.6
+      use_velocity_scaled_lookahead_dist: true
+      use_cost_regulated_linear_velocity_scaling: true
+      cost_scaling_dist: 0.3
+      cost_scaling_gain: 1.0
+      use_collision_detection: true
+      max_allowed_time_to_collision_up_to_carrot: 1.0
+
     velocity_smoother:
       plugin: "nav2_velocity_smoother::VelocitySmoother"
       smoothing_frequency: 20.0
@@ -152,167 +177,14 @@ controller_server:
       # Usa CLOSED_LOOP si tu odometría es buena; ayuda a amortiguar inversión de signo
       feedback: "CLOSED_LOOP"             # antes OPEN_LOOP
       max_velocity: [0.4, 0.0, 1.0]
-      min_velocity: [0.05, 0.0, 0.15]     # antes 0.1
+      min_velocity: [0.05, 0.0, 0.1]     # antes 0.1
       max_accel: [0.3, 0.0, 0.5]
       max_decel: [-0.4, 0.0, -0.5]
-      deadband_velocity: [0.02, 0.0, 0.15]  # antes 0.1
+      deadband_velocity: [0.02, 0.0, 0.05]  # antes 0.1
       velocity_timeout: 1.0
 
     plugin_lib_names:
       - "nav2_mppi_controller"
-
-# controller_server:
-#   ros__parameters:
-#     use_sim_time: False
-#     controller_frequency: 20.0
-
-#     # Minimum velocity thresholds
-#     min_x_velocity_threshold: 0.05
-#     min_y_velocity_threshold: 0.05
-#     min_theta_velocity_threshold: 0.15   
-
-#     failure_tolerance: 0.8               
-
-#     progress_checker_plugin: "progress_checker"
-#     goal_checker_plugins: ["general_goal_checker"]
-#     smoother_plugins: ["velocity_smoother"]
-#     controller_plugins: ["FollowPath"]
-
-#     progress_checker:
-#       plugin: "nav2_controller::SimpleProgressChecker"
-#       required_movement_radius: 0.2
-#       movement_time_allowance: 20.0
-
-#     general_goal_checker:
-#       stateful: True
-#       plugin: "nav2_controller::SimpleGoalChecker"
-#       xy_goal_tolerance: 0.2
-#       yaw_goal_tolerance: 1.0
-
-#     FollowPath:
-#       plugin: "nav2_rotation_shim_controller::RotationShimController"
-#       primary_controller: "nav2_mppi_controller::MPPIController"
-
-#       # --- ROTATION SHIM ---
-#       angular_dist_threshold: 1.20 # Radians
-#       angular_disengage_threshold: 0.40
-#       rotate_to_heading_angular_vel: 1.0
-#       max_angular_accel: 3.0
-#       simulate_ahead_time: 0.0
-#       rotate_to_goal_heading: true
-
-#       # --- MPPI ---
-#       time_steps: 56
-#       model_dt: 0.05
-#       batch_size: 2000
-#       vx_std: 0.2
-#       vy_std: 0.0 # Should change if onmni
-#       wz_std: 0.4
-
-#       vx_max: 0.4
-#       vx_min: 0.0
-#       vy_max: 0.0 # Changed from 0.0 to 0.2 to allow for some lateral movement
-#       vy_min: 0.0 # Changed from 0.0 to -0.2 to allow for some lateral movement
-#       wz_max: 1.0
-
-#       ax_max: 0.5
-#       ax_min: -0.5
-#       az_max: 1.0
-
-#       iteration_count: 1
-#       prune_distance: 1.7
-#       transform_tolerance: 0.1
-#       temperature: 0.5
-#       gamma: 0.015
-#       motion_model: "Ackermann"
-#       visualize: true
-#       retry_attempt_limit: 3
-
-#       TrajectoryVisualizer:
-#         trajectory_step: 5
-#         time_step: 3
-
-#       # AckermannConstraints removed as we are using DiffDrive
-
-#     critics:
-#         - "ConstraintCritic"
-#         - "CostCritic"
-#         - "GoalCritic"
-#         - "PathAlignCritic"
-#         - "PathFollowCritic"
-#         - "PathAngleCritic"
-#         - "PreferForwardCritic"
-#         - "VelocityDeadbandCritic"
-
-#     ConstraintCritic:
-#       enabled: true
-#       cost_power: 1
-#       cost_weight: 5.0 # Ligeramente aumentado para asegurar que respeta los límites vx/vy
-
-#     GoalCritic:
-#       enabled: true
-#       cost_power: 1
-#       cost_weight: 8.0 # Aumentado para que tenga más "ganas" de llegar al final
-#       threshold_to_consider: 1.4
-
-#     PathAlignCritic:
-#       enabled: true # ACTIVADO: Esto obliga al robot a orientar el frontal con la ruta
-#       cost_power: 1
-#       cost_weight: 12.0 # Peso alto para evitar que se desplace lateralmente (que no "deslice")
-#       max_path_occupancy_ratio: 0.05
-#       trajectory_point_step: 4
-#       threshold_to_consider: 0.5
-#       offset_from_furthest: 20
-#       use_path_orientations: false
-
-#     PathFollowCritic:
-#       enabled: true
-#       cost_power: 1
-#       cost_weight: 5.0
-#       offset_from_furthest: 5
-#       threshold_to_consider: 1.4
-
-#     PathAngleCritic:
-#       enabled: true
-#       cost_power: 1
-#       cost_weight: 3.0 # Subido un poco para penalizar ángulos de avance forzados
-#       offset_from_furthest: 4
-#       threshold_to_consider: 0.5
-#       max_angle_to_furthest: 1.0
-#       forward_preference: true
-
-#     PreferForwardCritic:
-#       enabled: true
-#       cost_power: 1
-#       cost_weight: 10.0 # MUY IMPORTANTE: Penaliza ir hacia atrás o de lado, forzando modo Ackermann
-
-#     CostCritic:
-#       enabled: true
-#       cost_power: 1
-#       cost_weight: 4.0
-#       critical_cost: 250.0 # Reducido ligeramente para dar margen de maniobra cerca de obstáculos
-#       consider_footprint: true
-#       collision_cost: 1000.0 # Bajado de 1M: Evita que un solo pixel de ruido bloquee todo el sistema
-#       near_goal_distance: 1.0
-#       trajectory_point_step: 2
-
-#     VelocityDeadbandCritic:
-#       enabled: true
-#       cost_power: 1
-#       cost_weight: 5.0 # BAJADO de 20.0: Un peso tan alto mataba cualquier intento de movimiento lento
-#       deadband_velocities: [0.02, 0.02, 0.05] # Umbrales reducidos para un arranque más suave
-
-#     velocity_smoother:
-#       plugin: "nav2_velocity_smoother::VelocitySmoother"
-#       smoothing_frequency: 20.0
-#       scale_velocities: false
-#       feedback: "CLOSED_LOOP"
-#       max_velocity: [0.4, 0.2, 1.0]
-#       min_velocity: [0.05, 0.0, 0.15]
-#       max_accel: [0.3, 0.2, 0.5]
-#       max_decel: [-0.5, -0.2, -0.5]
-#       deadband_velocity: [0.02, 0.02, 0.15]
-#       velocity_timeout: 1.0
 
 # =====================
 # LOCAL COSTMAP
@@ -323,7 +195,7 @@ local_costmap:
       use_sim_time: False          # Robot real
       global_frame: "odom"         # Típico para local costmap
       robot_base_frame: "base_footprint"
-      resolution: 0.05
+      resolution: 0.01
       transform_tolerance: 0.2
 
       rolling_window: true
@@ -335,7 +207,7 @@ local_costmap:
       publish_frequency: 10.0
 
       footprint: "[[-0.375, -0.275], [-0.375, 0.275], [0.375, 0.275], [0.375, -0.275]]"
-      footprint_padding: 0.03
+      footprint_padding: 0.005
 
       plugins:
         - "voxel_layer"
@@ -347,7 +219,7 @@ local_costmap:
         enabled: true
         voxel_decay: 0.5         # Obstáculos desaparecen rápido
         decay_model: 0           # 0: Tiempo fijo
-        voxel_size: 0.05
+        voxel_size: 0.01
         z_voxels: 10
         max_obstacle_height: 2.0
         mark_threshold: 0
@@ -397,8 +269,8 @@ local_costmap:
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         enabled: true
-        inflation_radius: 0.55       # Mucho mayor que el radio inscrito (~0.275 m)
-        cost_scaling_factor: 10.0    # Coste decrece de forma gradual
+        inflation_radius: 1.0      
+        cost_scaling_factor: 5.0 
         inflate_unknown: true
         inflate_around_unknown: true
 

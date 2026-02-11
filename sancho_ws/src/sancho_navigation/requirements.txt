@@ -1,2 +1,5 @@
 tf2_ros
 tf-transformations
+cvxopt
+numpy
+scipy

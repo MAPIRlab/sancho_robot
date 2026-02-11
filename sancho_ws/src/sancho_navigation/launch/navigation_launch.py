@@ -17,7 +17,7 @@ def generate_launch_description():
     prefix_cmd = LaunchConfiguration('prefix')
     map_yaml_file = LaunchConfiguration('map')
     params_file = LaunchConfiguration('params_file')
-    default_bt_xml_filename = LaunchConfiguration('default_bt_xml_filename')
+    default_nav_to_pose_bt_xml = LaunchConfiguration('default_nav_to_pose_bt_xml')
 
     pkg_share = get_package_share_directory("sancho_navigation")
     
@@ -57,7 +57,7 @@ def generate_launch_description():
     configured_behavior_params = RewrittenYaml(
         source_file=behavior_params_path,
         root_key="",
-        param_rewrites={"default_nav_to_pose_bt_xml": default_bt_xml_filename},
+        param_rewrites={"default_nav_to_pose_bt_xml": default_nav_to_pose_bt_xml},
         convert_types=True
     )
 
@@ -81,15 +81,15 @@ def generate_launch_description():
     )
 
     declare_bt_xml_cmd = DeclareLaunchArgument(
-        'default_bt_xml_filename',
-        default_value=os.path.join(pkg_share, 'bt', 'testBT.xml'),
+        'default_nav_to_pose_bt_xml',
+        default_value=os.path.join(pkg_share, 'bt', 'main.xml'),
         description='Full path to the behavior tree xml file to use'
     )
 
     # Common remappings
     remappings = [
         ("cmd_vel_in", "cmd_vel_raw"),
-        ("cmd_vel_out", "cmd_vel"),
+        ("cmd_vel_out", "cmd_vel_nav2"),
     ]
 
     # Grupo de nodos
@@ -149,7 +149,7 @@ def generate_launch_description():
                 executable="controller_server",
                 name="controller_server",
                 parameters=[controller_params_path],
-                remappings=[("cmd_vel", "cmd_vel_raw")],
+                remappings=[("cmd_vel", "cmd_vel")],
                 output="screen",
                 prefix=prefix_cmd,
                 emulate_tty=True,
@@ -191,6 +191,18 @@ def generate_launch_description():
         ]
     )
 
+    semantic_scan_node = Node(
+        package="sancho_navigation", 
+        executable="semantic_scan_filter",
+        name="semantic_scan_filter",
+        remappings=[
+            ("/scan_persistent", "/scan_persistent"),
+            ("/scan_non_persistent", "/scan_non_persistent"),
+        ],
+        output="screen",
+        respawn=use_respawn,
+    )
+
     depth_scan_node = Node(
         package="depthimage_to_laserscan",
         executable="depthimage_to_laserscan_node",
@@ -216,5 +228,6 @@ def generate_launch_description():
         declare_map_yaml_cmd,
         declare_bt_xml_cmd,
         nav2_nodes,
-        depth_scan_node
+        depth_scan_node,
+        semantic_scan_node
     ])
