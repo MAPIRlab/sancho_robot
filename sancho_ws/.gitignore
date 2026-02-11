@@ -175,3 +175,4 @@ certs/*.pem
 /notebook_Test
 src/sancho_vision/sancho_vision/dlib_inference_test.py
 src/sancho_perception/sancho_perception/metrics_node.py
+**/models/*
