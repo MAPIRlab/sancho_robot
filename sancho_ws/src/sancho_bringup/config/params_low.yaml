@@ -4,12 +4,12 @@
     framerate: 30.0  # Ajustado a 10 FPS para mayor estabilidad en condiciones de poca luz
     io_method: "mmap"
     frame_id: "camera"
-    pixel_format: "yuyv"  # Usando YUYV para calidad de imagen sin compresión
+    pixel_format: "mjpeg2rgb"  # Usando YUYV para calidad de imagen sin compresión
     av_device_format: "YUV422P"
     image_width: 640  # Aumentado para mejorar la resolución de la imagen
     image_height: 480  # Aumentado para mejorar la resolución de la imagen
     camera_name: "calibrated_camera"
-    camera_info_url: "package://usb_cam/config/camera_info_low.yaml"
+    camera_info_url: "package://sancho_bringup/config/camera_info_low.yaml"
 
     # Desactivar configuraciones automáticas para un mayor control
     auto_white_balance: false
