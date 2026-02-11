@@ -14,7 +14,7 @@ def generate_launch_description():
     usb_cam_param_file = os.path.join(
         get_package_share_directory('sancho_bringup'),
         'config',
-        'params_mid.yaml'   
+        'params_640.yaml'   
     )
 
     # Lanzar LiDAR Hokuyo

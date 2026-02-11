@@ -112,15 +112,24 @@ void UsbCam::read_frame()
       m_image.v4l2_fmt.type = buf.type;
       buf.memory = V4L2_MEMORY_MMAP;
 
-      // Get current v4l2 pixel format
+      // Get current v4l2 pixel format //EDIT: DONT CRASH IF IT FAILS
       if (-1 == usb_cam::utils::xioctl(m_fd, static_cast<int>(VIDIOC_G_FMT), &m_image.v4l2_fmt)) {
         switch (errno) {
-          case EAGAIN:
-            return;
-          default:
-            throw std::runtime_error("Invalid v4l2 format");
+            case EAGAIN:
+                return;
+            default:
+                static int error_count = 0;
+                // CHANGE THIS:
+                std::cerr << "[usb_cam] G_FMT failed, skipping frame" << std::endl;
+                error_count++;
+                if (error_count > 100) {
+                    // If it fails 100 times in a row, the hardware link is likely dead
+                    throw std::runtime_error("Camera hardware link lost.");
+                }
+                return; // Don't throw, just exit the function and try again next timer tick
         }
       }
+
       /// Dequeue buffer with the new image
       if (-1 == usb_cam::utils::xioctl(m_fd, static_cast<int>(VIDIOC_DQBUF), &buf)) {
         switch (errno) {

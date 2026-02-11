@@ -6,7 +6,7 @@ usb_cam_node:
     framerate: 15.0  # Baja tasa de frames para menos carga de CPU
     pixel_format: yuyv  # <<--- SIN compresión
     camera_name: "sancho_camera"
-    camera_info_url: "package://sancho_bringup/config/camera_info_high.yaml"
+    camera_info_url: "package://sancho_bringup/config/camera_info_low.yaml"
 
     # SOLO estos parámetros que son seguros:
     brightness: 64
