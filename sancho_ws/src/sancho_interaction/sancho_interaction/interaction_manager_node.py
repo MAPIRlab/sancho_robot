@@ -516,9 +516,9 @@ class InteractionManager(LifecycleNode):
             self.get_logger().debug("Face detection pipeline verificada como activa.")
         return all_active
 
-    def activate_face_tracking(self) -> bool:
-        """Activate face tracker module."""
-        return self.activate_module(ModuleNames.FACE_TRACKER)
+    # def activate_face_tracking(self) -> bool:
+    #     """Activate face tracker module."""
+    #     return self.activate_module(ModuleNames.FACE_TRACKER)
 
     def deactivate_all_modules(self) -> bool:
         """Deactivate all active modules."""
