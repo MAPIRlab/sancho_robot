@@ -1,9 +1,0 @@
-source;share/sancho_vision/hook/pythonpath.ps1
-source;share/sancho_vision/hook/pythonpath.dsv
-source;share/sancho_vision/hook/pythonpath.sh
-source;share/sancho_vision/hook/ament_prefix_path.ps1
-source;share/sancho_vision/hook/ament_prefix_path.dsv
-source;share/sancho_vision/hook/ament_prefix_path.sh
-source;../../build/sancho_vision/share/sancho_vision/hook/pythonpath_develop.ps1
-source;../../build/sancho_vision/share/sancho_vision/hook/pythonpath_develop.dsv
-source;../../build/sancho_vision/share/sancho_vision/hook/pythonpath_develop.sh

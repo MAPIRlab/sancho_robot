@@ -1,1 +1,0 @@
-/home/mapir/sancho_robot/sancho_ws/src/sancho_vision/build/sancho_vision/launch/detector_recognizer.launch.py
