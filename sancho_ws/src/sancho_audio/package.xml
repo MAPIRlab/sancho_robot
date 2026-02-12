@@ -17,6 +17,7 @@
   <depend>soundfile</depend>
   <depend>pyannote.audio</depend>
   <depend>scipy</depend>
+  <depend>requests</depend>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>

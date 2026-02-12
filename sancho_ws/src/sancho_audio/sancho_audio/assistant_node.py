@@ -3,6 +3,7 @@ import time
 import rclpy
 import sounddevice as sd
 from rclpy.node import Node
+import requests
 
 from enum import Enum
 from queue import Queue
@@ -101,6 +102,7 @@ class Assistant:
         self.node = AssistantNode(self)
 
         self.question_id = QUESTION.NO_QUESTION
+        
 
     def spin(self):
         while rclpy.ok():
@@ -127,17 +129,50 @@ class Assistant:
 
             rclpy.spin_once(self.node)
 
+    def call_mapirbot(self, text, user_id, user_name):
+        url = "https://olympics-housewives-however-different.trycloudflare.com/ask"
+        payload = {
+            "query": text,
+            "thread_id": user_id if user_id and user_id != "Unknown" else "Mapirbot_thread"
+        }
+        headers = {"Content-Type": "application/json"}
+        
+        try:
+            response = requests.post(url, data=json.dumps(payload), headers=headers, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                self.node.get_logger().info(f"[INFO] Respuesta de Mapirbot: {data}")
+                if isinstance(data, dict):
+                    return data.get("response", str(data)), data.get("emotion", "happy")
+                return str(data), "happy"
+            else:
+                self.node.get_logger().error(f"[ERROR] Error de Mapirbot: {response.status_code}")
+                return "Perdona, mi conexión con el agente remoto ha fallado.", "sad"
+        except Exception as e:
+            self.node.get_logger().error(f"[ERROR] Excepción llamando a Mapirbot: {e}")
+            return "Lo siento, ha habido un error al conectar con mi agente.", "sad"
+        
+
     def process_user_transcription(self, text, user_id, user_name):
         self.node.get_logger().info(f"{user_name or 'Desconocido'} dice: {text}")
         self.node.face_mode_pub.publish(String(data="thinking"))
+
+        #if self.question_id == QUESTION.NO_QUESTION: # Si es un mensaje normal
+        #    ai_response, emotion, data, intent = self.sancho_prompt_request(text, user_id, user_name)
+
+        #    if intent == COMMANDS.TAKE_PICTURE:
+        #        data_json = json.dumps(data)
+        #        self.gui_request("show_photo", data_json) # Show photo
+
+        #    self.play_tts(ai_response, emotion=emotion)
+
         
         if self.question_id == QUESTION.NO_QUESTION: # Si es un mensaje normal
-            ai_response, emotion, data, intent = self.sancho_prompt_request(text, user_id, user_name)
-
-            if intent == COMMANDS.TAKE_PICTURE:
-                data_json = json.dumps(data)
-                self.gui_request("show_photo", data_json) # Show photo
-
+            #if not user_id or user_id == "Unknown":
+            #    self.play_tts("Hola, no te veo muy bien. ¿Cómo te llamas?", emotion="surprised", keep_asking=True)
+            #    self.question_id = QUESTION.GET_NAME
+            #else:
+            ai_response, emotion = self.call_mapirbot(text, user_id, user_name)
             self.play_tts(ai_response, emotion=emotion)
 
         elif self.question_id == QUESTION.GET_NAME: # Si es la respuesta cual es tu nombre
