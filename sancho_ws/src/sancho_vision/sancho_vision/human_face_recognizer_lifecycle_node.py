@@ -1,6 +1,7 @@
 import json
 import rclpy
 import threading
+import time
 
 from rclpy.lifecycle import LifecycleNode, TransitionCallbackReturn
 from rclpy.qos import QoSProfile
@@ -30,7 +31,9 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
             ("encoder_name", "facenet"),
             ("db_mode", "save"),
             ("learn_without_name", True),
-            ("processing_rate", 10.0)
+            ("processing_rate", 10.0),
+            ("recognition_cache_ttl", 10.0),
+            ("recognition_cache_max_size", 20),
         ])
 
         self.bridge = HRIBridge()
@@ -49,7 +52,11 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
         self.get_faceprint_srv = None
         self.set_learn_without_name_srv = None
 
-        # simple cache: tracker_id -> (face_aligned, features, faceprint, distance, pos, face_updated, confidence)
+        # recognition cache: tracker_id -> entry dict
+        # entry: {
+        #   'face_aligned', 'features', 'faceprint', 'distance', 'pos',
+        #   'face_updated', 'confidence', 'last_seen', 'hits'
+        # }
         self.recognition_cache = {}
 
     def on_configure(self, state) -> TransitionCallbackReturn:
@@ -61,6 +68,8 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
         self.db_mode = self.get_parameter("db_mode").value
         self.learn_without_name = self.get_parameter("learn_without_name").value
         self.processing_rate = self.get_parameter("processing_rate").value
+        self.cache_ttl = float(self.get_parameter("recognition_cache_ttl").value)
+        self.cache_max_size = int(self.get_parameter("recognition_cache_max_size").value)
 
         try:
             self.encoder = load_encoder(self.encoder_name)
@@ -110,6 +119,7 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
         self._lock = threading.Lock()
         self.lastest_detections = None
         self.save_db_timer = self.create_timer(10.0, lambda: self.classifier.db.save())
+        self.cache_prune_timer = self.create_timer(5.0, self.prune_cache)
         self.spin_timer = self.create_timer(1.0 / self.processing_rate, self.spin)
 
         return super().on_activate(state)
@@ -122,6 +132,10 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
         if self.spin_timer:
             self.spin_timer.cancel()
             self.spin_timer = None
+
+        if self.cache_prune_timer:
+            self.cache_prune_timer.cancel()
+            self.cache_prune_timer = None
 
         if self.save_db_timer:
             self.save_db_timer.cancel()
@@ -139,6 +153,34 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
     def detections_callback(self, msg: FaceDetectionArray):
         with self._lock:
             self.lastest_detections = msg
+
+    def prune_cache(self):
+        '''Llamada periódicamente para eliminar entradas de la caché'''
+        self.get_logger().info("Ejecutando prune_cache()...")
+        now = time.monotonic()
+
+        lock = getattr(self, "_lock", None)
+        if lock:
+            lock.acquire()
+        try:
+            # Eliminar entradas que superan el TTL
+            expired = [tid for tid, e in self.recognition_cache.items() if (now - e.get("last_seen", 0)) > self.cache_ttl]
+            for tid in expired:
+                del self.recognition_cache[tid]
+                self.get_logger().info(f"Eliminada entrada expirada con id {tid} de la caché")
+
+            # Eliminar entradas que llevan más tiempo sin verse para ajustarse al tamaño máximo
+            if len(self.recognition_cache) > self.cache_max_size:
+                # Ordenar ids por 'last_seen' (más viejos primero)
+                sorted_ids = sorted(self.recognition_cache.items(), key=lambda kv: kv[1].get("last_seen", 0))
+                # Eliminar más antiguas hasta que el tamaño esté bien
+                for tid, _ in sorted_ids[:len(self.recognition_cache) - self.cache_max_size]:
+                    if tid in self.recognition_cache:
+                        del self.recognition_cache[tid]
+                        self.get_logger().info(f"Eliminada entrada con id {tid} de la caché por política LRU")
+        finally:
+            if lock:
+                lock.release()
     
     def spin(self):
         with self._lock:
@@ -197,22 +239,24 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
 
         marked_image = frame.copy()
         recognitions = []
+        now = time.monotonic()
+
         for det in detections:
             position = [det.corner.x, det.corner.y, det.width, det.height]
             confidence = det.confidence
             tracker_id = int(det.id) if hasattr(det, "id") else 0
 
-            # Use cached recognition when we have a tracker id and a cache entry
+            # Utilizamos el id del tracker para consultar la cache
             if tracker_id and tracker_id in self.recognition_cache:
-                (cached_face_aligned, cached_features, cached_faceprint,
-                 cached_distance, cached_pos, cached_face_updated, cached_conf) = self.recognition_cache[tracker_id]
+                entry = self.recognition_cache[tracker_id] 
+                entry['last_seen'] = now
 
-                face_aligned = cached_face_aligned
-                features = cached_features
-                faceprint = cached_faceprint
-                distance = cached_distance
-                pos = cached_pos
-                face_updated = cached_face_updated
+                face_aligned = entry['face_aligned']
+                features = entry['features']
+                faceprint = entry['faceprint']
+                distance = entry['distance']
+                pos = entry['pos']
+                face_updated = entry['face_updated']
 
                 display_name = "Unknown" if not faceprint["id"] else (faceprint["name"] if faceprint["name"] else f"User-{faceprint['id']}")
                 self.get_logger().info(f"[cached] {display_name} -> Distance: {distance:.4f} | Confidence: {confidence:.4f}")
@@ -222,7 +266,7 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
                 recognitions.append((face_aligned, features, faceprint, distance, pos, face_updated))
                 continue
 
-            # No valid cache: compute alignment, features and classification
+            # No hay entrada en la cache: preprocesar cara, calcular embedding y clasificarlo
             face_aligned = align_face(frame, position)
             features = self.encoder.encode_face(face_aligned)
             faceprint, distance, pos = self.classifier.classify_face(features)
@@ -249,9 +293,18 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
             
             mark_face(marked_image, [int(i) for i in position], distance, 0.80, 0.90, display_name, score=confidence, showDistance=True, showScore=True)
 
-            # store/update cache if tracker id present
+            # Actualizar la cache si hay un id del tracker
             if tracker_id:
-                self.recognition_cache[tracker_id] = (face_aligned, features, faceprint, distance, pos, face_updated, confidence)
+                self.recognition_cache[tracker_id] = {
+                    'face_aligned': face_aligned,
+                    'features': features,
+                    'faceprint': faceprint,
+                    'distance': distance,
+                    'pos': pos,
+                    'face_updated': face_updated,
+                    'confidence': confidence,
+                    'last_seen': now,
+                }
 
             recognitions.append((face_aligned, features, faceprint, distance, pos, face_updated))
 
