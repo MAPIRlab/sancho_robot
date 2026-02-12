@@ -125,7 +125,7 @@ class HumanFaceDetectorLifecycleNode(LifecycleNode):
             detection.width = float(x2-x1)
             detection.height = float(y2-y1)
             detection.confidence = float(score)
-            detection.id = id
+            detection.id = int(id)
             msg_array.detections.append(detection)
 
         self.get_logger().info("No se han detectado caras" if len(msg_array.detections) == 0 else 

@@ -49,6 +49,9 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
         self.get_faceprint_srv = None
         self.set_learn_without_name_srv = None
 
+        # simple cache: tracker_id -> (face_aligned, features, faceprint, distance, pos, face_updated, confidence)
+        self.recognition_cache = {}
+
     def on_configure(self, state) -> TransitionCallbackReturn:
         self.get_logger().info("Configurando nodo de reconocimiento...")
 
@@ -197,7 +200,29 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
         for det in detections:
             position = [det.corner.x, det.corner.y, det.width, det.height]
             confidence = det.confidence
+            tracker_id = int(det.id) if hasattr(det, "id") else 0
 
+            # Use cached recognition when we have a tracker id and a cache entry
+            if tracker_id and tracker_id in self.recognition_cache:
+                (cached_face_aligned, cached_features, cached_faceprint,
+                 cached_distance, cached_pos, cached_face_updated, cached_conf) = self.recognition_cache[tracker_id]
+
+                face_aligned = cached_face_aligned
+                features = cached_features
+                faceprint = cached_faceprint
+                distance = cached_distance
+                pos = cached_pos
+                face_updated = cached_face_updated
+
+                display_name = "Unknown" if not faceprint["id"] else (faceprint["name"] if faceprint["name"] else f"User-{faceprint['id']}")
+                self.get_logger().info(f"[cached] {display_name} -> Distance: {distance:.4f} | Confidence: {confidence:.4f}")
+
+                mark_face(marked_image, [int(i) for i in position], distance, 0.80, 0.90, display_name, score=confidence, showDistance=True, showScore=True)
+
+                recognitions.append((face_aligned, features, faceprint, distance, pos, face_updated))
+                continue
+
+            # No valid cache: compute alignment, features and classification
             face_aligned = align_face(frame, position)
             features = self.encoder.encode_face(face_aligned)
             faceprint, distance, pos = self.classifier.classify_face(features)
@@ -223,7 +248,11 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
             self.get_logger().info(f"{display_name} -> Distance: {distance:.4f} | Confidence: {confidence:.4f}")
             
             mark_face(marked_image, [int(i) for i in position], distance, 0.80, 0.90, display_name, score=confidence, showDistance=True, showScore=True)
-            
+
+            # store/update cache if tracker id present
+            if tracker_id:
+                self.recognition_cache[tracker_id] = (face_aligned, features, faceprint, distance, pos, face_updated, confidence)
+
             recognitions.append((face_aligned, features, faceprint, distance, pos, face_updated))
 
         marked_img_msg = None # Si eso mover todo esto a assistant helper que ahi se determina al interlocutor
