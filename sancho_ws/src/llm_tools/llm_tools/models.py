@@ -71,7 +71,7 @@ class MODELS:
 
         class MAPIRBOT(SmartStrEnum):
             MAPIRBOT = "mapirbot"
-
+    
     class EMBEDDING:
         class OPENAI(SmartStrEnum):
             SMALL_3 = "text-embedding-3-small"
