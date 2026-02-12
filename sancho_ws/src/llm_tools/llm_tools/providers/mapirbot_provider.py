@@ -3,7 +3,7 @@ import json
 from .api_provider import APIProvider
 
 class MapirbotProvider(APIProvider):
-    def __init__(self, api_url="https://psi-cindy-trips-injection.trycloudflare.com/ask"):
+    def __init__(self, api_url="https://olympics-housewives-however-different.trycloudflare.com/ask"):
         self.api_url = api_url
 
     def prompt(self, model, prompt_system, messages_json, user_input, parameters_json):
