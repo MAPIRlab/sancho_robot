@@ -83,49 +83,43 @@ class AssistantHelperLifecycleNode(LifecycleNode):
     def on_configure(self, state) -> TransitionCallbackReturn:
         self.get_logger().info("Configurando AssistantHelper lifecycle node...")
 
-        try:
-            self.name = self.get_parameter("name").value
+        self.name = self.get_parameter("name").value
 
-            self.microphone_topic = self.get_parameter("microphone_topic").value
-            self.mode_topic = self.get_parameter("mode_topic").value
-            self.face_recognitions_topic = self.get_parameter("face_recognitions_topic").value
-            self.audio_doa_topic = self.get_parameter("audio_doa_topic").value
-            self.face_mode_topic = self.get_parameter("face_mode_topic").value
-            self.assistant_transcription_topic = self.get_parameter("assistant_transcription_topic").value
-            self.question_tts_topic = self.get_parameter("question_tts_topic").value
-            self.stt_service_name = self.get_parameter("stt_service").value
-            self.ask_user_service_name = self.get_parameter("ask_user_service").value
-            self.processing_rate = float(self.get_parameter("processing_rate").value)
+        self.microphone_topic = self.get_parameter("microphone_topic").value
+        self.mode_topic = self.get_parameter("mode_topic").value
+        self.face_recognitions_topic = self.get_parameter("face_recognitions_topic").value
+        self.audio_doa_topic = self.get_parameter("audio_doa_topic").value
+        self.face_mode_topic = self.get_parameter("face_mode_topic").value
+        self.assistant_transcription_topic = self.get_parameter("assistant_transcription_topic").value
+        self.question_tts_topic = self.get_parameter("question_tts_topic").value
+        self.stt_service_name = self.get_parameter("stt_service").value
+        self.ask_user_service_name = self.get_parameter("ask_user_service").value
+        self.processing_rate = float(self.get_parameter("processing_rate").value)
 
-            self.helper_chunk_size = float(self.get_parameter("helper_chunk_size").value)
-            self.intensity_threshold = int(self.get_parameter("intensity_threshold").value)
-            self.timeout_seconds = float(self.get_parameter("timeout_seconds").value)
-            self.hotword = self.get_parameter("hotword").value
-            self.attach_criterion = self.get_parameter("attach_criterion").value
+        self.helper_chunk_size = float(self.get_parameter("helper_chunk_size").value)
+        self.intensity_threshold = int(self.get_parameter("intensity_threshold").value)
+        self.timeout_seconds = float(self.get_parameter("timeout_seconds").value)
+        self.hotword = self.get_parameter("hotword").value
+        self.attach_criterion = self.get_parameter("attach_criterion").value
 
-            qos10 = QoSProfile(depth=10)
-            self.pub_face_mode = self.create_lifecycle_publisher(String, self.face_mode_topic, qos10)
-            self.pub_assistant_text = self.create_lifecycle_publisher(UserTranscription, self.assistant_transcription_topic, qos10)
-            self.pub_question_tts = self.create_lifecycle_publisher(QuestionTTS, self.question_tts_topic, qos10)
+        qos10 = QoSProfile(depth=10)
+        self.pub_face_mode = self.create_lifecycle_publisher(String, self.face_mode_topic, qos10)
+        self.pub_assistant_text = self.create_lifecycle_publisher(UserTranscription, self.assistant_transcription_topic, qos10)
+        self.pub_question_tts = self.create_lifecycle_publisher(QuestionTTS, self.question_tts_topic, qos10)
 
-            self.stt_client = self.create_client(STT, self.stt_service_name)
-            # Timeout de 5s para no bloquear el nodo eternamente si STT no arranca
-            if not self.stt_client.wait_for_service(timeout_sec=5.0):
-                self.get_logger().error('CRITICAL: STT service not available after 5 seconds!')
-                return TransitionCallbackReturn.FAILURE
-            
-            self.helper = AssistantHelper(self, 
-                                          name=self.name,
-                                          helper_chunk_size=self.helper_chunk_size,
-                                          intensity_threshold=self.intensity_threshold,
-                                          timeout_seconds=self.timeout_seconds,
-                                          hotword=self.hotword,
-                                          attach_criterion=self.attach_criterion)
+        self.stt_client = self.create_client(STT, self.stt_service_name)
+        while not self.stt_client.wait_for_service(timeout_sec=1.0):
+            self.get_logger().info('STT service not available, waiting again...')
+        
+        self.helper = AssistantHelper(self, 
+                                      name=self.name,
+                                      helper_chunk_size=self.helper_chunk_size,
+                                      intensity_threshold=self.intensity_threshold,
+                                      timeout_seconds=self.timeout_seconds,
+                                      hotword=self.hotword,
+                                      attach_criterion=self.attach_criterion)
 
-            return TransitionCallbackReturn.SUCCESS
-        except Exception as e:
-            self.get_logger().error(f"Error during on_configure: {e}")
-            return TransitionCallbackReturn.FAILURE
+        return super().on_configure(state)
 
     def on_activate(self, state) -> TransitionCallbackReturn:
         self.get_logger().info("Activando AssistantHelper lifecycle node...")
@@ -141,7 +135,7 @@ class AssistantHelperLifecycleNode(LifecycleNode):
 
         self.spin_timer = self.create_timer(1.0 / self.processing_rate, self.helper.spin_step)
 
-        return TransitionCallbackReturn.SUCCESS
+        return super().on_activate(state)
 
     def on_deactivate(self, state) -> TransitionCallbackReturn:
         self.get_logger().info("Desactivando AssistantHelper lifecycle node...")
@@ -170,7 +164,7 @@ class AssistantHelperLifecycleNode(LifecycleNode):
             self.destroy_service(self.ask_user_server)
             self.ask_user_server = None
 
-        return TransitionCallbackReturn.SUCCESS
+        return super().on_deactivate(state)
 
     def microphone_callback(self, msg: ChunkMono):
         new_audio = list([np.int16(x) for x in msg.chunk_mono])
@@ -413,16 +407,12 @@ class AssistantHelper:
 
 
 def main(args=None):
-    try:
-        rclpy.init(args=args)
-        node = AssistantHelperLifecycleNode()
-        rclpy.spin(node)
-        rclpy.shutdown()
-    except Exception as e:
-        # Esto ayudará a ver errores fatales en la terminal si el nodo no arranca
-        print(f"FATAL ERROR IN ASSISTANT HELPER: {e}")
-        import traceback
-        traceback.print_exc()
+    rclpy.init(args=args)
+  
+    node = AssistantHelperLifecycleNode()
+
+    rclpy.spin(node)
+    rclpy.shutdown()
 
 if __name__ == '__main__':
     main()
