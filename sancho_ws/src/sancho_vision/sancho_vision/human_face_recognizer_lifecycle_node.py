@@ -55,7 +55,7 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
         # recognition cache: tracker_id -> entry dict
         # entry: {
         #   'face_aligned', 'features', 'faceprint', 'distance', 'pos',
-        #   'face_updated', 'confidence', 'last_seen', 'hits'
+        #   'face_updated', 'confidence', 'last_seen'
         # }
         self.recognition_cache = {}
 
@@ -244,7 +244,7 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
         for det in detections:
             position = [det.corner.x, det.corner.y, det.width, det.height]
             confidence = det.confidence
-            tracker_id = int(det.id) if hasattr(det, "id") else 0
+            tracker_id = int(det.tid) if hasattr(det, "tid") else 0
 
             # Utilizamos el id del tracker para consultar la cache
             if tracker_id and tracker_id in self.recognition_cache:
@@ -293,8 +293,8 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
             
             mark_face(marked_image, [int(i) for i in position], distance, 0.80, 0.90, display_name, score=confidence, showDistance=True, showScore=True)
 
-            # Actualizar la cache si hay un id del tracker
-            if tracker_id:
+            # Actualizar la cache
+            if tracker_id and faceprint["id"]:
                 self.recognition_cache[tracker_id] = {
                     'face_aligned': face_aligned,
                     'features': features,
