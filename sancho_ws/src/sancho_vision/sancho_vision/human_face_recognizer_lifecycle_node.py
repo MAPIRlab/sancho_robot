@@ -295,6 +295,7 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
 
             # Actualizar la cache
             if tracker_id and faceprint["id"]:
+                self.get_logger().info(f"{display_name} added to cache")
                 self.recognition_cache[tracker_id] = {
                     'face_aligned': face_aligned,
                     'features': features,

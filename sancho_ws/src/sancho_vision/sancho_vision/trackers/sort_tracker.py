@@ -40,7 +40,7 @@ class SortTracker(BaseTracker):
             det_idx = int(match[0])
             trk_idx = int(match[1])
 
-            track_data = tracker_outputs[trk_idx]  # [x1,y1,x2,y2,id]
+            track_data = tracker_outputs[trk_idx]  # [x1,y1,x2,y2,tid]
             score = detections[det_idx, 4]
 
             track_with_score = np.append(track_data, score)

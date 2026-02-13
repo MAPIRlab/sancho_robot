@@ -15,6 +15,6 @@ class BaseTracker(ABC):
             image (ndarray): (Optional) Actual image, in case of visual tracker (like DeepSORT).
 
         Returns:
-            tracked_faces (ndarray): Numpy array in the format [[x1, y1, x2, y2, id, score], ...]
+            tracked_faces (ndarray): Numpy array in the format [[x1, y1, x2, y2, tid, score], ...]
         '''
         pass

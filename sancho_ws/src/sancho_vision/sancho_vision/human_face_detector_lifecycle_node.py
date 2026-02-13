@@ -109,7 +109,7 @@ class HumanFaceDetectorLifecycleNode(LifecycleNode):
         # (x,y,w,h), confidence
         positions, confidences = self.detect(msg)
 
-        # [[x1,y1,x2,y2,id,score], ...]
+        # [[x1,y1,x2,y2,tid,score], ...]
         tracked_faces = self.tracker.update(positions, confidences, image=msg)
 
         # Crear mensaje
@@ -119,13 +119,13 @@ class HumanFaceDetectorLifecycleNode(LifecycleNode):
         msg_array.header.frame_id = msg.header.frame_id
         msg_array.image = msg  # <-- añadimos la imagen original
 
-        for x1, y1, x2, y2, id, score in tracked_faces:
+        for x1, y1, x2, y2, tid, score in tracked_faces:
             detection = FaceDetection()
             detection.corner = Point(x=float(x1), y=float(y1), z=0.0)
             detection.width = float(x2-x1)
             detection.height = float(y2-y1)
             detection.confidence = float(score)
-            detection.id = int(id)
+            detection.tid = int(tid)
             msg_array.detections.append(detection)
 
         self.get_logger().info("No se han detectado caras" if len(msg_array.detections) == 0 else 
