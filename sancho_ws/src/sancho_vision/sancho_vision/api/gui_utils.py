@@ -25,12 +25,21 @@ def drawTexts(frame, position, distance, MIDDLE_BOUND, UPPER_BOUND, classified=N
     if showScore and score is not None:
         drawText(frame, "Score: " + str(round(score, 5)), [position[0], position[1] + int(h*1.5)], colorScore, wantedWidth=wantedWidth)
 
-def mark_face(frame, position, distance, MIDDLE_BOUND, UPPER_BOUND, classified=None, drawRectangle=True, score=None, showDistance=False, showScore=False, interlocutor=None, inter_time=0):
+def mark_face(frame, position, distance, MIDDLE_BOUND, UPPER_BOUND, classified=None, drawRectangle=True, score=None, showDistance=False, showScore=False, interlocutor=None, inter_time=0, tracker_id=None):
     x, y, w, h = position
+    color = getClassifiedColor(distance, MIDDLE_BOUND, UPPER_BOUND)
+
     if drawRectangle:
-        cv2.rectangle(frame, (x, y), (x + w, y + h), getClassifiedColor(distance, MIDDLE_BOUND, UPPER_BOUND), 2)
+        cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
+    
+    if tracker_id:
+        label = f"#{tracker_id}"
+        # white text over classified color background
+        drawTextLarge(frame, label, (x, max(5, y - 5)), textColor=(255,255,255), bgColor=color, scale=1.2, thickness=3)
+
     drawTexts(frame, (x, y + h + 10), distance, MIDDLE_BOUND, UPPER_BOUND, classified=classified, 
               score=score, wantedWidth=w, showDistance=showDistance, showScore=showScore)
+    
     if interlocutor is not None and classified is not None and interlocutor == classified:
         drawText(frame, "INTERLOCUTOR " + str(round(inter_time, 2)) + "s", (x-20, y), (0, 255, 255), wantedWidth=w+40)
 
@@ -53,6 +62,18 @@ def drawText(image, text, position, textColor, bgColor=(0,0,0), wantedWidth=None
     cv2.putText(image, text, position, font, scale, textColor, textThickness, cv2.LINE_AA)
 
     return position[0], position[1], width, height
+
+def drawTextLarge(image, text, position, textColor=(255,255,255), bgColor=(0,0,0), scale=1.4, thickness=3):
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    (width, height), _ = cv2.getTextSize(text, font, scale, thickness)
+    # ensure label stays on-frame
+    px = max(0, position[0])
+    py = max(int(height), position[1])
+    backgroundPosition = (px, py - int(height*1.2))
+    backgroundSize = (width, int(height*1.4))
+    cv2.rectangle(image, backgroundPosition, (backgroundPosition[0] + backgroundSize[0], backgroundPosition[1] + backgroundSize[1]), bgColor, cv2.FILLED)
+    cv2.putText(image, text, (px, py), font, scale, textColor, thickness, cv2.LINE_AA)
+    return px, py, width, height
 
 def submit(root):
     root.event_generate('<Return>')

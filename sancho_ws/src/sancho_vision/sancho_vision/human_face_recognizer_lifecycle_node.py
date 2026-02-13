@@ -261,7 +261,7 @@ class HumanFaceRecognizerLifecycleNode(LifecycleNode):
                 display_name = "Unknown" if not faceprint["id"] else (faceprint["name"] if faceprint["name"] else f"User-{faceprint['id']}")
                 self.get_logger().info(f"[cached] {display_name} -> Distance: {distance:.4f} | Confidence: {confidence:.4f}")
 
-                mark_face(marked_image, [int(i) for i in position], distance, 0.80, 0.90, display_name, score=confidence, showDistance=True, showScore=True)
+                mark_face(marked_image, [int(i) for i in position], distance, 0.80, 0.90, display_name, score=confidence, showDistance=True, showScore=True, tracker_id=tracker_id)
 
                 recognitions.append((face_aligned, features, faceprint, distance, pos, face_updated))
                 continue
