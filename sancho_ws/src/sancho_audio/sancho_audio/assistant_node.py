@@ -144,7 +144,7 @@ class Assistant:
             tuple: (text, emotion)
         """
         # TODO: Change thread_id to a dynamic value
-        url = "https://olympics-housewives-however-different.trycloudflare.com/ask"
+        url = "https://these-codes-beef-returns.trycloudflare.com/ask"
         payload = {
             "query": text,
             "thread_id": user_id if user_id and user_id != "Unknown" else "Mapirbot_thread"
