@@ -47,8 +47,8 @@ class AssistantNode(Node):
         self.confirm_name_pub = self.create_publisher(Bool, "/gui/confirm_name", 10)
         
         self.text_sub = self.create_subscription(UserTranscription, 'sancho_audio/assistant_helper/transcription', self.text_callback, 10)
-        self.tts_sub = self.create_subscription(InputTTS, 'input_tts', self.tts_callback, 10)
-        self.tts_sub = self.create_subscription(QuestionTTS, 'question_tts', self.question_callback, 10)
+        self.input_tts_sub = self.create_subscription(InputTTS, 'input_tts', self.tts_callback, 10)
+        self.question_tts_sub = self.create_subscription(QuestionTTS, 'question_tts', self.question_callback, 10)
         self.cancel_question_sub = self.create_subscription(Empty, 'assistant/cancel_question', self.cancel_question_callback, 10)
 
         self.log_pub = self.create_publisher(ConversationTurn, "conversation_log/add", 10)
@@ -361,6 +361,7 @@ class Assistant:
         self.question_id = self.question_id if keep_asking else QUESTION.NO_QUESTION
         
         self.node.face_mode_pub.publish(String(data=face_mode)) # Mouth mode
+        self.node.get_logger().info(f"Cambiando estado del helper a: {helper_mode.name}")
         self.node.helper_mode_pub.publish(Int16(data=helper_mode.value)) # Helper mode
 
     def _get_available_transition_id(self, node_name: str, label: str):
