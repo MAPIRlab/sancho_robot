@@ -14,6 +14,8 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
         (os.path.join("share", package_name, "launch"), glob("launch/*")),
+        (os.path.join("share", package_name, "models"), glob("models/*")),
+        (os.path.join("share", package_name, "exps"), glob("exps/*")) 
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -31,7 +33,7 @@ setup(
             'single_person_detector_node = sancho_perception.single_person_detector_node:main',
             'single_person_waypoint_generator_node = sancho_perception.single_person_waypoint_generator_node:main',
             'relay_metrics_node = sancho_perception.metrics_node:main',
-            'perception_test = sancho_perception.perception_test:main',
+            'perception_test = sancho_perception.tracking_node:main',
         ],
     },
 )

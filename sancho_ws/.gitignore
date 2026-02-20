@@ -175,3 +175,8 @@ certs/*.pem
 /notebook_Test
 src/sancho_vision/sancho_vision/dlib_inference_test.py
 src/sancho_perception/sancho_perception/metrics_node.py
+<<<<<<< HEAD
+**/models/*
+=======
+**/models/
+>>>>>>> 3c882e9 (Updated gitignore to avoid models folder)
