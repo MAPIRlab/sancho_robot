@@ -38,6 +38,8 @@ setup(
 
             'camera = sancho_vision.camera_node:main',
             'video = sancho_vision.video_node:main',
+            'body_face_fusion_node = sancho_vision.body_face_fusion_node:main',
+            'face_visualizer_node = sancho_vision.face_visualizer_node:main',
         ],
     },
 )
