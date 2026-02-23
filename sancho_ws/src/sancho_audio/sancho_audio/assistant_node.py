@@ -72,6 +72,8 @@ class AssistantNode(Node):
         self.question_queue = Queue()
         self.greet_queue = Queue(maxsize=1)
 
+        self.declare_parameter("mapirbot_url", "https://sagem-aluminium-mud-heading.trycloudflare.com/ask")
+        
         self.get_logger().info("Assistant Node initializated succesfully.")
 
     def text_callback(self, msg):
@@ -144,7 +146,7 @@ class Assistant:
             tuple: (text, emotion)
         """
         # TODO: Change thread_id to a dynamic value
-        url = "https://these-codes-beef-returns.trycloudflare.com/ask"
+        url = self.node.get_parameter("mapirbot_url").get_parameter_value().string_value
         payload = {
             "query": text,
             "thread_id": user_id if user_id and user_id != "Unknown" else "Mapirbot_thread"
