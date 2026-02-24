@@ -20,14 +20,25 @@ ASSISTANT_HELPER_VENV = "/home/mapir/sancho_robot/sancho_ws/runtimes/assistant_h
 def generate_launch_description():
     prefix_cmd = LaunchConfiguration('prefix')
 
+    #llm = Node(
+    #    package='llm_tools',
+    #    executable='llm',
+    #    name='llm',
+    #    parameters=[{
+    #        "llm_load_models": f"[['{PROVIDER.OPENAI}', ['{MODELS.LLM.OPENAI.GPT_3_5_TURBO}'], '{OPENAI_API_KEY}']]",
+    #        "llm_active_provider": f"{PROVIDER.OPENAI}",
+    #        "llm_active_model": f"{MODELS.LLM.OPENAI.GPT_3_5_TURBO}",
+    #    }]
+    #)
+
     llm = Node(
         package='llm_tools',
         executable='llm',
-        name='llm',
+        name='mapirbot',
         parameters=[{
-            "llm_load_models": f"[['{PROVIDER.OPENAI}', ['{MODELS.LLM.OPENAI.GPT_3_5_TURBO}'], '{OPENAI_API_KEY}']]",
-            "llm_active_provider": f"{PROVIDER.OPENAI}",
-            "llm_active_model": f"{MODELS.LLM.OPENAI.GPT_3_5_TURBO}",
+            "llm_load_models": f"[['{PROVIDER.MAPIRBOT}', ['{MODELS.LLM.MAPIRBOT.MAPIRBOT}'], '{OPENAI_API_KEY}']]",
+            "llm_active_provider": f"{PROVIDER.MAPIRBOT}",
+            "llm_active_model": f"{MODELS.LLM.MAPIRBOT.MAPIRBOT}",
         }]
     )
 

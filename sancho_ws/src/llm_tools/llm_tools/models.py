@@ -22,6 +22,8 @@ class PROVIDER(SmartStrEnum):
     GEMMA = "gemma"
     FALCON = "falcon"
     YI = "yi"
+    # Mapirbot
+    MAPIRBOT = "mapirbot"
 
 class MODELS:
     class LLM:
@@ -67,6 +69,9 @@ class MODELS:
             YI_1_5_9B_CHAT = "01-ai/Yi-1.5-9B-Chat"
             YI_1_5_34B_CHAT = "01-ai/Yi-1.5-34B-Chat"
 
+        class MAPIRBOT(SmartStrEnum):
+            MAPIRBOT = "mapirbot"
+    
     class EMBEDDING:
         class OPENAI(SmartStrEnum):
             SMALL_3 = "text-embedding-3-small"

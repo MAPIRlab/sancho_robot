@@ -26,6 +26,7 @@ class LLMNode(Node):
         PROVIDER.GEMMA: ("llm_tools.providers.gemma_provider", "GemmaProvider"),
         PROVIDER.FALCON: ("llm_tools.providers.falcon_provider", "FalconProvider"),
         PROVIDER.YI: ("llm_tools.providers.yi_provider", "YIProvider"),
+        PROVIDER.MAPIRBOT: ("llm_tools.providers.mapirbot_provider", "MapirbotProvider"),
     }
 
     def __init__(self):

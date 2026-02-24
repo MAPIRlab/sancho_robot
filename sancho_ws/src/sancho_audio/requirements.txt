@@ -5,3 +5,5 @@ pyaudio
 scipy
 soundfile
 pyannote.audio
+
+requests

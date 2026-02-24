@@ -3,6 +3,7 @@ import time
 import rclpy
 import sounddevice as sd
 from rclpy.node import Node
+import requests
 
 from enum import Enum
 from queue import Queue
@@ -10,7 +11,7 @@ from queue import Queue
 from std_msgs.msg import String, Int16, Bool, Empty
 from std_srvs.srv import SetBool
 from hri_msgs.srv import SanchoPrompt, TriggerUserInteraction
-from sancho_msgs.msg import InputTTS, QuestionTTS, UserTranscription
+from sancho_msgs.msg import InputTTS, QuestionTTS, UserTranscription, ConversationTurn
 from sancho_msgs.srv import GreetPeople
 from speech_msgs.srv import TTS
 
@@ -46,9 +47,11 @@ class AssistantNode(Node):
         self.confirm_name_pub = self.create_publisher(Bool, "/gui/confirm_name", 10)
         
         self.text_sub = self.create_subscription(UserTranscription, 'sancho_audio/assistant_helper/transcription', self.text_callback, 10)
-        self.tts_sub = self.create_subscription(InputTTS, 'input_tts', self.tts_callback, 10)
-        self.tts_sub = self.create_subscription(QuestionTTS, 'question_tts', self.question_callback, 10)
+        self.input_tts_sub = self.create_subscription(InputTTS, 'input_tts', self.tts_callback, 10)
+        self.question_tts_sub = self.create_subscription(QuestionTTS, 'question_tts', self.question_callback, 10)
         self.cancel_question_sub = self.create_subscription(Empty, 'assistant/cancel_question', self.cancel_question_callback, 10)
+
+        self.log_pub = self.create_publisher(ConversationTurn, "conversation_log/add", 10)
 
         self.sancho_greet_people_srv = self.create_service(GreetPeople, 'assistant/greet_people', self.sancho_greet_people_service)
 
@@ -69,6 +72,8 @@ class AssistantNode(Node):
         self.question_queue = Queue()
         self.greet_queue = Queue(maxsize=1)
 
+        self.declare_parameter("mapirbot_url", "https://sagem-aluminium-mud-heading.trycloudflare.com/ask")
+        
         self.get_logger().info("Assistant Node initializated succesfully.")
 
     def text_callback(self, msg):
@@ -101,6 +106,7 @@ class Assistant:
         self.node = AssistantNode(self)
 
         self.question_id = QUESTION.NO_QUESTION
+        
 
     def spin(self):
         while rclpy.ok():
@@ -127,18 +133,97 @@ class Assistant:
 
             rclpy.spin_once(self.node)
 
+    def call_mapirbot(self, text, user_id, user_name):
+        """
+        Call Mapirbot to get a response.
+
+        Args:
+            text (str): Text to send to Mapirbot.
+            user_id (str): User ID.
+            user_name (str): User name.
+        
+        Returns:
+            tuple: (text, emotion)
+        """
+        # TODO: Change thread_id to a dynamic value
+        url = self.node.get_parameter("mapirbot_url").get_parameter_value().string_value
+        payload = {
+            "query": text,
+            "thread_id": user_id if user_id and user_id != "Unknown" else "Mapirbot_thread"
+        }
+        headers = {"Content-Type": "application/json"}
+        
+        try:
+            response = requests.post(url, data=json.dumps(payload), headers=headers, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                self.node.get_logger().info(f"[INFO] Respuesta de Mapirbot: {data}")
+                if isinstance(data, dict):
+                    text = data.get("response", str(data))
+                    emotion = data.get("emotion", "happy")
+                else:
+                    text = str(data)
+                    emotion = "happy"
+                
+                return text, emotion
+            else:
+                self.node.get_logger().error(f"[ERROR] Error de Mapirbot: {response.status_code}")
+                return "Perdona, mi conexión con el agente remoto ha fallado.", "sad"
+        except Exception as e:
+            self.node.get_logger().error(f"[ERROR] Excepción llamando a Mapirbot: {e}")
+            return "Lo siento, ha habido un error al conectar con mi agente.", "sad"
+    
+    def log_conversation(self, user_text, assistant_text, user_id, user_name, emotion):
+        """
+        Log a conversation turn.
+
+        Args:
+            user_text (str): Text from the user.
+            assistant_text (str): Text from the assistant.
+            user_id (str): User ID.
+            user_name (str): User name.
+            emotion (str): Emotion of the assistant.
+        """
+        # TODO: Change chat_id to a dynamic value
+        turn = ConversationTurn()
+        turn.chat_id = "0"
+        turn.user_timestamp = time.time()
+        turn.user_id = user_id or "Unknown"
+        turn.user_name = user_name or "Usuario"
+        turn.user_text = user_text
+        turn.assistant_timestamp = time.time()
+        turn.assistant_text = assistant_text
+        turn.assistant_provider = "mapirbot"
+        turn.assistant_model = "mapirbot"
+        turn.assistant_value_json = json.dumps({"emotion": emotion})
+        self.node.log_pub.publish(turn)
+        
+
     def process_user_transcription(self, text, user_id, user_name):
         self.node.get_logger().info(f"{user_name or 'Desconocido'} dice: {text}")
         self.node.face_mode_pub.publish(String(data="thinking"))
+
+        #if self.question_id == QUESTION.NO_QUESTION: # Si es un mensaje normal
+        #    ai_response, emotion, data, intent = self.sancho_prompt_request(text, user_id, user_name)
+
+        #    if intent == COMMANDS.TAKE_PICTURE:
+        #        data_json = json.dumps(data)
+        #        self.gui_request("show_photo", data_json) # Show photo
+
+        #    self.play_tts(ai_response, emotion=emotion)
+
         
         if self.question_id == QUESTION.NO_QUESTION: # Si es un mensaje normal
-            ai_response, emotion, data, intent = self.sancho_prompt_request(text, user_id, user_name)
-
-            if intent == COMMANDS.TAKE_PICTURE:
-                data_json = json.dumps(data)
-                self.gui_request("show_photo", data_json) # Show photo
-
+            #if not user_id or user_id == "Unknown":
+            #    # If we don't know the user, Mapirbot generates the question "who are you"
+            #    ai_response, emotion = self.call_mapirbot(text, user_id, user_name)
+            #    self.play_tts(ai_response, emotion=emotion, keep_asking=True)
+            #    self.question_id = QUESTION.GET_NAME
+            #    self.log_conversation(text, ai_response, user_id, user_name, emotion)
+            #else:
+            ai_response, emotion = self.call_mapirbot(text, user_id, user_name)
             self.play_tts(ai_response, emotion=emotion)
+            self.log_conversation(text, ai_response, user_id, user_name, emotion)
 
         elif self.question_id == QUESTION.GET_NAME: # Si es la respuesta cual es tu nombre
             name_said, name = self.sancho_get_name_request(text)
@@ -159,12 +244,11 @@ class Assistant:
                 self.play_tts("No te he entendido bien. ¿Podrías repetirlo?", "sad", keep_asking=True)
 
     def sancho_greet_people(self, ids, names): # Cuando Sancho busca a un grupo y los ve y se prepara para decirles algo, aqui se dice ese algo
-        text = self.sancho_prompt_greet_request( 
-            args_json=json.dumps({"people": names}), 
-            mode=MODE.NO_ONE_KNOWN if not names else MODE.SOME_KNOWN if len(names) != len(ids) else MODE.ALL_KNOWN
-        )
-
-        self.play_tts(text)
+        # Usamos Mapirbot para generar el saludo
+        greet_text = f"Saluda a estas personas: {', '.join(names)}" if names else "Saluda a alguien que acabas de ver pero no conoces."
+        text, emotion = self.call_mapirbot(greet_text, "0", "Varios")
+        
+        self.play_tts(text, emotion=emotion)
 
         self._activate_lifecycle_node("assistant_helper") # Activar assistant helper
         self._activate_lifecycle_node("face_manager") # Activar human face manager
@@ -175,6 +259,7 @@ class Assistant:
         sancho_prompt_request.mode = mode
 
         future_sancho_prompt = self.node.sancho_prompt_client.call_async(sancho_prompt_request)
+        
         rclpy.spin_until_future_complete(self.node, future_sancho_prompt)
         result_sancho_prompt = future_sancho_prompt.result()
 
@@ -278,6 +363,7 @@ class Assistant:
         self.question_id = self.question_id if keep_asking else QUESTION.NO_QUESTION
         
         self.node.face_mode_pub.publish(String(data=face_mode)) # Mouth mode
+        self.node.get_logger().info(f"Cambiando estado del helper a: {helper_mode.name}")
         self.node.helper_mode_pub.publish(Int16(data=helper_mode.value)) # Helper mode
 
     def _get_available_transition_id(self, node_name: str, label: str):
