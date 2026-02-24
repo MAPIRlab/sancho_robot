@@ -11,7 +11,7 @@ from rclpy.node import Node
 from rclpy.parameter import ParameterType
 from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
 
-from sancho_msgs.msg import AudioData, VADSegment
+from sancho_interfaces.msg import AudioData, VADSegment
 
 
 class VADDetectorNode(Node):

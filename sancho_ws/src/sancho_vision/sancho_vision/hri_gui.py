@@ -7,8 +7,8 @@ from rclpy.node import Node
 from rclpy.timer import Timer
 from std_msgs.msg import Empty, String, Bool
 
-from hri_msgs.msg import FaceNameResponse, FaceQuestionResponse
-from hri_msgs.srv import TriggerUserInteraction
+from sancho_interfaces.msg import FaceNameResponse, FaceQuestionResponse
+from sancho_interfaces.srv import TriggerUserInteraction
 
 from .gui import AppController
 

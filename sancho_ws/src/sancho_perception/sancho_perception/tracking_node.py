@@ -7,7 +7,7 @@ import torch
 import numpy as np
 import sys
 import os
-from sancho_msgs.msg import FaceDetectionArray, FaceDetection
+from sancho_interfaces.msg import FaceDetectionArray, FaceDetection
 from geometry_msgs.msg import Point
 
 from ament_index_python.packages import get_package_share_directory

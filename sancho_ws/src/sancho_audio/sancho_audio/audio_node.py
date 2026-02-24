@@ -6,7 +6,7 @@ import time
 import rclpy
 from rclpy.node import Node
 
-from hri_msgs.msg import ChunkMono, ChunkStereo
+from sancho_interfaces.msg import ChunkMono, ChunkStereo
 
 
 class AudioNode(Node):

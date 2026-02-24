@@ -19,7 +19,7 @@ from tf2_ros import (
     TransformListener,
 )
 
-from sancho_msgs.msg import PersonPose, PersonsPoses
+from sancho_interfaces.msg import PersonPose, PersonsPoses
 
 random.seed(42)
 # Opcional: semilla para reproducibilidad

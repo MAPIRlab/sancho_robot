@@ -7,7 +7,7 @@ from rclpy.node import Node
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 
-from ros2web_msgs.srv import R2WSubscribe
+from sancho_interfaces.srv import R2WSubscribe
 
 
 class Video(Node):

@@ -4,7 +4,7 @@ from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 import cv2
 
-from sancho_msgs.msg import FaceRecognitionArray
+from sancho_interfaces.msg import FaceRecognitionArray
 from .api.gui_utils import mark_face
 
 class FaceVisualizerNode(Node):

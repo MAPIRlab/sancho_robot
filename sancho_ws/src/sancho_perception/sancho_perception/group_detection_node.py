@@ -11,7 +11,7 @@ from sklearn.cluster import DBSCAN
 from sklearn.metrics import silhouette_score
 from visualization_msgs.msg import Marker, MarkerArray
 
-from sancho_msgs.msg import GroupInfo
+from sancho_interfaces.msg import GroupInfo
 
 
 def bounding_box_area(points: np.ndarray) -> float:

@@ -4,7 +4,7 @@ import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Float32
 
-from sancho_msgs.msg import VADSegment
+from sancho_interfaces.msg import VADSegment
 
 # Import both methods
 from .tdoa_nodes import STRATEGIES, TDOAStrategy

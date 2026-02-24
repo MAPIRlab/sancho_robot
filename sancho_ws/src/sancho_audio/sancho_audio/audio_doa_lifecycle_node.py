@@ -6,7 +6,7 @@ from rclpy.lifecycle import LifecycleNode, State, TransitionCallbackReturn
 from rclpy.qos import QoSProfile
 
 from std_msgs.msg import Float32
-from hri_msgs.msg import ChunkStereo
+from sancho_interfaces.msg import ChunkStereo
 
 from .utils.doa import DOAMethod, GCCPHATDOA, NCCDOA, DOA_METHODS
 

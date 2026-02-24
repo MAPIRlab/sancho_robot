@@ -3,8 +3,8 @@ from rclpy.node import Node
 from std_msgs.msg import Header
 from geometry_msgs.msg import PointStamped
 from sensor_msgs.msg import CameraInfo
-from sancho_msgs.msg import FaceDetection, FaceRecognition, FaceRecognitionArray
-# from sancho_msgs.srv import ComputeCluster  # Custom srv: uint32[] member_ids; float32 centroid_x; float32 centroid_y; float32 centroid_z
+from sancho_interfaces.msg import FaceDetection, FaceRecognition, FaceRecognitionArray
+# from sancho_interfaces.srv import ComputeCluster  # Custom srv: uint32[] member_ids; float32 centroid_x; float32 centroid_y; float32 centroid_z
 from std_srvs.srv import Empty as ComputeCluster  # Placeholder, replace with actual custom service
 from visualization_msgs.msg import Marker, MarkerArray
 import tf2_ros

@@ -4,7 +4,7 @@ import numpy as np
 
 import rclpy
 from rclpy.node import Node
-from hri_msgs.msg import ChunkMono, ChunkStereo
+from sancho_interfaces.msg import ChunkMono, ChunkStereo
 
 OUTPUT_PATH = "/home/mapir/sancho_robot/sancho_ws/src/sancho_audio/sancho_audio/tests/record_test.wav"
 

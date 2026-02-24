@@ -141,7 +141,7 @@ def generate_launch_description():
     #  REST API (for faceprint database management via web UI)
     # ──────────────────────────────────────────────────────────────────────────
     api_rest_node = Node(
-        package='sancho_web_assistant',
+        package='sancho_web_bridge',
         executable='api_rest',
         name='api_rest',
         parameters=[{

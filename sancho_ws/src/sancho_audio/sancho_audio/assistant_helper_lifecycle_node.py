@@ -10,10 +10,10 @@ from rclpy.qos import QoSProfile
 from rclpy.lifecycle import LifecycleNode, TransitionCallbackReturn
 
 from std_msgs.msg import String, Float32, Int16
-from hri_msgs.msg import ChunkMono
-from sancho_msgs.msg import QuestionTTS, FaceRecognitionArray, UserTranscription
-from sancho_msgs.srv import AskUser
-from speech_msgs.srv import STT
+from sancho_interfaces.msg import ChunkMono
+from sancho_interfaces.msg import QuestionTTS, FaceRecognitionArray, UserTranscription
+from sancho_interfaces.srv import AskUser
+from sancho_interfaces.srv import STT
 
 from .utils.sound import play
 from .utils.sounds import ACTIVATION_SOUND, TIME_OUT_SOUND

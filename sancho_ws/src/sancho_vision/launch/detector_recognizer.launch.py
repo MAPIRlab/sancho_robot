@@ -115,7 +115,7 @@ def generate_launch_description():
         ),
 
         Node(
-            package='rumi_web',
+            package='sancho_web_bridge',
             executable='session_manager',
             name='session_manager',
             output='screen',
@@ -124,7 +124,7 @@ def generate_launch_description():
         ),
 
         Node(
-            package='sancho_web_assistant',
+            package='sancho_web_bridge',
             executable='api_rest',
             name='api_rest',
             parameters=[{

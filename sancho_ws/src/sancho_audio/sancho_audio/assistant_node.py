@@ -10,10 +10,10 @@ from queue import Queue
 
 from std_msgs.msg import String, Int16, Bool, Empty
 from std_srvs.srv import SetBool
-from hri_msgs.srv import SanchoPrompt, TriggerUserInteraction
-from sancho_msgs.msg import InputTTS, QuestionTTS, UserTranscription, ConversationTurn
-from sancho_msgs.srv import GreetPeople
-from speech_msgs.srv import TTS
+from sancho_interfaces.srv import SanchoPrompt, TriggerUserInteraction
+from sancho_interfaces.msg import InputTTS, QuestionTTS, UserTranscription, ConversationTurn
+from sancho_interfaces.srv import GreetPeople
+from sancho_interfaces.srv import TTS
 
 from sancho_audio.assistant_helper_node import HELPER_STATE
 from sancho_ai.sancho_ai_node import MODE

@@ -4,7 +4,7 @@ import wave
 import numpy as np
 import rclpy
 from rclpy.node import Node
-from sancho_msgs.msg import AudioData
+from sancho_interfaces.msg import AudioData
 
 
 class QuickChecker(Node):

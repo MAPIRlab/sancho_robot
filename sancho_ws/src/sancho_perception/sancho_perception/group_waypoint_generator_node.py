@@ -24,7 +24,7 @@ from visualization_msgs.msg import Marker, MarkerArray
 
 _ = do_transform_pose_stamped
 
-from sancho_msgs.msg import GroupInfo
+from sancho_interfaces.msg import GroupInfo
 
 
 class GroupWaypointGeneratorNode(LifecycleNode):
