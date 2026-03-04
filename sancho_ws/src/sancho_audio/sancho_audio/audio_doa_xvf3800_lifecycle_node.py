@@ -12,24 +12,21 @@ class AudioDOAXVF3800LifecycleNode(LifecycleNode):
 
     def __init__(self):
         super().__init__("audio_doa_xvf3800")
-        
-        self.declare_parameters(namespace='', parameters={
-            ("doa_topic", "sancho_audio/doa"),                  # tópico Float32 con grados
-            ("poll_hz", 10.0),                                  # frecuencia de sondeo
-            ("no_speech_value", float("nan")),                  # valor cuando no hay voz/ángulo
-        })
+
+        self.declare_parameter("doa_topic", "sancho_audio/doa")
+        self.declare_parameter("poll_hz", 10.0)
 
         self.pub_angle = None
         self.timer = None
 
-        self._deg_re = re.compile(r"\((nan|[-+]?\d+(?:\.\d+)?)\s+deg\)", flags=re.I) # Para sacar el ángulo procesado
+        # RE used to get angle from command output
+        self._deg_re = re.compile(r"\((nan|[-+]?\d+(?:\.\d+)?)\s+deg\)", flags=re.I)
 
     def on_configure(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info("Configurando nodo AudioDOAXVF3800LifecycleNode.")
 
         self.doa_topic = self.get_parameter("doa_topic").value
-        self.poll_hz = float(self.get_parameter("poll_hz").value)
-        self.no_speech_value = float(self.get_parameter("no_speech_value").value)
+        self.poll_hz = self.get_parameter("poll_hz").get_parameter_value().double_value
 
         if self.poll_hz <= 0.0:
             self.get_logger().warn("poll_hz <= 0. Ajustando a 1.0 Hz.")
@@ -61,23 +58,25 @@ class AudioDOAXVF3800LifecycleNode(LifecycleNode):
 
     def spin(self):
         angle = self._read_processed_deg()
-
-        if angle is None:
-            self.pub_angle.publish(Float32(data=self.no_speech_value))
-            self.get_logger().debug("Sin voz (publicado NaN).")
+        if angle:
+            angle = 180 - angle
+            self.get_logger().info(f"DoA: {angle:6.2f}°")
+            if self.pub_angle:
+                self.pub_angle.publish(Float32(data=angle))
         else:
-            angle = float(angle) % 360.0
-            self.pub_angle.publish(Float32(data=angle))
-            self.get_logger().info(f"DoA (processed): {angle:6.2f}°")
+            self.get_logger().info("No angle")
+
 
     def _read_processed_deg(self):
+        cmd = ["xvf_host", "AUDIO_MGR_SELECTED_AZIMUTHS"]
+
         try:
-            out = subprocess.check_output(["xvf_host", "AUDIO_MGR_SELECTED_AZIMUTHS"], text=True)
+            out = subprocess.check_output(cmd, text=True)
         except subprocess.CalledProcessError as e:
             self.get_logger().warn(f"Error invocando comando: {e}")
             return None
         except FileNotFoundError:
-            self.get_logger().error(f"No se encontró el ejecutable '{self.cmd[0]}'.")
+            self.get_logger().error(f"No se encontró el ejecutable '{cmd[0]}'.")
             return None
 
         matches = self._deg_re.findall(out)

@@ -28,32 +28,32 @@ def generate_launch_description():
         emulate_tty=True,
     )
 
-    # audio_doa_node = LifecycleNode(
-    #     namespace='',
-    #     package='sancho_audio',
-    #     executable='audio_doa_xvf3800_lifecycle',
-    #     name='audio_doa_xvf3800_lifecycle',
-    #     output='screen',
-    #     prefix=prefix_cmd,
-    #     emulate_tty=True,
-    # )
-
     audio_doa_node = LifecycleNode(
         namespace='',
         package='sancho_audio',
-        executable='audio_doa_lifecycle',
-        name='audio_doa_lifecycle',
+        executable='audio_doa_xvf3800_lifecycle',
+        name='audio_doa_xvf3800_lifecycle',
         output='screen',
         prefix=prefix_cmd,
         emulate_tty=True,
     )
 
+    # audio_doa_node = LifecycleNode(
+    #     namespace='',
+    #     package='sancho_audio',
+    #     executable='audio_doa_lifecycle',
+    #     name='audio_doa_lifecycle',
+    #     output='screen',
+    #     prefix=prefix_cmd,
+    #     emulate_tty=True,
+    # )
 
-    audio_doa_overlay_node = Node(
+
+    doa_active_speaker_node = Node(
         namespace='',
         package='sancho_audio',
-        executable='audio_doa_overlay',
-        name='audio_doa_overlay'
+        executable='doa_active_speaker',
+        name='doa_active_speaker'
     )
 
     configurator_node = Node(
@@ -64,7 +64,7 @@ def generate_launch_description():
         parameters=[
             {
                 'activate': True,
-                'node_names': ['microphone', 'audio_doa_lifecycle'] # audio_doa_xvf3800_lifecycle
+                'node_names': ['microphone', 'audio_doa_xvf3800_lifecycle'] # audio_doa_lifecycle
             }
         ],
     )
@@ -86,7 +86,7 @@ def generate_launch_description():
             microphone_node,
             face_node,
             audio_doa_node,
-            audio_doa_overlay_node,
+            doa_active_speaker_node,
             configurator_node
         ]),
     ])
