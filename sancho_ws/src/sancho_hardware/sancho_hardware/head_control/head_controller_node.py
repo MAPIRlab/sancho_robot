@@ -79,7 +79,7 @@ class HRIHeadNode(Node):
         self.declare_parameter("idle_move_min_interval", 5.0)
         self.declare_parameter("idle_move_max_interval", 8.0)
         self.declare_parameter("pan_limit", [-1.20, 1.20])
-        self.declare_parameter("tilt_limit", [-0.5, 0.0])
+        self.declare_parameter("tilt_limit", [-0.35, 0.0])
         self.declare_parameter("tolerance", 0.001)
         self.declare_parameter("tracking_timeout", 5.0)
         self.declare_parameter("joint_group_name", "turret")
