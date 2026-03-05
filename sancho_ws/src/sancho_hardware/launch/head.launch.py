@@ -6,6 +6,8 @@ from launch_ros.actions import Node
 
 
 def generate_launch_description():
+    interbotix_xsturret_control_path = get_package_share_directory('interbotix_xsturret_control')
+
     return LaunchDescription([
         Node(
             package='interbotix_xs_sdk',
@@ -15,8 +17,8 @@ def generate_launch_description():
             namespace='wxxms',
             prefix="xterm -hold -e",
             parameters=[{
-                'motor_configs': os.path.join(get_package_share_directory("interbotix_xsturret_control"), 'config', 'wxxms.yaml'),
-                'mode_configs': os.path.join(get_package_share_directory("interbotix_xsturret_control"), 'config', 'modes.yaml'),
+                'motor_configs': os.path.join(interbotix_xsturret_control_path, 'config', 'wxxms.yaml'),
+                'mode_configs': os.path.join(interbotix_xsturret_control_path, 'config', 'modes.yaml'),
                 'load_configs': False
             }]
         ),

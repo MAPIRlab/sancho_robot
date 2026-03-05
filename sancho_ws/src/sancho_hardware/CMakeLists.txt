@@ -40,31 +40,37 @@ install(TARGETS
 # ----------------------------------------------------------------------------
 # Python Module and Nodes
 # ----------------------------------------------------------------------------
-# Install the Python package/module
 ament_python_install_package(${PROJECT_NAME})
 
-# Install the Python scripts as executables so `ros2 run` can find them
 install(PROGRAMS
   ${PROJECT_NAME}/head_control/head_controller_node.py
   DESTINATION lib/${PROJECT_NAME}
   RENAME head_controller_node
 )
 
-# Install test_face_emotions.py
 install(PROGRAMS
   ${PROJECT_NAME}/test_face_emotions.py
   DESTINATION lib/${PROJECT_NAME}
   RENAME test_face_emotions
 )
 
-# Install resource folders or other data
-install(DIRECTORY resource/
-  DESTINATION share/${PROJECT_NAME}/resource
-)
+# ----------------------------------------------------------------------------
+# Install Launch and Config
+# ----------------------------------------------------------------------------
 
-# Install launch files
+# Install all launch files (including your new wrappers)
 install(DIRECTORY launch/
   DESTINATION share/${PROJECT_NAME}/launch
+)
+
+# Install the config folder and all its subfolders (cameras, head, lidar)
+install(DIRECTORY config/
+  DESTINATION share/${PROJECT_NAME}/config
+)
+
+# Install resource folders
+install(DIRECTORY resource/
+  DESTINATION share/${PROJECT_NAME}/resource
 )
 
 ament_package()
