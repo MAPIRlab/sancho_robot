@@ -23,13 +23,13 @@ class DOAActiveSpeakerNode(Node):
         doa_overlay_topic (str): DoA overlay topic
         
     Publishers:
-        doa_overlay_topic (Image): Publishes camera image with a vertical line representing DoA
+        - doa_overlay_topic (Image): Publishes camera image with a vertical line representing DoA
 
     Subscribers:
-        camera_info_topic (CameraInfo): Subscribes to get fx and cx paremeters
-        joint_states_topic (JointState): Subscribes to get yaw angle from head joints
-        recognitions_topic (FaceRecognitionArray): Subscribes to get persons bounding boxes, identities and camera image.
-        doa_topic (Float32): Subscribes to get DoA
+        - camera_info_topic (CameraInfo): Subscribes to get fx and cx paremeters
+        - joint_states_topic (JointState): Subscribes to get yaw angle from head joints
+        - recognitions_topic (FaceRecognitionArray): Subscribes to get persons bounding boxes, identities and camera image.
+        - doa_topic (Float32): Subscribes to get DoA
     """
 
     def __init__(self):

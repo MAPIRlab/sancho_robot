@@ -32,7 +32,7 @@ setup(
             'audio_direction = sancho_audio.audio_direction_node:main',
             'microphone_capturer = sancho_audio.microphone_capturer_node:main',
             'recorder = sancho_audio.recorder_node:main',
-            'voice_activity_detector = sancho_audio.vad_node:main',
+            'vad_transcriptor_node = sancho_audio.vad_transcriptor_node:main',
             'stereo_recorder = sancho_audio.stereo_recorder_node:main',
             'assistant_helper=sancho_audio.assistant_helper_node:main',
             'assistant_helper_lifecycle=sancho_audio.assistant_helper_lifecycle_node:main',
@@ -41,7 +41,9 @@ setup(
             'microphone=sancho_audio.microphone_node:main',
             'audio_doa_lifecycle=sancho_audio.audio_doa_lifecycle_node:main',
             'audio_doa_xvf3800_lifecycle=sancho_audio.audio_doa_xvf3800_lifecycle_node:main',
-            'doa_active_speaker=sancho_audio.doa_active_speaker_node:main'
+            'doa_active_speaker=sancho_audio.doa_active_speaker_node:main',
+            'hotword_detector_node=sancho_audio.hotword_detector_node:main',
+            'interaction_manager_node=sancho_audio.interation_manager_node:main'
         ],
     },
 )
