@@ -1,12 +1,10 @@
 import os
 from dotenv import load_dotenv
 
-from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
-from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
-from launch_ros.actions import Node, LifecycleNode
+from launch_ros.actions import Node
 
 # Assuming you also have a TTS_MODELS enum in speech_tools.models
 from speech_tools.models import STT_MODELS, TTS_MODELS, TTS_SPEAKERS
@@ -19,8 +17,6 @@ OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 
 def generate_launch_description():
     prefix_cmd = LaunchConfiguration('prefix')
-
-    vision_pkg_dir = get_package_share_directory('sancho_vision')
 
     # Microphone
     microphone_node = Node(
@@ -44,27 +40,6 @@ def generate_launch_description():
             {'hotword_event_topic': '/voice_events/hotword_detected'}
         ]
     )
-
-    # ----- Speaker Recognition -------
-    person_recognition_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            os.path.join(vision_pkg_dir, 'launch', 'body_face_pipeline.launch.py')
-        ),
-    )
-
-    audio_doa_node = LifecycleNode(
-        namespace='',
-        package='sancho_audio',
-        executable='audio_doa_xvf3800_lifecycle',
-        name='audio_doa_xvf3800_lifecycle',
-    )
-
-    doa_active_speaker = Node(
-        package='sancho_audio',
-        executable='doa_active_speaker',
-        name='doa_active_speaker',
-    )
-    # ---------------------------------------
 
     # ------------ Transcription ----------------
     # STT Node
@@ -162,11 +137,8 @@ def generate_launch_description():
             default_value='xterm -hold -e' if os.environ.get('DISPLAY') else '',
             description='Prefijo para lanzar nodos en terminal (p.ej.: “xterm -hold -e”)'
         ),
-        person_recognition_launch,
         microphone_node,
         hotword_node,
-        audio_doa_node,
-        doa_active_speaker,
         stt_node,
         vad_transcriptor_node,
         llm_node,

@@ -35,12 +35,12 @@ class InteractionManagerNode(Node):
     def __init__(self):
         super().__init__("interaction_manager")
 
-        self.declare_parameter("mapirbot_url", "https://specialist-generous-gathered-games.trycloudflare.com/ask")
+        self.declare_parameter("mapirbot_url", "https://experiments-suspension-predictions-mid.trycloudflare.com/ask")
         self.declare_parameter("hotword_node", "hotword_detector")
-        self.declare_parameter("asr_node", "vad_transcriptor")
+        self.declare_parameter("transcriptor_node", "vad_transcriptor")
 
         self.hotword_node = self.get_parameter("hotword_node").get_parameter_value().string_value
-        self.asr_node = self.get_parameter("asr_node").get_parameter_value().string_value
+        self.transcriptor_node = self.get_parameter("transcriptor_node").get_parameter_value().string_value
         self.mapirbot_url = self.get_parameter("mapirbot_url").get_parameter_value().string_value
 
         self.question_state = QuestionState.NO_QUESTION
@@ -59,14 +59,14 @@ class InteractionManagerNode(Node):
         # Service Clients (Cada uno con su propio grupo para evitar deadlocks entre hilos)
         self.tts_client = self.create_client(TTS, 'speech_tools/tts', callback_group=MutuallyExclusiveCallbackGroup())
         self.hotword_enable_client = self.create_client(SetBool, f'/{self.hotword_node}/enable_listening', callback_group=MutuallyExclusiveCallbackGroup())
-        self.asr_enable_client = self.create_client(SetBool, f'/{self.asr_node}/enable_recording', callback_group=MutuallyExclusiveCallbackGroup())
+        self.transcriptor_enable_client = self.create_client(SetBool, f'/{self.transcriptor_node}/enable_recording', callback_group=MutuallyExclusiveCallbackGroup())
 
         self.get_logger().info("Interaction Manager initialized. Setting up the auditory system...")
         threading.Thread(target=self.initial_setup, daemon=True).start()
 
     def initial_setup(self):
-        """Sets the initial state: ASR off, Hotword on."""
-        self.set_node_state(self.asr_enable_client, False, self.asr_node)
+        """Sets the initial state: Transcription off, Hotword on."""
+        self.set_node_state(self.transcriptor_enable_client, False, self.transcriptor_node)
         self.set_node_state(self.hotword_enable_client, True, self.hotword_node)
         
         self.face_mode_pub.publish(String(data="idle"))
@@ -99,16 +99,22 @@ class InteractionManagerNode(Node):
 
     def on_hotword_detected(self, msg: Empty):
         self.get_logger().info("Wake word detected! Activating attention...")
-        try: play(ACTIVATION_SOUND) 
-        except Exception: pass
-        
         self.face_mode_pub.publish(String(data="listening"))
-        threading.Thread(target=self._switch_to_active_listening, daemon=True).start()
+        
+        threading.Thread(target=self._play_sound_and_listen, daemon=True).start()
 
-    def _switch_to_active_listening(self):
-        # El Hotword ya se ha auto-silenciado internamente, pero lo mandamos por seguridad
+    def _play_sound_and_listen(self):
+        # Deactivate hotword detection
         self.set_node_state(self.hotword_enable_client, False, self.hotword_node)
-        self.set_node_state(self.asr_enable_client, True, self.asr_node)
+        
+        # Play sound and wait until it has finished
+        try: 
+            play(ACTIVATION_SOUND, wait_for_end=True) 
+        except Exception as e: 
+            self.get_logger().warn(f"Error reproduciendo sonido: {e}")
+        
+        # Activate transcription
+        self.set_node_state(self.transcriptor_enable_client, True, self.transcriptor_node)
 
     def on_transcription_received(self, msg: String):
         text = msg.data.strip()
@@ -116,6 +122,7 @@ class InteractionManagerNode(Node):
         
         if not text:
             self.get_logger().info("No speech detected or timeout reached. Returning to idle state.")
+            self.play_tts("Lo siento, no te he entendido")
             self.reset_to_idle()
             return
 
@@ -171,7 +178,7 @@ class InteractionManagerNode(Node):
 
         if keep_asking:
             self.face_mode_pub.publish(String(data="listening"))
-            self.set_node_state(self.asr_enable_client, True, self.asr_node)
+            self.set_node_state(self.transcriptor_enable_client, True, self.transcriptor_node)
         else:
             self.reset_to_idle()
 

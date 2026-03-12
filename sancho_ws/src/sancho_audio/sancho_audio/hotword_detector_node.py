@@ -41,7 +41,6 @@ class HotwordDetectorNode(Node):
         self.get_logger().info(f"{self.get_name()} initialized and ready.")
 
     def enable_callback(self, request, response):
-        """Activa o desactiva la compuerta de audio."""
         self._is_listening = request.data
         self.get_logger().info(f"Hotword listening state set to: {self._is_listening}")
         response.success = True

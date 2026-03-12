@@ -1,10 +1,11 @@
 import math
 import cv2
+import json
 
 import rclpy
 from rclpy.node import Node
 
-from std_msgs.msg import Float32
+from std_msgs.msg import Float32, String
 from sensor_msgs.msg import Image, JointState, CameraInfo
 from sancho_msgs.msg import FaceRecognitionArray, FaceRecognition
 from cv_bridge import CvBridge
@@ -21,9 +22,12 @@ class DOAActiveSpeakerNode(Node):
         recognitions_topic (str): Persons recognitions topic
         doa_topic (str): DoA topic
         doa_overlay_topic (str): DoA overlay topic
+        active_speaker_info_topic (str): Active Speaker Info topic
         
     Publishers:
         - doa_overlay_topic (Image): Publishes camera image with a vertical line representing DoA
+        - active_speaker_info_topic (String): Publishes a JSON formatted string containing active speaker information 
+
 
     Subscribers:
         - camera_info_topic (CameraInfo): Subscribes to get fx and cx paremeters
@@ -53,6 +57,7 @@ class DOAActiveSpeakerNode(Node):
         self.declare_parameter("recognitions_topic", "/face_recognitions")
         self.declare_parameter("doa_topic", "/sancho_audio/doa")
         self.declare_parameter("doa_overlay_topic", "/sancho_camera/image_audio_doa")
+        self.declare_parameter("active_speaker_info_topic", "/active_speaker_info")
 
         info_topic = self.get_parameter("camera_info_topic").get_parameter_value().string_value
         joint_states_topic = self.get_parameter("joint_states_topic").get_parameter_value().string_value
@@ -60,6 +65,7 @@ class DOAActiveSpeakerNode(Node):
         recognitions_topic = self.get_parameter("recognitions_topic").get_parameter_value().string_value
         doa_topic = self.get_parameter("doa_topic").get_parameter_value().string_value
         doa_overlay_topic = self.get_parameter("doa_overlay_topic").get_parameter_value().string_value
+        active_speaker_info_topic = self.get_parameter("active_speaker_info_topic").get_parameter_value().string_value
 
         # Subscriptions
         self.sub_info = self.create_subscription(CameraInfo, info_topic, self.on_camera_info, 5)
@@ -67,8 +73,9 @@ class DOAActiveSpeakerNode(Node):
         self.sub_recog = self.create_subscription(FaceRecognitionArray, recognitions_topic, self.on_recognitions, 5)
         self.sub_doa = self.create_subscription(Float32, doa_topic, self.on_doa, 10)
         
-        # Publishers: DOA overlay image
+        # Publishers
         self.pub = self.create_publisher(Image, doa_overlay_topic, 5)
+        self.speaker_pub = self.create_publisher(String, active_speaker_info_topic, 10)
 
         self.get_logger().info("DoA Active Speaker Node initialized successfully")
 
@@ -77,7 +84,6 @@ class DOAActiveSpeakerNode(Node):
         yaw_off = self.head_yaw_deg or 0.0
 
         self.last_angle = float(doa_deg) + float(yaw_off)
-        self.get_logger().info(f"DoA: {doa_deg:.2f}   Yaw: {yaw_off}   Angle: {self.last_angle}")
         self.last_audio_time = self.get_clock().now()
 
     def on_joint_states(self, msg: JointState):
@@ -179,6 +185,10 @@ class DOAActiveSpeakerNode(Node):
                     "id": best_recog.classified_id, 
                     "name": best_recog.classified_name
                 }
+
+                msg_speaker = String()
+                msg_speaker.data = json.dumps(self.speaker)
+                self.speaker_pub.publish(msg_speaker)
 
         out = self.draw_overlay(frame, angle_x)
         self.pub.publish(self.bridge.cv2_to_imgmsg(out, encoding="bgr8"))
