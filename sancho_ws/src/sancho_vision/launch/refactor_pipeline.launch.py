@@ -6,7 +6,7 @@ from launch.actions import DeclareLaunchArgument, GroupAction
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
-from sancho_web_assistant.apis import API_LIST
+from sancho_web_bridge.assistant.apis import API_LIST
 from speech_tools.models import STT_MODELS, TTS_MODELS, TTS_SPEAKERS
 from llm_tools.models import PROVIDER, MODELS
 
@@ -15,7 +15,7 @@ GOOGLE_STT_API_KEY = os.environ.get("GOOGLE_STT_API_KEY")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 
-ASSISTANT_HELPER_VENV = "/home/mapir/sancho_robot/sancho_ws/runtimes/assistant_helper/venv"
+ASSISTANT_HELPER_VENV = "/home/mapir/sancho_refactor/sancho_ws/runtimes/assistant_helper/venv"
 
 def generate_launch_description():
     prefix_cmd = LaunchConfiguration('prefix')

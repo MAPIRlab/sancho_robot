@@ -37,7 +37,7 @@ def mark_face(frame, position, distance, MIDDLE_BOUND, UPPER_BOUND, classified=N
         # white text over classified color background
         drawTextLarge(frame, label, (x, max(5, y - 5)), textColor=(255,255,255), bgColor=color, scale=1.2, thickness=3)
 
-    drawTexts(frame, (x, y + h + 10), distance, MIDDLE_BOUND, UPPER_BOUND, classified=classified, 
+    drawTexts(frame, (x, y + 10), distance, MIDDLE_BOUND, UPPER_BOUND, classified=classified, 
               score=score, wantedWidth=w, showDistance=showDistance, showScore=showScore)
     
     if interlocutor is not None and classified is not None and interlocutor == classified:

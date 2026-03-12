@@ -27,7 +27,7 @@ from launch.actions import DeclareLaunchArgument, GroupAction
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import LifecycleNode, Node
 
-from sancho_web_assistant.apis import API_LIST
+from sancho_web_bridge.assistant.apis import API_LIST
 
 
 def generate_launch_description():
@@ -65,7 +65,7 @@ def generate_launch_description():
             'human_tracking_topic':    '/sancho_perception/human_tracking',
             'face_recognitions_topic': '/face_recognitions',
             'detector_name':           'mtcnn',  # swap to 'yolov8' or 'mtcnn' for better recall
-            'encoder_name':            'facenet',
+            'encoder_name':            'efficientface',
             'head_fraction':           0.60,
             'cache_ttl':               10.0,
             'cache_max_size':          20,

@@ -7,7 +7,7 @@ from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import LifecycleNode, Node
 from launch.substitutions import PythonExpression
 
-from sancho_web_assistant.apis import API_LIST
+from sancho_web_bridge.assistant.apis import API_LIST
 
 
 def generate_launch_description():

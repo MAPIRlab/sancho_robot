@@ -33,46 +33,33 @@ class FaceVisualizerNode(Node):
         self.get_logger().info(f"Face Visualizer Node started. Subscribed to {input_topic}, publishing to {output_topic}")
 
     def callback(self, msg: FaceRecognitionArray):
-        # 1. Handle "No Detections" Case
         if not msg.detections:
-            # If we have an image but no people, just publish the clean image
             if msg.image.data:
-                # FIX: Use pub_viz, not the non-existent pub_recog
                 self.pub_viz.publish(msg.image) 
             return
 
-        # 2. Convert to OpenCV
         try:
             frame = self.bridge.imgmsg_to_cv2(msg.image, desired_encoding="bgr8")
         except Exception as e:
             self.get_logger().error(f"Error converting image: {e}")
             return
 
-        # 3. Get Drawing Parameters
+        # Parameters from node configuration
         middle_bound = self.get_parameter('middle_bound').value
         upper_bound = self.get_parameter('upper_bound').value
-        show_distance = self.get_parameter('show_distance').value
-        show_score = self.get_parameter('show_score').value
         draw_rectangle = self.get_parameter('draw_rectangle').value
 
-        # 4. Iterate and Draw
-        # We can safely zip because the Fusion node guarantees lists are same length
         for det, recog in zip(msg.detections, msg.recognitions):
-            x = int(det.corner.x)
-            y = int(det.corner.y)
-            w = int(det.width)
-            h = int(det.height)
+            # Coordinates from the body tracker
+            x, y, w, h = int(det.corner.x), int(det.corner.y), int(det.width), int(det.height)
             position = [x, y, w, h]
             
-            # Now safely populated by the Fusion node
+            # Data from the recognition result
             distance = recog.distance 
-            confidence = det.confidence
             
-            # Logic for display name
             cid = recog.classified_id
             cname = recog.classified_name
             
-            # If we have a name, use it; otherwise check if we have a temporary ID
             if cname:
                 display_name = cname
             elif cid:
@@ -89,13 +76,13 @@ class FaceVisualizerNode(Node):
                 upper_bound, 
                 display_name, 
                 drawRectangle=draw_rectangle, 
-                score=confidence, 
-                showDistance=show_distance, 
-                showScore=show_score,
+                score=det.confidence, 
+                showDistance=True,   # KEPT: Showing the distance metric
+                showScore=False,      # REMOVED: Confidence % is now hidden
                 tracker_id=det.tid if det.tid > 0 else None
             )
 
-        # 5. Publish Final Image
+        # Publish the annotated frame
         out_msg = self.bridge.cv2_to_imgmsg(frame, "bgr8")
         out_msg.header = msg.header
         self.pub_viz.publish(out_msg)

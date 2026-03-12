@@ -4,6 +4,7 @@ import time
 import threading
 import numpy as np
 from rclpy.node import Node
+from rclpy.executors import MultiThreadedExecutor
 from concurrent.futures import ThreadPoolExecutor
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
@@ -16,46 +17,36 @@ from .encoders import load_encoder
 from .classifiers.complex_classifier import ComplexClassifier
 from .aligners.aligner_dlib import align_face
 
+from sancho_interfaces.srv import Training, GetString
+from sancho_interfaces.srv import Detection, Recognition
+from std_srvs.srv import SetBool, Empty as EmptySrv
+
+from sancho_interfaces.msg import FacePosition
+import json
 
 # ──────────────────────────────────────────────────────────
 #  Threshold tiers (mirrors HumanFaceRecognizerLifecycleNode)
 # ──────────────────────────────────────────────────────────
-LOWER_BOUND  = 0.65   # below  → Unknown
-MIDDLE_BOUND = 0.75   # 0.75–0.80 → probable
-UPPER_BOUND  = 0.85   # ≥ 0.90  → very confident → refine online
+LOWER_BOUND  = 0.70   # below  → Unknown
+MIDDLE_BOUND = 0.80   # 0.75–0.80 → probable
+UPPER_BOUND  = 0.90   # ≥ 0.90  → very confident → refine online
 
 
 class BodyFaceFusionNode(Node):
-    """
-    Pipeline B: anchors face identities to stable body-track IDs (ByteTrack/YOLOX).
-
-    For each body track received from sancho_perception, it:
-      1. Crops the head region (top 40 % of the body bounding box).
-      2. Applies preprocess_frame() preprocessing (from pipeline A's detector node).
-      3. Runs a configurable face detector on the crop.
-      4. Aligns the best detected face with dlib 68-point landmarks.
-      5. Encodes it with FaceNet (or any configured encoder).
-      6. Classifies via cosine similarity against faceprints_db.json.
-      7. Stores the result in a TTL/LRU recognition cache keyed by body TID.
-
-    Because identification is cached by body TID, it persists through face
-    occlusions as long as the body track is alive.
-    """
-
     def __init__(self):
         super().__init__('body_face_fusion_node')
         self.bridge = CvBridge()
 
-        # ── Parameters ─────────────────────────────────────────────────────
+        # ── Parámetros Actualizados ─────────────────────────────────────────
         self.declare_parameters(namespace='', parameters=[
             ('human_tracking_topic',    '/sancho_perception/human_tracking'),
             ('face_recognitions_topic', '/face_recognitions'),
-            ('detector_name',           'mtcnn'),   # same options as pipeline A
-            ('encoder_name',            'facenet'),
-            ('head_fraction',           0.40),   # top N% of body box → face region
-            ('cache_ttl',               10.0),   # seconds before a cached entry expires
-            ('cache_max_size',          20),      # LRU eviction limit
-            ('cleanup_timeout',         30.0),   # seconds before a body TID is forgotten
+            ('detector_name',           'mtcnn'),   
+            ('encoder_name',            'efficientface'),
+            ('head_fraction',           0.40),   
+            ('cache_ttl',               15.0),   
+            ('cache_max_size',          20),      
+            ('cleanup_timeout',         30.0),   
         ])
 
         detector_name  = self.get_parameter('detector_name').value
@@ -63,76 +54,92 @@ class BodyFaceFusionNode(Node):
         self.cache_ttl      = float(self.get_parameter('cache_ttl').value)
         self.cache_max_size = int(self.get_parameter('cache_max_size').value)
         self.head_fraction  = float(self.get_parameter('head_fraction').value)
+        self.cleanup_timeout = float(self.get_parameter('cleanup_timeout').value)
 
-        # ── ML components (same as pipeline A) ─────────────────────────────
+        # ── Componentes ML ─────────────────────────────────────────────────
         try:
-            self.detector   = load_detector(detector_name)
-            self.get_logger().info(f"Detector loaded: {detector_name}")
+            self.detector = load_detector(detector_name)
+            self.get_logger().info(f"Detector cargado: {detector_name}")
         except Exception as e:
-            self.get_logger().error(f"Failed to load detector '{detector_name}': {e}")
+            self.get_logger().error(f"Error al cargar detector: {e}")
             raise
 
         try:
-            self.encoder    = load_encoder(encoder_name)
-            self.get_logger().info(f"Encoder loaded: {encoder_name}")
+            self.encoder = load_encoder(encoder_name)
+            self.get_logger().info(f"Encoder cargado: {encoder_name} (EfficientFaceV2S)")
         except Exception as e:
-            self.get_logger().error(f"Failed to load encoder '{encoder_name}': {e}")
+            self.get_logger().error(f"Error al cargar encoder: {e}")
             raise
 
+        # El clasificador gestiona el archivo JSON 'faceprints_db.json'
         self.classifier = ComplexClassifier('save')
 
-        # ── Recognition cache (mirrors HumanFaceRecognizerLifecycleNode) ───
-        #
-        # Key  : body tracker TID (int)
-        # Value: {face_aligned, features, faceprint, distance, pos,
-        #         face_updated, last_seen}
-        self.recognition_cache: dict = {}
-
-        # ── Body-lifetime tracking (for cleanup) ────────────────────────────
-        self.last_seen: dict = {}    # tid → wall-clock timestamp
-
-        # ── Retry counters (to rate-limit inference per TID) ────────────────
-        self.retry_count: dict = {}  # tid → int
-
-        # ── Thread safety ───────────────────────────────────────────────────
+        # ── Control de Flujo y Estados ──────────────────────────────────────
+        self.identifying_tids = set()
+        self.pending_confirmation = set()
+        self.pending_naming = set()  # TIDs esperando respuesta del usuario
+        self.recognition_cache = {}  # tid -> {faceprint, distance, features, etc.}
+        self.last_seen = {}          # tid -> timestamp (para cleanup)
+        self.retry_count = {}        # tid -> int (para rate-limit de inferencia)
+        
         self.state_lock = threading.Lock()
-
-        # One worker thread for non-blocking ML inference
+        
+        # Pool de hilos para no bloquear el callback de ROS con la red neuronal
         self.inference_pool = ThreadPoolExecutor(max_workers=1)
 
-        # ── ROS I/O ─────────────────────────────────────────────────────────
-        human_topic   = self.get_parameter('human_tracking_topic').value
-        recog_topic   = self.get_parameter('face_recognitions_topic').value
+        # ── Servidores de Servicios ────────────────────────────────────────
+        self.training_srv = self.create_service(Training, "/recognition/training", self.training_service)
+        self.get_faceprint_srv = self.create_service(GetString, "/recognition/get_faceprint", self.get_people_service)
+        self.clear_no_name_srv = self.create_service(EmptySrv, "/recognition/clear_no_name", self.clear_no_name_service)
+        self.set_learn_without_name_srv = self.create_service(SetBool, "/recognition/set_learn_without_name", self.set_learn_without_name_service)
+        self.detect_srv = self.create_service(Detection, "detection", self.detect_faces_service)
+        self.recognize_srv = self.create_service(Recognition, "recognition", self.recognize_face_service)
+        
+        # Mapeo de comandos para el dispatcher del clasificador
+        self.training_dispatcher = {
+            "refine_class": self.classifier.refine_class,
+            "add_features": self.classifier.add_features,
+            "add_class":    self.classifier.add_class,
+            "rename_class": self.classifier.rename_class,
+            "delete_class": self.classifier.delete_class,
+            "delete_all":   self.classifier.delete_all
+        }
+
+        # ── ROS I/O ────────────────────────────────────────────────────────
+        human_topic = self.get_parameter('human_tracking_topic').value
+        recog_topic = self.get_parameter('face_recognitions_topic').value
+        
         self.sub_human = self.create_subscription(
             FaceDetectionArray, human_topic, self.human_callback, 10)
+        
         self.pub_recog = self.create_publisher(
-            FaceRecognitionArray, recog_topic, 10)
+            FaceRecognitionArray, recog_topic, 5)
 
-        # ── Timers ───────────────────────────────────────────────────────────
-        self.cache_prune_timer  = self.create_timer(5.0,  self.prune_cache)
-        self.cleanup_timer      = self.create_timer(10.0, self.cleanup_body_tracks)
+        # ── Timers de Mantenimiento ────────────────────────────────────────
+        self.cache_prune_timer = self.create_timer(5.0, self.prune_cache)
+        self.cleanup_timer     = self.create_timer(10.0, self.cleanup_body_tracks)
 
         self.get_logger().info(
-            f"BodyFaceFusionNode ready | "
-            f"detector={detector_name} | encoder={encoder_name} | "
-            f"head_fraction={self.head_fraction:.0%}"
+            f"BodyFaceFusionNode Iniciado | "
+            f"Encoder: {encoder_name} | "
+            f"Cache TTL: {self.cache_ttl}s"
         )
 
     # ─────────────────────────────────────────────────────────────────────────
-    #  Preprocessing  (exact copy of pipeline A's HumanFaceDetectorLifecycleNode)
+    #  Identification pipeline
     # ─────────────────────────────────────────────────────────────────────────
-    def preprocess_frame(self, frame):
-        """Bilateral filter + histogram equalization on the Y channel of YCrCb."""
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        image_bilateral = cv2.bilateralFilter(gray, d=5, sigmaColor=50, sigmaSpace=50)
-        gray_equalized  = cv2.equalizeHist(image_bilateral)
-        frame_ycrcb     = cv2.cvtColor(frame, cv2.COLOR_BGR2YCrCb)
-        frame_ycrcb[:, :, 0] = gray_equalized
-        return cv2.cvtColor(frame_ycrcb, cv2.COLOR_YCrCb2BGR)
+    def _update_recognition_entry(self, tid, face_aligned, features, faceprint, distance, pos):
+        """Helper to update or create a recognition entry in the cache."""
+        self.recognition_cache[tid] = {
+            'face_aligned': face_aligned,
+            'features':     features,
+            'faceprint':    faceprint,
+            'distance':     distance,
+            'pos':          pos,
+            'face_updated': False,
+            'last_seen':    time.monotonic()
+        }
 
-    # ─────────────────────────────────────────────────────────────────────────
-    #  Main callback
-    # ─────────────────────────────────────────────────────────────────────────
     def human_callback(self, msg: FaceDetectionArray):
         if not msg.detections:
             return
@@ -144,177 +151,177 @@ class BodyFaceFusionNode(Node):
             return
 
         now = time.monotonic()
-
-        out_msg           = FaceRecognitionArray()
-        out_msg.header    = msg.header
-        out_msg.image     = self.bridge.cv2_to_imgmsg(frame, "bgr8")
+        out_msg = FaceRecognitionArray()
+        out_msg.header = msg.header
+        out_msg.image = self.bridge.cv2_to_imgmsg(frame, "bgr8")
         out_msg.image.header = msg.header
-
-        # FIX: Preprocess the FULL frame globally, exactly like Pipeline A
-        frame_preprocessed = self.preprocess_frame(frame.copy())
 
         with self.state_lock:
             for body in msg.detections:
                 tid = body.tid
                 self.last_seen[tid] = now
 
-                if tid in self.recognition_cache:
-                    entry = self.recognition_cache[tid]
-                    entry['last_seen'] = now
-                    recog = self._entry_to_recognition(entry)
+                # 1. ESTADO: Pendiente de nombre
+                if tid in self.pending_naming:
+                    if tid in self.recognition_cache:
+                        entry = self.recognition_cache[tid]
+                        entry['last_seen'] = now
+                        recog = self._entry_to_recognition(entry)
+                        recog.classified_name = 'Unknown'
+                    else:
+                        recog = self._create_unknown_placeholder(msg.header)
+                        
                     out_msg.recognitions.append(recog)
                     out_msg.detections.append(body)
                     continue
 
+                # 2. ESTADO: Pendiente de confirmación
+                if tid in self.pending_confirmation:
+                    if tid in self.recognition_cache:
+                        entry = self.recognition_cache[tid]
+                        entry['last_seen'] = now
+                        recog = self._entry_to_recognition(entry)
+                    else:
+                        recog = self._create_unknown_placeholder(msg.header)
+                        
+                    out_msg.recognitions.append(recog)
+                    out_msg.detections.append(body)
+                    continue
+
+                # 3. ESTADO: IA pensando
+                if tid in self.identifying_tids:
+                    recog = self._create_unknown_placeholder(msg.header)
+                    out_msg.recognitions.append(recog)
+                    out_msg.detections.append(body)
+                    continue 
+
+                # 4. ESTADO: Reconocido (Caché)
+                if tid in self.recognition_cache:
+                    entry = self.recognition_cache[tid]
+                    entry['last_seen'] = now
+                    recog = self._entry_to_recognition(entry)
+                    recog.face_aligned.header = msg.header 
+                    out_msg.recognitions.append(recog)
+                    out_msg.detections.append(body)
+                    continue
+
+                # 5. ESTADO: Nuevo track -> IA
                 if tid not in self.retry_count:
                     self.retry_count[tid] = 0
 
-                if self.retry_count[tid] % 10 == 0:
-                    # FIX: Pass BOTH the raw frame and the preprocessed frame
+                if self.retry_count[tid] % 5 == 0:
+                    self.get_logger().info(f"[TID {tid}] Enviando a IA...")
+                    self.identifying_tids.add(tid) 
                     self.inference_pool.submit(
                         self.process_identification,
-                        tid, frame.copy(), frame_preprocessed.copy(), body
+                        tid, frame.copy(), body 
                     )
 
-                self.retry_count[tid] = (self.retry_count[tid] + 1) % 10001
-
-                # Publish "Unknown" placeholder while we wait for inference
-                recog = FaceRecognition()
-                recog.classified_id   = ''
-                recog.classified_name = 'Unknown'
-                recog.distance        = 0.0
+                self.retry_count[tid] += 1
+                
+                recog = self._create_unknown_placeholder(msg.header)
                 out_msg.recognitions.append(recog)
                 out_msg.detections.append(body)
 
         self.pub_recog.publish(out_msg)
 
-    # ─────────────────────────────────────────────────────────────────────────
-    #  Identification pipeline (runs in thread pool)
-    # ─────────────────────────────────────────────────────────────────────────
-    def process_identification(self, tid: int, frame_raw: np.ndarray, frame_preproc: np.ndarray, body_det):
+    def _create_unknown_placeholder(self, header):
+        """Helper para crear el mensaje de desconocido."""
+        recog = FaceRecognition()
+        recog.classified_id = ''
+        recog.classified_name = 'Analyzing...'
+        recog.distance = 0.0
+        recog.face_aligned = Image()
+        recog.face_aligned.header = header
+        recog.face_aligned.encoding = "bgr8"
+        return recog
+
+    def process_identification(self, tid: int, frame_raw: np.ndarray, body_det):
+        self.get_logger().info(f"--- [HILO IA] Iniciando proceso para TID {tid} ---")
+        
         try:
             x = int(body_det.corner.x)
             y = int(body_det.corner.y)
             w = int(body_det.width)
             h = int(body_det.height)
 
-            # ── 1. Context Padding ───────────────────────────────────────────
-            y_margin = int(h * 0.20)
-            x_margin = int(w * 0.20)
-            head_h = int(h * 0.50) 
-            
-            y1 = max(0, y - y_margin) 
+            y_margin = int(h * 0.2)
+            x_margin = int(w * 0.2)
+            head_h = int(h * self.head_fraction)
+
+            y1 = max(0, y - y_margin)
             y2 = min(frame_raw.shape[0], y + head_h)
-            x1 = max(0, x - x_margin) 
-            x2 = min(frame_raw.shape[1], x + w + x_margin) 
+            x1 = max(0, x - x_margin)
+            x2 = min(frame_raw.shape[1], x + w + x_margin)
 
-            # ── 2. Detection (Using the Globally Preprocessed Frame) ─────────
-            # We take the crop from the image that was already globally equalized
-            crop_prep = frame_preproc[y1:y2, x1:x2]
+            crop = frame_raw[y1:y2, x1:x2]
 
-            if crop_prep.shape[0] < 40 or crop_prep.shape[1] < 40:
-                self.get_logger().info(f"[TID {tid}] SILENT EXIT: Head crop too small {crop_prep.shape}")
+            if crop.shape[0] < 40 or crop.shape[1] < 40:
+                self.get_logger().warn(f"[TID {tid}] Recorte demasiado pequeño: {crop.shape}")
                 return
 
-            positions, confidences = self.detector.get_faces(crop_prep)
-
-            # Fallback to full body if head crop misses
-            if len(positions) == 0:
-                fy1, fy2 = max(0, y), min(frame_raw.shape[0], y + h)
-                fx1, fx2 = max(0, x), min(frame_raw.shape[1], x + w)
-                
-                full_crop_prep = frame_preproc[fy1:fy2, fx1:fx2]
-                
-                if full_crop_prep.shape[0] >= 40 and full_crop_prep.shape[1] >= 40:
-                    positions, confidences = self.detector.get_faces(full_crop_prep)
-                    if len(positions) > 0:
-                        y1, x1 = fy1, fx1 # Update offset references for mapping
+            positions, confidences = self.detector.get_faces(crop)
 
             if len(positions) == 0:
-                self.get_logger().info(f"[TID {tid}] SILENT EXIT: No face found by Dlib in any crop.")
+                self.get_logger().info(f"[TID {tid}] No se detectó cara.")
                 return
 
-            # ── 3. Coordinate Mapping ─────────────────────────────────────────
-            best_idx  = int(np.argmax(confidences))
+            best_idx = int(np.argmax(confidences))
+            best_conf = float(confidences[best_idx])
+
+            if best_conf < 0.85:
+                self.get_logger().warn(f"[TID {tid}] Baja confianza: {best_conf:.2f}")
+                return
+
             best_face = positions[best_idx]
-            best_conf = confidences[best_idx]
-
-            if best_conf < 0.60: 
-                self.get_logger().info(f"[TID {tid}] SILENT EXIT: Ignored false positive (conf={best_conf:.3f})")
-                return
-
-            # Safely extract coordinates whether it's a Dlib rectangle or a list
-            if hasattr(best_face, 'left'):
-                face_x = best_face.left() + x1
-                face_y = best_face.top() + y1
-                face_w = best_face.width()
-                face_h = best_face.height()
-            else:
-                face_x = best_face[0] + x1
-                face_y = best_face[1] + y1
-                face_w = best_face[2]
-                face_h = best_face[3]
-
+            if hasattr(best_face, 'left'): # Dlib
+                face_x, face_y = best_face.left() + x1, best_face.top() + y1
+                face_w, face_h = best_face.width(), best_face.height()
+            else: # List/Array
+                face_x, face_y = best_face[0] + x1, best_face[1] + y1
+                face_w, face_h = best_face[2], best_face[3]
+            
             absolute_position = [face_x, face_y, face_w, face_h]
-            self.get_logger().info(f"[TID {tid}] Face detected | conf={best_conf:.3f}")
 
-            # ── 4. Align & Encode (Using the RAW Frame) ───────────────────────
-            # FaceNet needs raw pixels, not equalized pixels
             face_aligned = align_face(frame_raw, absolute_position)
+            if face_aligned is None:
+                return
 
             features = self.encoder.encode_face(face_aligned)
             faceprint, distance, pos = self.classifier.classify_face(features)
-
-            self.get_logger().info(
-                f"[TID {tid}] Classification → '{faceprint.get('name', 'Unknown')}' | "
-                f"distance={distance:.4f} | conf={best_conf:.3f}"
-            )
-
-            # ... Keep your existing threshold (Step 5) and caching (Step 6) logic ...
-            # ── 5. Apply Thresholds ───────────────────────────────────────────
-            face_updated = False
-            if distance >= UPPER_BOUND and best_conf >= 1.0:
-                self.classifier.refine_class(faceprint['id'], features, pos)
-                face_updated = self.classifier.save_face(faceprint['id'], face_aligned, best_conf)
-
-            if distance < LOWER_BOUND:
-                self.get_logger().info(f"[TID {tid}] REJECTED (distance {distance:.4f} < {LOWER_BOUND})")
-                return
-
-            # ── 6. Cache ──────────────────────────────────────────────────────
-            display_name = (
-                "Unknown"         if not faceprint.get("id") else
-                faceprint["name"] if faceprint.get("name")   else
-                f"User-{faceprint['id']}"
-            )
-            self.get_logger().info(f"[TID {tid}] CACHED as '{display_name}' (distance={distance:.4f})")
-
-            entry = {
-                'face_aligned': face_aligned,
-                'features':     features,
-                'faceprint':    faceprint,
-                'distance':     distance,
-                'pos':          pos,
-                'face_updated': face_updated,
-                'last_seen':    time.monotonic(),
-            }
+            display_name = faceprint.get("name", "Unknown") if isinstance(faceprint, dict) else "Unknown"
 
             with self.state_lock:
-                self.recognition_cache[tid] = entry
-                self.retry_count.pop(tid, None)
+                if distance < LOWER_BOUND:
+                    if tid not in self.pending_naming:
+                        self.get_logger().warn(f"TID {tid} desconocido (dist: {distance:.2f}).")
+                        self._update_recognition_entry(tid, face_aligned, features, 
+                                                     {'id': '', 'name': 'Unknown'}, distance, pos)
+                        self.pending_naming.add(tid)
+                        
+                elif distance < UPPER_BOUND:
+                    if tid not in self.pending_confirmation:
+                        self.get_logger().info(f"[TID {tid}] Dudoso. ¿Es '{display_name}'? (dist: {distance:.2f})")
+                        self._update_recognition_entry(tid, face_aligned, features, faceprint, distance, pos)
+                        self.pending_confirmation.add(tid)
+
+                else:
+                    self.get_logger().info(f"[TID {tid}] RECONOCIDO como '{display_name}' (dist: {distance:.2f})")
+                    self._update_recognition_entry(tid, face_aligned, features, faceprint, distance, pos)
 
         except Exception as e:
             import traceback
-            self.get_logger().error(f"[TID {tid}] HIDDEN THREAD CRASH: {e}\n{traceback.format_exc()}")
+            self.get_logger().error(f"[TID {tid}] ERROR EN IA: {e}\n{traceback.format_exc()}")
+        
+        finally:
+            with self.state_lock:
+                if tid in self.identifying_tids:
+                    self.identifying_tids.remove(tid)
 
-    # ─────────────────────────────────────────────────────────────────────────
-    #  Cache maintenance  (mirrors HumanFaceRecognizerLifecycleNode)
-    # ─────────────────────────────────────────────────────────────────────────
     def prune_cache(self):
         """Evict stale entries from the recognition cache (TTL + LRU)."""
         now = time.monotonic()
         with self.state_lock:
-            # TTL eviction
             expired = [
                 tid for tid, e in self.recognition_cache.items()
                 if (now - e.get('last_seen', 0)) > self.cache_ttl
@@ -323,7 +330,6 @@ class BodyFaceFusionNode(Node):
                 del self.recognition_cache[tid]
                 self.get_logger().info(f"[cache] Evicted TID {tid} (TTL expired)")
 
-            # LRU eviction if over max size
             if len(self.recognition_cache) > self.cache_max_size:
                 sorted_ids = sorted(
                     self.recognition_cache.items(),
@@ -337,44 +343,163 @@ class BodyFaceFusionNode(Node):
     def cleanup_body_tracks(self):
         """Remove tracking state for body TIDs that have disappeared."""
         now = time.monotonic()
-        timeout = float(self.get_parameter('cleanup_timeout').value)
         with self.state_lock:
             to_remove = [
                 tid for tid, last in self.last_seen.items()
-                if (now - last) > timeout
+                if (now - last) > self.cleanup_timeout
             ]
             for tid in to_remove:
                 self.last_seen.pop(tid, None)
                 self.retry_count.pop(tid, None)
                 self.recognition_cache.pop(tid, None)
+                self.pending_naming.discard(tid)
+                self.pending_confirmation.discard(tid)
+                self.identifying_tids.discard(tid)
                 self.get_logger().info(f"[body] Cleaned up TID {tid} (body track gone)")
 
     # ─────────────────────────────────────────────────────────────────────────
-    #  Helpers
+    #  Services
     # ─────────────────────────────────────────────────────────────────────────
-    @staticmethod
-    def _entry_to_recognition(entry: dict) -> FaceRecognition:
+    def detect_faces_service(self, request, response):
+        try:
+            frame = self.bridge.imgmsg_to_cv2(request.frame, "bgr8")
+            positions, confidences = self.detector.get_faces(frame)
+            
+            out_positions = []
+            out_scores = []
+            
+            for pos, conf in zip(positions, confidences):
+                fp = FacePosition()
+                if hasattr(pos, 'left'):
+                    fp.x, fp.y = float(pos.left()), float(pos.top())
+                    fp.width, fp.height = float(pos.width()), float(pos.height())
+                else:
+                    fp.x, fp.y, fp.width, fp.height = map(float, pos)
+                
+                out_positions.append(fp)
+                out_scores.append(float(conf))
+                
+            response.positions = out_positions
+            response.scores = out_scores
+            return response
+        except Exception as e:
+            self.get_logger().error(f"API Detection service failed: {e}")
+            return response
+
+    def recognize_face_service(self, request, response):
+        try:
+            frame = self.bridge.imgmsg_to_cv2(request.frame, "bgr8")
+            pos_req = [int(request.position.x), int(request.position.y), 
+                       int(request.position.width), int(request.position.height)]
+            
+            face_aligned = align_face(frame, pos_req)
+            features = self.encoder.encode_face(face_aligned)
+            faceprint, distance, pos = self.classifier.classify_face(features)
+            
+            face_updated = False
+            if distance >= UPPER_BOUND and request.score >= 1.0:
+                self.classifier.refine_class(faceprint['id'], features, pos)
+                face_updated = self.classifier.save_face(faceprint['id'], face_aligned, request.score)
+                
+            response.face_aligned = self.bridge.cv2_to_imgmsg(face_aligned, encoding="bgr8")
+            response.features = [float(f) for f in features]
+            response.classified_id = str(faceprint.get('id', ''))
+            response.classified_name = str(faceprint.get('name', 'Unknown'))
+            response.distance = float(distance)
+            response.pos = int(pos) if pos is not None else -1 
+            response.face_updated = bool(face_updated)
+            return response
+        except Exception as e:
+            self.get_logger().error(f"API Recognition service failed: {e}")
+            return response
+
+    def training_service(self, request, response):
+        try:
+            cmd_type = request.cmd_type.data
+            args = json.loads(request.args.data)
+            target_tid = args.pop("tid", None)
+
+            if cmd_type in self.training_dispatcher:
+                result, message = self.training_dispatcher[cmd_type](**args)
+                
+                if result >= 0:
+                    with self.state_lock:
+                        tids = [target_tid] if target_tid is not None else list(self.pending_naming)
+                        for t in tids:
+                            self.pending_naming.discard(t)
+                            self.pending_confirmation.discard(t)
+                            if t in self.recognition_cache:
+                                new_name = args.get("class_name", args.get("name", args.get("label")))
+                                if new_name:
+                                    self.recognition_cache[t]['faceprint']['name'] = new_name
+                                if cmd_type == "add_class" and isinstance(message, dict) and "id" in message:
+                                    self.recognition_cache[t]['faceprint']['id'] = str(message["id"])
+                                self.recognition_cache[t]['distance'] = 1.0
+                            self.retry_count[t] = 0
+            elif cmd_type == "cancel":
+                with self.state_lock:
+                    tids = [target_tid] if target_tid is not None else list(self.pending_naming | self.pending_confirmation)
+                    for t in tids:
+                        self.pending_naming.discard(t)
+                        self.pending_confirmation.discard(t)
+                        self.retry_count[t] = 0
+                result, message = 0, "Cancelled"
+            else:
+                result, message = -1, f"Unknown command: {cmd_type}"
+        except Exception as e:
+            result, message = -1, f"Error: {e}"
+
+        response.result = result
+        response.message.data = str(message["id"] if cmd_type == "add_class" and result >= 0 else message)
+        return response
+
+    def get_people_service(self, request, response):
+        args = json.loads(request.args) if request.args else {}
+        if args.get("id"):
+            result = self.classifier.db.get_by_id(args["id"])
+        else:
+            result = self.classifier.db.get_all(args.get("name", ""))
+        response.text = json.dumps(result)
+        return response
+
+    def clear_no_name_service(self, request, response):
+        self.classifier.clear_no_name()
+        return response
+
+    def set_learn_without_name_service(self, request, response):
+        return response
+
+    def _entry_to_recognition(self, entry: dict) -> FaceRecognition:
         faceprint = entry['faceprint']
         recog = FaceRecognition()
-        recog.classified_id   = faceprint.get('id', '')
-        recog.classified_name = faceprint.get('name', '')
-        recog.distance        = float(entry.get('distance', 0.0))
-        recog.face_updated    = bool(entry.get('face_updated', False))
-        return recog
+        recog.classified_id = faceprint.get('id', '')
+        recog.classified_name = faceprint.get('name', 'Unknown')
+        recog.distance = float(entry.get('distance', 0.0))
+        recog.features = [float(f) for f in entry.get('features', [])]
+        if entry.get('pos'):
+            recog.pos = entry['pos'] 
+        recog.face_updated = bool(entry.get('face_updated', False))
 
+        if entry['face_aligned'] is not None and hasattr(entry['face_aligned'], 'shape'):
+            recog.face_aligned = self.bridge.cv2_to_imgmsg(entry['face_aligned'], encoding="bgr8")
+        else:
+            recog.face_aligned = Image()
+            recog.face_aligned.encoding = "bgr8" 
+        return recog
 
 def main(args=None):
     rclpy.init(args=args)
     node = BodyFaceFusionNode()
+    executor = MultiThreadedExecutor()
+    executor.add_node(node)
     try:
-        rclpy.spin(node)
+        executor.spin()
     except KeyboardInterrupt:
         pass
     finally:
         node.inference_pool.shutdown(wait=False)
         node.destroy_node()
         rclpy.shutdown()
-
 
 if __name__ == '__main__':
     main()

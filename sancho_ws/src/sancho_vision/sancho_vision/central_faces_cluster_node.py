@@ -33,7 +33,7 @@ class CentralFacesClusterNode(Node):
         self.declare_parameter('marker_ns', 'faces')
         self.declare_parameter('marker_lifetime', 0.3)          # seg
         self.declare_parameter('head_frame', 'camera_link')
-        self.declare_parameter('pixel_to_meter', 0.002)         # <<< 1 px = 2 mm (ajústalo a tu gusto)
+        self.declare_parameter('pixel_to_meter', 0.002)        # <<< 1 px = 2 mm (ajústalo a tu gusto)
         self.declare_parameter('sphere_diameter', 0.3)         # <<< 3 cm por esfera
         self.declare_parameter('text_height', 0.6)             # <<< 6 cm de alto del texto
 

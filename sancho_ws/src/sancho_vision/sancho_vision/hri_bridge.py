@@ -44,16 +44,22 @@ class HRIBridge:
 
         return img_msg
 
-    def cv2_to_base64(self, image, quality=50): #ros2utils
+    def cv2_to_base64(self, image, quality=50, max_dim=None):
         """Transforms an Image in cv2 format to base64 from JPEG
         
         Args:
             image (Image-CV2): The image
             quality (int): The quality of the JPEG encode
+            max_dim (int): Maximum dimension (width or height) to resize if exceeded
         
         Returns:
             image_base64 (str): The base64 of the image
         """
+        if max_dim:
+            h, w = image.shape[:2]
+            if max(h, w) > max_dim:
+                scale = max_dim / max(h, w)
+                image = cv2.resize(image, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
 
         encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), quality]
         _, jpeg = cv2.imencode('.jpg', image, encode_param)

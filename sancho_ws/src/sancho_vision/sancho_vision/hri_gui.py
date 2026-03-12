@@ -47,7 +47,7 @@ class HRIGUINode(Node):
 
 class HRIGUI:
     def __init__(self):
-        self.controller = AppController(self.send_face_name_response, self.send_face_question_response)
+        self.controller = AppController(self.send_face_name_response, self.send_face_question_response, self.send_face_timeout_response)
         self.node = HRIGUINode(self)
         self.timeout_timer: Timer | None = None
 
