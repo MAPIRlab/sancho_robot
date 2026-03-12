@@ -10,11 +10,15 @@ from std_srvs.srv import SetBool
 from hri_msgs.msg import ChunkMono
 from speech_msgs.srv import STT
 
+IMPORTS_SUCCESSFUL = True
+IMPORT_ERROR_MSG = ""
+
 try:
     from .utils.silero_vad_attach_criterion import SileroVADAttachCriterion
     from .utils.intensity_attach_criterion import IntensityAttachCriterion
-except ImportError:
-    pass
+except ImportError as e:
+    IMPORTS_SUCCESSFUL = False
+    IMPORT_ERROR_MSG = str(e)
 
 
 class AudioState(int, Enum):
@@ -36,13 +40,15 @@ class VADTranscriptorNode(Node):
         self.declare_parameter("vad_criterion", "intensity")
         self.declare_parameter("intensity_threshold", 900)
         self.declare_parameter("timeout_seconds", 5.0)
-        self.declare_parameter("helper_chunk_size", 0.5)
+        self.declare_parameter("chunk_size", 0.5)
+        self.declare_parameter("silence_patience_seconds", 1.5)
 
         self.audio_state = AudioState.NO_AUDIO
         self.audio_buffer = []
         self.check_audio_buffer = []
         self.previous_chunk = []
         self.start_listening_time = 0.0
+        self.silence_timer = 0.0
         self._is_listening = False
 
         mic_topic = self.get_parameter("mic_topic").get_parameter_value().string_value
@@ -50,10 +56,18 @@ class VADTranscriptorNode(Node):
         criterion = self.get_parameter("vad_criterion").get_parameter_value().string_value
         threshold = self.get_parameter("intensity_threshold").get_parameter_value().integer_value
 
+        if not IMPORTS_SUCCESSFUL:
+            self.get_logger().fatal(f"Could not import VAD models: {IMPORT_ERROR_MSG}")
+            raise RuntimeError("Missing dependencies. Node cannot initialize properly.")
+
         if criterion == "intensity":
             self.chunk_attach_criterion = IntensityAttachCriterion(threshold)
-        else:
+        elif criterion == "silero":
             self.chunk_attach_criterion = SileroVADAttachCriterion()
+        else:
+            error_msg = f"Unrecognized criterion: {criterion}"
+            self.get_logger().error(error_msg)
+            raise ValueError(error_msg)
 
         self.transcription_pub = self.create_publisher(String, transcription_topic, 10)
         self.mic_sub = self.create_subscription(ChunkMono, mic_topic, self.on_audio_chunk, 10)
@@ -64,7 +78,6 @@ class VADTranscriptorNode(Node):
         self.get_logger().info(f"{self.get_name()} initialized and ready.")
 
     def enable_callback(self, request, response):
-        """Activa o desactiva la compuerta de grabación y resetea buffers."""
         self._is_listening = request.data
         if self._is_listening:
             self.get_logger().info(">>> LISTENING FOR VOICE COMMAND <<<")
@@ -73,8 +86,9 @@ class VADTranscriptorNode(Node):
             self.audio_buffer = []
             self.check_audio_buffer = []
             self.previous_chunk = []
+            self.silence_timer = 0.0
         else:
-            self.get_logger().info(">>> SPEECH RECOGNIZER DEACTIVATED <<<")
+            self.get_logger().info(">>> VAD TRANSCRIPTOR DEACTIVATED <<<")
         
         response.success = True
         return response
@@ -88,7 +102,7 @@ class VADTranscriptorNode(Node):
         self.check_audio_buffer.extend(new_audio)
 
         timeout = self.get_parameter("timeout_seconds").get_parameter_value().double_value
-        chunk_size = self.get_parameter("helper_chunk_size").get_parameter_value().double_value
+        chunk_size = self.get_parameter("chunk_size").get_parameter_value().double_value
 
         # Timeout check
         if len(self.audio_buffer) == 0 and (time.time() - self.start_listening_time) > timeout:
@@ -99,7 +113,10 @@ class VADTranscriptorNode(Node):
 
         # VAD grouping logic
         if len(self.check_audio_buffer) >= (chunk_size * sample_rate):
+            # Someone talked
             if self.chunk_attach_criterion.should_attach_chunk(self.check_audio_buffer, sample_rate):
+                self.silence_timer = 0.0
+                
                 if self.audio_state == AudioState.NO_AUDIO:
                     self.audio_state = AudioState.SOME_AUDIO
                     self.audio_buffer.extend(self.previous_chunk)
@@ -107,10 +124,17 @@ class VADTranscriptorNode(Node):
                 self.audio_buffer.extend(self.check_audio_buffer)
                 self.get_logger().debug(f"Voice detected. Buffer: {len(self.audio_buffer) / sample_rate:.1f}s")
             
+            # Silence
             elif self.audio_state != AudioState.NO_AUDIO:
-                self.audio_state = AudioState.END_AUDIO
                 self.audio_buffer.extend(self.check_audio_buffer)
-                self.get_logger().info("End of speech detected. Processing STT...")
+                self.silence_timer += chunk_size
+                
+                patience = self.get_parameter("silence_patience_seconds").get_parameter_value().double_value
+                
+                # Silence patience exceeded
+                if self.silence_timer >= patience:
+                    self.audio_state = AudioState.END_AUDIO
+                    self.get_logger().info("End of speech detected (Silence patience reached).")
 
             self.previous_chunk = self.check_audio_buffer
             self.check_audio_buffer = []
