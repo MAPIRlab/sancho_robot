@@ -11,7 +11,7 @@ class LLMEngine(ServiceEngine):
 
         load_dotenv()
 
-        self.prompt_cli = self.create_client(Prompt, "llm_tools/prompt")
+        self.prompt_cli = self.create_client(Prompt, "sancho_hri/llm/prompt")
 
         self.node.get_logger().info("Prompt Engine initializated succesfully")
 

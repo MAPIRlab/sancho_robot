@@ -4,7 +4,7 @@
   <name>sancho_bringup</name>
   <version>0.0.0</version>
   <description>TODO: Package description</description>
-  <maintainer email="antoniocanetebaena1234@gmail.com">mapir</maintainer>
+  <maintainer email="pablohorjim@uma.es">mapir</maintainer>
   <license>TODO: License declaration</license>
 
   <test_depend>ament_copyright</test_depend>

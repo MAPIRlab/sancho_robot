@@ -1,4 +1,4 @@
-from sancho_interfaces.msg import SpeechLoadModel as LoadModelMsg
+from sancho_interfaces.msg import SpeechLoadModelMsg as LoadModelMsg
 from sancho_interfaces.srv import STTGetActiveModel, STTGetModels, STTSetActiveModel, SpeechLoadModel, SpeechUnloadModel
 
 from .service_engine import ServiceEngine

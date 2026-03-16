@@ -318,7 +318,7 @@ private:
   void initialize_params()
   {
     this->declare_parameter("pointCloudTopic", "base/custom_cloud");
-    this->declare_parameter("pointCloutFrameId", "laser");
+    this->declare_parameter("pointCloudFrameId", "laser");
 
     this->declare_parameter("scanTopic1", "lidar_front_right/scan");
 
@@ -350,7 +350,7 @@ private:
   void refresh_params()
   {
     this->get_parameter_or<std::string>("pointCloudTopic", cloudTopic_, "pointCloud");
-    this->get_parameter_or<std::string>("pointCloutFrameId", cloudFrameId_, "laser");
+    this->get_parameter_or<std::string>("pointCloudFrameId", cloudFrameId_, "laser");
     this->get_parameter_or<std::string>("scanTopic1", topic1_, "lidar_front_right/scan");
 
     this->get_parameter_or<float>("laser1AngleMin", laser1AngleMin_, -181.0);

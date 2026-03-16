@@ -47,7 +47,7 @@ class AssistantHelperLifecycleNode(LifecycleNode):
             ("face_mode_topic", "face/mode"),
             ("assistant_transcription_topic", "sancho_audio/assistant_helper/transcription"),
             ("question_tts_topic", "question_tts"),
-            ("stt_service", "speech_tools/stt"),
+            ("stt_service", "sancho_hri/speech/stt"),
             ("ask_user_service", "sancho_audio/ask_user"),
             ("processing_rate", 100.0),  # Hz del timer de procesamiento
 

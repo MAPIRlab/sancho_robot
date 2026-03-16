@@ -1,0 +1,28 @@
+usb_cam_node:
+    ros__parameters:
+      video_device: "/dev/nose_cam"
+      framerate: 15.0
+      io_method: "mmap"
+      frame_id: "camera"
+      pixel_format: "mjpeg2rgb" # rgb8, yuyv, yuyv2rgb, uyvy, uyvy2rgb, mono8, mono16, y102mono8, raw_mjpeg, mjpeg2rgb, m4202rgb
+      #av_device_format: "YUV422P" 
+      image_width: 640
+      image_height: 480
+      camera_name: "calibrated_camera"
+      camera_info_url: "package://sancho_hardware/config/cameras/camera_info_640.yaml"
+      brightness: -1
+      contrast: -1
+      saturation: -1
+      sharpness: -1
+      gain: -1
+      auto_white_balance: false
+      white_balance: 4000
+      autoexposure: false
+      exposure: 100
+      autofocus: false
+      focus: -1
+      white_balance_temperature_auto: false
+      exposure_auto: 1
+      focus_auto: false
+
+

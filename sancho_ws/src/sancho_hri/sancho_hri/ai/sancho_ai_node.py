@@ -35,18 +35,18 @@ class SanchoAINode(Node):
     }
 
     def __init__(self, ai_type):
-        super().__init__("sancho_hri.ai")
+        super().__init__("sancho_ai")
 
         self.ai_type = ai_type 
-        self.sancho_hri.ai = create_sancho_ai(self.ai_type)
+        self.ai = create_sancho_ai(self.ai_type)
         self.memory_manager = MemoryManager()
         self.chats = {}
 
         self.conversation_log_pub = self.create_publisher(ConversationTurn, "conversation_log/add", 10)
 
-        self.prompt_srv = self.create_service(SanchoPrompt, "sancho_hri.ai/prompt", self.prompt_service)
-        self.get_memories_srv = self.create_service(GetString, "sancho_hri.ai/get_memories", self.get_memories_service)
-        self.update_memory_srv = self.create_service(GetString, "sancho_hri.ai/update_memory", self.update_memory_service)
+        self.prompt_srv = self.create_service(SanchoPrompt, "sancho_hri/ai/prompt", self.prompt_service)
+        self.get_memories_srv = self.create_service(GetString, "sancho_hri/ai/get_memories", self.get_memories_service)
+        self.update_memory_srv = self.create_service(GetString, "sancho_hri/ai/update_memory", self.update_memory_service)
 
         LogManager.init(self)
 
@@ -106,7 +106,7 @@ class SanchoAINode(Node):
 
         chat_history = self.chats.get(chat_id, [])
         user_memory = self.memory_manager.get_memory_text(real_user_id) # If no user_id, memory will be ""
-        value, intent, arguments, provider, model = self.sancho_hri.ai.on_message(text, chat_history, display_user_id, display_user_name, user_memory)
+        value, intent, arguments, provider, model = self.ai.on_message(text, chat_history, display_user_id, display_user_name, user_memory)
         assistant_timestamp = datetime.now().timestamp()
 
         response.value_json = json.dumps(value)

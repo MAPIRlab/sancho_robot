@@ -14,9 +14,13 @@ class PhotoScreen(QWidget):
 
     def update_content(self, photo_base64=None):
         if photo_base64:
-            pixmap = QPixmap()
-            pixmap.loadFromData(base64.b64decode(photo_base64))
-            self.image_label.setPixmap(pixmap.scaled(
-                1200, 800, Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation
-            ))
+            try:
+                pixmap = QPixmap()
+                pixmap.loadFromData(base64.b64decode(photo_base64))
+                if not pixmap.isNull():
+                    self.image_label.setPixmap(pixmap.scaled(
+                        800, 600, Qt.AspectRatioMode.KeepAspectRatio,
+                        Qt.TransformationMode.SmoothTransformation
+                    ))
+            except Exception as e:
+                print(f"Error updating content: {e}")

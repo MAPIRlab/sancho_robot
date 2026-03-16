@@ -13,9 +13,11 @@ class AskIfNameScreen(QWidget):
         self.question_label = QLabel(alignment=Qt.AlignmentFlag.AlignCenter)
         self.button_yes = QPushButton("Sí")
         self.button_no = QPushButton("No")
+        self.button_cancel = QPushButton("Cancelar")
         button_layout = QHBoxLayout()
         button_layout.addWidget(self.button_yes)
         button_layout.addWidget(self.button_no)
+        button_layout.addWidget(self.button_cancel)
 
         self.layout.addWidget(self.image_label)
         self.layout.addWidget(self.question_label)
@@ -23,10 +25,14 @@ class AskIfNameScreen(QWidget):
 
     def update_content(self, photo_base64=None, name=""):
         if photo_base64:
-            pixmap = QPixmap()
-            pixmap.loadFromData(base64.b64decode(photo_base64))
-            self.image_label.setPixmap(pixmap.scaled(
-                800, 600, Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation
-            ))
+            try:
+                pixmap = QPixmap()
+                pixmap.loadFromData(base64.b64decode(photo_base64))
+                if not pixmap.isNull():
+                    self.image_label.setPixmap(pixmap.scaled(
+                        640, 480, Qt.AspectRatioMode.KeepAspectRatio,
+                        Qt.TransformationMode.SmoothTransformation
+                    ))
+            except Exception as e:
+                print(f"Error updating content: {e}")
         self.question_label.setText(f"¿Eres {name}?")

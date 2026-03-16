@@ -3,12 +3,13 @@ from .base_encoder import BaseEncoder
 
 def load_encoder(encoder_name: str) -> BaseEncoder:
     encoder_map = {
+        "efficientface": "efficientfacev2_encoder.EfficientFaceV2SEncoder",
         "facenet": "facenet_encoder.FaceNetEncoder",
         "openface": "openface_encoder.OpenFaceEncoder",
         "arcface": "arcface_encoder.ArcFaceEncoder",
         "sface": "sface_encoder.SFaceEncoder",
         "vggface": "vggface_encoder.VGGFaceEncoder",
-        "dino": "dino_encoder.DINOV2Encoder",
+        "dino": "dinov2_encoder.DINOV2Encoder",
     }
 
     try:

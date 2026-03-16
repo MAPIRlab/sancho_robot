@@ -32,15 +32,20 @@ class ServiceEngine(ABC):
         if srv_name in self.clients:
             return self.clients[srv_name]
 
+        # Simply create and register the client. DO NOT block the thread here.
         client = self.node.create_client(srv_type, srv_name)
-        while not client.wait_for_service(timeout_sec=1.0):
-            self.node.get_logger().info(f'{srv_name} service not available, waiting again...')
-
         self.clients[srv_name] = client
         
         return client
 
-    def call_service(self, client: Client, request):
+    def call_service(self, client: Client, request, timeout_sec=2.0):
+        # 1. Check if the service is alive before committing to the call.
+        # This gives offline services a brief window to respond without hanging the web request forever.
+        if not client.wait_for_service(timeout_sec=timeout_sec):
+            self.node.get_logger().error(f"Service {client.srv_name} is offline or unreachable.")
+            raise TimeoutError(f"El servicio {client.srv_name} no está disponible.")
+
+        # 2. Proceed with the call if the service is ready
         future = client.call_async(request)
         rclpy.spin_until_future_complete(self.node, future)
         result = future.result()

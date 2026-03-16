@@ -1,7 +1,7 @@
 import os
 import sys
 
-from PyQt6.QtCore import QTimer
+from PyQt6.QtCore import QTimer, QObject, pyqtSignal
 from PyQt6.QtWidgets import QApplication
 
 from ..model.app_model import AppModel
@@ -9,19 +9,29 @@ from ..view.main_window import MainWindow
 from ..view.splash_screen import SplashScreen
 
 
+class CommSignals(QObject):
+    update_screen_signal = pyqtSignal(str, dict)
+
+
 class AppController:
-    def __init__(self, name_callback, question_callback):
+    def __init__(self, name_callback, question_callback, cancel_callback=None):
         self.name_callback = name_callback
         self.question_callback = question_callback
+        self.cancel_callback = cancel_callback
 
         self.app = QApplication(sys.argv)
         self.model = AppModel()
         self.view = MainWindow()
         self.splash = SplashScreen()
+
+        self.signals = CommSignals()
+        self.signals.update_screen_signal.connect(self.handle_update_screen)
         
         self.view.get_name_screen.send_button.clicked.connect(self.submit_name)
+        self.view.get_name_screen.cancel_button.clicked.connect(self.cancel_action)
         self.view.ask_if_name_screen.button_yes.clicked.connect(lambda: self.submit_confirmation(True))
         self.view.ask_if_name_screen.button_no.clicked.connect(lambda: self.submit_confirmation(False))
+        self.view.ask_if_name_screen.button_cancel.clicked.connect(self.cancel_action)
 
         self.apply_styles()
     
@@ -48,7 +58,7 @@ class AppController:
 
     def set_mode_normal(self):
         self.model.mode = "normal"
-        self.view.set_screen("normal")
+        self.signals.update_screen_signal.emit("normal", {})
 
     def set_mode_get_name(self, photo_base64):
         if self.is_priority_mode():
@@ -57,7 +67,7 @@ class AppController:
         
         self.model.mode = "get_name"
         self.model.photo_base64 = photo_base64
-        self.view.set_screen("get_name", photo_base64=photo_base64)
+        self.signals.update_screen_signal.emit("get_name", {"photo_base64": photo_base64})
         
         return True
 
@@ -69,7 +79,7 @@ class AppController:
         self.model.mode = "ask_if_name"
         self.model.photo_base64 = photo_base64
         self.model.ask_if_name_person = name
-        self.view.set_screen("ask_if_name", photo_base64=photo_base64, name=name)
+        self.signals.update_screen_signal.emit("ask_if_name", {"photo_base64": photo_base64, "name": name})
 
         return True
 
@@ -80,7 +90,7 @@ class AppController:
         
         self.model.mode = "show_photo"
         self.model.photo_base64 = photo_base64
-        self.view.set_screen("photo", photo_base64=photo_base64)
+        self.signals.update_screen_signal.emit("photo", {"photo_base64": photo_base64})
 
         return True
 
@@ -108,3 +118,13 @@ class AppController:
         self.question_callback(answer)
 
         self.set_mode_normal()
+
+    def cancel_action(self):
+        print(f"[{self.model.mode}] Cancelado por el usuario.")
+        if self.cancel_callback:
+            self.cancel_callback()
+        
+        self.set_mode_normal()
+
+    def handle_update_screen(self, screen_name, kwargs):
+        self.view.set_screen(screen_name, **kwargs)
