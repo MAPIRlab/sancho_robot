@@ -86,6 +86,8 @@ class HRIHeadNode(Node):
         self.declare_parameter("pan_joint", "pan")
         self.declare_parameter("tilt_joint", "tilt")
         self.declare_parameter("tracking_topic", "/head_goal")
+        self.declare_parameter("profile_velocity", 2400)
+        self.declare_parameter("profile_acceleration", 300)
 
         self.idle_min = self.get_parameter("idle_move_min_interval").value
         self.idle_max = self.get_parameter("idle_move_max_interval").value
@@ -99,6 +101,8 @@ class HRIHeadNode(Node):
         self.pan_joint = self.get_parameter("pan_joint").value
         self.tilt_joint = self.get_parameter("tilt_joint").value
         tracking_topic = self.get_parameter("tracking_topic").value
+        self.profile_velocity = self.get_parameter("profile_velocity").value
+        self.profile_acceleration = self.get_parameter("profile_acceleration").value
 
         # Variables de estado
         self.state = State.IDLE
@@ -137,16 +141,20 @@ class HRIHeadNode(Node):
         req.name = self.joint_group
         req.mode = "position"
         req.profile_type = "time"
-        req.profile_velocity = 2400  # Tiempo que tarda en llegar a la posición
-        req.profile_acceleration = (
-            300  # TIempo que tarda en llegar a la aceleración maxima
-        )
+        req.profile_velocity = self.profile_velocity
+        req.profile_acceleration = self.profile_acceleration
+        
+        # Send the request asynchronously and attach a callback for the result
         future = self.op_srv.call_async(req)
-        rclpy.spin_until_future_complete(self, future)
-        if future.result() is None:
-            self.get_logger().error("Failed to set operating mode.")
-        else:
-            self.get_logger().info("Operating mode set to POSITION.")
+        future.add_done_callback(self._op_mode_response_cb)
+
+    def _op_mode_response_cb(self, future):
+        try:
+            # If the service call was successful, future.result() will return the response
+            response = future.result()
+            self.get_logger().info("Operating mode successfully set to POSITION.")
+        except Exception as e:
+            self.get_logger().error(f"Failed to set operating mode: {e}")
 
     def joint_state_cb(self, msg: JointState):
         try:

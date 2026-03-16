@@ -7,6 +7,7 @@ from launch_ros.actions import Node
 
 def generate_launch_description():
     interbotix_xsturret_control_path = get_package_share_directory('interbotix_xsturret_control')
+    sancho_hardware_path = get_package_share_directory('sancho_hardware')
 
     return LaunchDescription([
         Node(
@@ -29,5 +30,6 @@ def generate_launch_description():
             output='screen',
             prefix="xterm -hold -e",
             emulate_tty=True,
+            parameters=[os.path.join(sancho_hardware_path, 'config', 'head', 'head_params.yaml')]
         ),
     ])
