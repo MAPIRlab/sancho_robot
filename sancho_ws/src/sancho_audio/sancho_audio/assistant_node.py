@@ -72,7 +72,7 @@ class AssistantNode(Node):
         self.question_queue = Queue()
         self.greet_queue = Queue(maxsize=1)
 
-        self.declare_parameter("mapirbot_url", "https://sagem-aluminium-mud-heading.trycloudflare.com/ask")
+        self.declare_parameter("mapirbot_url", "https://alt-gone-ent-pensions.trycloudflare.com/ask")
         
         self.get_logger().info("Assistant Node initializated succesfully.")
 
