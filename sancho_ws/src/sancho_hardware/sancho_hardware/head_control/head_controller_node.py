@@ -207,6 +207,9 @@ class HRIHeadNode(Node):
             self.tracking_timer = None
 
     def move_head(self, pan: float, tilt: float):
+        pan = np.clip(pan, -self.pan_limit_rad, self.pan_limit_rad)
+        tilt = np.clip(tilt, -self.tilt_limit_rad, self.tilt_limit_rad)
+        
         cmd = JointGroupCommand()
         cmd.name = self.joint_group
         cmd.cmd = [float(pan), float(tilt)]
