@@ -7,12 +7,13 @@ from enum import Enum
 
 import rclpy
 from rclpy.node import Node
-from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
+from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
 
 from std_msgs.msg import String, Empty
 from std_srvs.srv import SetBool
 from sancho_msgs.msg import ConversationTurn
+from sancho_msgs.srv import StartInteraction, EndInteraction, ForceAttention
 from speech_msgs.srv import TTS
 
 try:
@@ -26,14 +27,14 @@ class QuestionState(int, Enum):
     GET_NAME = 1
     CONFIRM_NAME = 2
 
-class InteractionManagerNode(Node):
+class DialogManagerNode(Node):
     """
     Core brain of the Sancho robot. 
     Orchestrates the audio nodes, processes text via the LLM (Mapirbot),
     manages the conversation state, and executes Text-to-Speech (TTS) actions.
     """
     def __init__(self):
-        super().__init__("interaction_manager")
+        super().__init__("dialog_manager")
 
         self.declare_parameter("mapirbot_url", "https://experiments-suspension-predictions-mid.trycloudflare.com/ask")
         self.declare_parameter("hotword_node", "hotword_detector")
@@ -46,6 +47,10 @@ class InteractionManagerNode(Node):
         self.question_state = QuestionState.NO_QUESTION
         self.current_speaker_id = "0"
         self.current_speaker_name = "Unknown"
+        self.latest_doa_angle = 0.0
+        self._waiting_for_attention = False
+
+        self.cb_group = ReentrantCallbackGroup()
 
         # Publishers
         self.face_mode_pub = self.create_publisher(String, "face/mode", 10)
@@ -56,12 +61,16 @@ class InteractionManagerNode(Node):
         self.transcription_sub = self.create_subscription(String, "/voice_events/user_transcription", self.on_transcription_received, 10)
         self.speaker_sub = self.create_subscription(String, "/active_speaker_info", self.on_speaker_update, 10)
 
-        # Service Clients (Cada uno con su propio grupo para evitar deadlocks entre hilos)
-        self.tts_client = self.create_client(TTS, 'speech_tools/tts', callback_group=MutuallyExclusiveCallbackGroup())
-        self.hotword_enable_client = self.create_client(SetBool, f'/{self.hotword_node}/enable_listening', callback_group=MutuallyExclusiveCallbackGroup())
-        self.transcriptor_enable_client = self.create_client(SetBool, f'/{self.transcriptor_node}/enable_recording', callback_group=MutuallyExclusiveCallbackGroup())
+        # Service Clients
+        self.tts_client = self.create_client(TTS, 'speech_tools/tts', callback_group=self.cb_group)
+        self.hotword_enable_client = self.create_client(SetBool, f'/{self.hotword_node}/enable_listening', callback_group=self.cb_group)
+        self.transcriptor_enable_client = self.create_client(SetBool, f'/{self.transcriptor_node}/enable_recording', callback_group=self.cb_group)
 
-        self.get_logger().info("Interaction Manager initialized. Setting up the auditory system...")
+        self.start_interaction_srv = self.create_service(StartInteraction, '~/start_interaction', self.start_interaction_cb, callback_group=self.cb_group)
+        self.end_interaction_client = self.create_client(EndInteraction, '/attention_manager/interaction_finished', callback_group=self.cb_group)
+        self.force_attention_client = self.create_client(ForceAttention, '/attention_manager/force_attention', callback_group=self.cb_group)
+
+        self.get_logger().info(f"{self.get_name()} initialized. Setting up the auditory system...")
         threading.Thread(target=self.initial_setup, daemon=True).start()
 
     def initial_setup(self):
@@ -89,6 +98,34 @@ class InteractionManagerNode(Node):
         response = future.result()
         return response.success if response else False
 
+    # ------- Communication with Attention Manager -----------
+    def start_interaction_cb(self, request, response):
+        self._waiting_for_attention = False # Cancelamos el watchdog si existía
+        
+        names_list = request.user_names
+        user_name = names_list[0] if names_list else "Desconocido"
+
+        threading.Thread(target=self.play_tts, args=(f"¡Hola {user_name}! Dime algo", "happy", True), daemon=True).start()
+
+        response.success = True
+        response.message = "Interacción aceptada."
+        return response
+    
+    def end_interaction(self, reason="unknown"):
+        self.get_logger().info(f"Terminando interacción. Motivo: {reason}")
+        self._waiting_for_attention = False
+
+        # 1. Apagamos el micro (por si acaso) y encendemos escucha pasiva
+        self.set_node_state(self.transcriptor_enable_client, False, self.transcriptor_node)
+        self.set_node_state(self.hotword_enable_client, True, self.hotword_node)
+        self.face_mode_pub.publish(String(data="idle"))
+
+        # 2. Devolvemos el control al cuerpo
+        req = EndInteraction.Request()
+        req.reason = reason
+        self.end_interaction_client.call_async(req)
+    # ------------------------------------------------------------------
+
     def on_speaker_update(self, msg: String):
         try:
             data = json.loads(msg.data)
@@ -101,9 +138,9 @@ class InteractionManagerNode(Node):
         self.get_logger().info("Wake word detected! Activating attention...")
         self.face_mode_pub.publish(String(data="listening"))
         
-        threading.Thread(target=self._play_sound_and_listen, daemon=True).start()
+        threading.Thread(target=self.play_sound_and_listen, daemon=True).start()
 
-    def _play_sound_and_listen(self):
+    def play_sound_and_listen(self):
         # Deactivate hotword detection
         self.set_node_state(self.hotword_enable_client, False, self.hotword_node)
         
@@ -129,9 +166,9 @@ class InteractionManagerNode(Node):
         self.get_logger().info(f"[USER -> SANCHO] {self.current_speaker_name}: {text}")
         self.face_mode_pub.publish(String(data="thinking"))
 
-        threading.Thread(target=self.process_cognition, args=(text,), daemon=True).start()
+        threading.Thread(target=self.echo, args=(text,), daemon=True).start()
 
-    def process_cognition(self, user_text):
+    def process_user_transcription(self, user_text):
         ai_response, emotion = self.call_mapirbot(user_text)
         self.log_conversation(user_text, ai_response, emotion)
 
@@ -141,6 +178,26 @@ class InteractionManagerNode(Node):
             self.question_state = QuestionState.NO_QUESTION
 
         self.play_tts(ai_response, emotion, keep_asking)
+
+    def echo(self, user_text):
+        self.get_logger().info("Modo echo...")
+        
+        texto_minusculas = user_text.lower()
+        
+        # 1. Comprobamos si el usuario se quiere despedir
+        if "adiós" in texto_minusculas or "hasta luego" in texto_minusculas or "terminar" in texto_minusculas:
+            ai_response = f"¡Ayps!"
+            emotion = "happy"
+            end_conversation = True
+            
+        # 2. Si no se despide, hacemos de loro
+        else:
+            ai_response = user_text
+            emotion = "neutral"
+            end_conversation = False
+            
+        # Reproducimos la respuesta generada localmente
+        self.play_tts(ai_response, emotion, keep_asking=(not end_conversation))
 
     def call_mapirbot(self, text):
         payload = {"query": text, "thread_id": self.current_speaker_id}
@@ -180,6 +237,7 @@ class InteractionManagerNode(Node):
             self.face_mode_pub.publish(String(data="listening"))
             self.set_node_state(self.transcriptor_enable_client, True, self.transcriptor_node)
         else:
+            self.end_interaction()
             self.reset_to_idle()
 
     def reset_to_idle(self):
@@ -204,13 +262,13 @@ class InteractionManagerNode(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    node = InteractionManagerNode()
+    node = DialogManagerNode()
     try:
         executor = MultiThreadedExecutor()
         executor.add_node(node)
         executor.spin()
     except KeyboardInterrupt:
-        node.get_logger().info("Interaction Manager shutting down manually...")
+        node.get_logger().info(f"{node.get_name()} shutting down manually...")
     finally:
         node.destroy_node()
         rclpy.shutdown()

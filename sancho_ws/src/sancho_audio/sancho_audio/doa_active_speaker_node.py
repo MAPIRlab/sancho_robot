@@ -181,14 +181,14 @@ class DOAActiveSpeakerNode(Node):
                     best_recog = recog
             
             if best_recog:
-                self.speaker = {
-                    "id": best_recog.classified_id, 
-                    "name": best_recog.classified_name
-                }
+                id, name = best_recog.classified_id, best_recog.classified_name
 
-                msg_speaker = String()
-                msg_speaker.data = json.dumps(self.speaker)
-                self.speaker_pub.publish(msg_speaker)
+                if not self.speaker or self.speaker["id"] != id:
+                    self.speaker = {"id": id, "name": name}
+
+                    msg_speaker = String()
+                    msg_speaker.data = json.dumps(self.speaker)
+                    self.speaker_pub.publish(msg_speaker)
 
         out = self.draw_overlay(frame, angle_x)
         self.pub.publish(self.bridge.cv2_to_imgmsg(out, encoding="bgr8"))

@@ -1,10 +1,12 @@
 import os
 from dotenv import load_dotenv
 
+from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
-from launch_ros.actions import Node
+from launch_ros.actions import Node, LifecycleNode
 
 # Assuming you also have a TTS_MODELS enum in speech_tools.models
 from speech_tools.models import STT_MODELS, TTS_MODELS, TTS_SPEAKERS
@@ -17,6 +19,8 @@ OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 
 def generate_launch_description():
     prefix_cmd = LaunchConfiguration('prefix')
+
+    vision_pkg_dir = get_package_share_directory('sancho_vision')
 
     # Microphone
     microphone_node = Node(
@@ -40,6 +44,27 @@ def generate_launch_description():
             {'hotword_event_topic': '/voice_events/hotword_detected'}
         ]
     )
+
+    # ----- Speaker Recognition -------
+    person_recognition_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(vision_pkg_dir, 'launch', 'body_face_pipeline.launch.py')
+        ),
+    )
+
+    audio_doa_node = LifecycleNode(
+        namespace='',
+        package='sancho_audio',
+        executable='audio_doa_xvf3800_lifecycle',
+        name='audio_doa_xvf3800_lifecycle',
+    )
+
+    doa_active_speaker = Node(
+        package='sancho_audio',
+        executable='doa_active_speaker',
+        name='doa_active_speaker',
+    )
+    # ---------------------------------------
 
     # ------------ Transcription ----------------
     # STT Node
@@ -67,7 +92,10 @@ def generate_launch_description():
             {'mic_topic': '/sancho_audio/microphone/mono'},
             {'transcription_topic': '/voice_events/user_transcription'},
             {'vad_criterion': 'silero'},
-            {'timeout_seconds': 5.0}
+            {"intensity_threshold": 900},
+            {'timeout_seconds': 5.0},
+            {"chunk_size": 0.5},
+            {"silence_patience_seconds": 1.5}
         ]
     )
     # --------------------------------------
@@ -101,18 +129,18 @@ def generate_launch_description():
         }]
     )
 
-    # Interaction Manager
+    # Dialog Manager
     # Core brain that orchestrates nodes and connects to the LLM
-    interaction_manager_node = Node(
+    dialog_manager_node = Node(
         package='sancho_audio',
-        executable='interaction_manager_node',
-        name='interaction_manager',
+        executable='dialog_manager_node',
+        name='dialog_manager',
         output='screen',
         prefix=prefix_cmd,
         emulate_tty=True,
         parameters=[
-            {'hotword_node_name': 'hotword_detector'},
-            {'asr_node_name': 'vad_transcriptor'},
+            {'hotword_node': 'hotword_detector'},
+            {'transcriptor_onde': 'vad_transcriptor'},
             {"mapirbot_url": "https://experiments-suspension-predictions-mid.trycloudflare.com/ask"}
         ]
     )
@@ -137,12 +165,15 @@ def generate_launch_description():
             default_value='xterm -hold -e' if os.environ.get('DISPLAY') else '',
             description='Prefijo para lanzar nodos en terminal (p.ej.: “xterm -hold -e”)'
         ),
+        person_recognition_launch,
         microphone_node,
         hotword_node,
+        audio_doa_node,
+        doa_active_speaker,
         stt_node,
         vad_transcriptor_node,
         llm_node,
         tts_node,
-        interaction_manager_node,
+        dialog_manager_node,
         configurator_node
     ])

@@ -26,6 +26,7 @@ setup(
     entry_points={
         'console_scripts': [
             'interaction_manager_node = sancho_interaction.interaction_manager_node:main',
+            'attention_manager_node = sancho_interaction.attention_manager_node:main'
         ],
     },
 )

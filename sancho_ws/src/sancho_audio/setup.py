@@ -43,7 +43,7 @@ setup(
             'audio_doa_xvf3800_lifecycle=sancho_audio.audio_doa_xvf3800_lifecycle_node:main',
             'doa_active_speaker=sancho_audio.doa_active_speaker_node:main',
             'hotword_detector_node=sancho_audio.hotword_detector_node:main',
-            'interaction_manager_node=sancho_audio.interation_manager_node:main'
+            'dialog_manager_node=sancho_audio.dialog_manager_node:main'
         ],
     },
 )
