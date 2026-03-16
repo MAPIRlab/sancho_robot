@@ -16,8 +16,8 @@ from sancho_interfaces.srv import GreetPeople
 from sancho_interfaces.srv import TTS
 
 from sancho_audio.assistant_helper_node import HELPER_STATE
-from sancho_ai.sancho_ai_node import MODE
-from sancho_ai.prompts.commands import COMMANDS
+from sancho_hri.ai.sancho_ai_node import MODE
+from sancho_hri.ai.prompts.commands import COMMANDS
 
 from lifecycle_msgs.srv import ChangeState, GetAvailableTransitions
 
@@ -55,13 +55,13 @@ class AssistantNode(Node):
 
         self.sancho_greet_people_srv = self.create_service(GreetPeople, 'assistant/greet_people', self.sancho_greet_people_service)
 
-        self.sancho_prompt_client = self.create_client(SanchoPrompt, "sancho_ai/prompt")
-        while not self.sancho_prompt_client.wait_for_service(timeout_sec=1.0):
-            self.get_logger().warning("Sancho Prompt Service not available, waiting...")
+        self.sancho_prompt_client = self.create_client(SanchoPrompt, "sancho_hri/llm/prompt")
+        #while not self.sancho_prompt_client.wait_for_service(timeout_sec=1.0):
+        self.get_logger().warning("Sancho Prompt Service not available, waiting...")
 
-        self.tts_client = self.create_client(TTS, 'speech_tools/tts')
-        while not self.tts_client.wait_for_service(timeout_sec=1.0):
-            self.get_logger().info('TTS service not available, waiting again...')
+        self.tts_client = self.create_client(TTS, 'sancho_hri/speech/tts')
+        #while not self.tts_client.wait_for_service(timeout_sec=1.0):
+        self.get_logger().info('TTS service not available, waiting again...')
 
         self.gui_client = self.create_client(TriggerUserInteraction, 'gui/request')
         #while not self.gui_client.wait_for_service(timeout_sec=1.0):
@@ -72,7 +72,7 @@ class AssistantNode(Node):
         self.question_queue = Queue()
         self.greet_queue = Queue(maxsize=1)
 
-        self.declare_parameter("mapirbot_url", "https://sagem-aluminium-mud-heading.trycloudflare.com/ask")
+        self.declare_parameter("mapirbot_url", "https://dynamic-gig-networks-silk.trycloudflare.com/ask")
         
         self.get_logger().info("Assistant Node initializated succesfully.")
 
@@ -154,7 +154,7 @@ class Assistant:
         headers = {"Content-Type": "application/json"}
         
         try:
-            response = requests.post(url, data=json.dumps(payload), headers=headers, timeout=10)
+            response = requests.post(url, data=json.dumps(payload), headers=headers, timeout=1000)
             if response.status_code == 200:
                 data = response.json()
                 self.node.get_logger().info(f"[INFO] Respuesta de Mapirbot: {data}")

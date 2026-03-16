@@ -28,25 +28,25 @@ def generate_launch_description():
         emulate_tty=True,
     )
 
-    # audio_doa_node = LifecycleNode(
-    #     namespace='',
-    #     package='sancho_audio',
-    #     executable='audio_doa_xvf3800_lifecycle',
-    #     name='audio_doa_xvf3800_lifecycle',
-    #     output='screen',
-    #     prefix=prefix_cmd,
-    #     emulate_tty=True,
-    # )
-
     audio_doa_node = LifecycleNode(
         namespace='',
         package='sancho_audio',
-        executable='audio_doa_lifecycle',
-        name='audio_doa_lifecycle',
+        executable='audio_doa_xvf3800_lifecycle',
+        name='audio_doa_xvf3800_lifecycle',
         output='screen',
         prefix=prefix_cmd,
         emulate_tty=True,
     )
+
+    # audio_doa_node = LifecycleNode(
+    #     namespace='',
+    #     package='sancho_audio',
+    #     executable='audio_doa_lifecycle',
+    #     name='audio_doa_lifecycle',
+    #     output='screen',
+    #     prefix=prefix_cmd,
+    #     emulate_tty=True,
+    # )
 
 
     audio_doa_overlay_node = Node(

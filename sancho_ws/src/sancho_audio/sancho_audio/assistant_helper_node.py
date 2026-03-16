@@ -57,7 +57,7 @@ class AssistantHelperNode(Node): # Poner una variable para esperar X chunks ante
         self.face_recog_sub = self.create_subscription(FaceRecognitionArray, 'face_recognitions', self.face_recog_callback, 10)
         self.audio_doa_sub = self.create_subscription(Float32, 'sancho_audio/doa', self.audio_doa_callback, 10)
 
-        self.stt_client = self.create_client(STT, 'speech_tools/stt')
+        self.stt_client = self.create_client(STT, 'sancho_hri/speech/stt')
         while not self.stt_client.wait_for_service(timeout_sec=1.0):
             self.get_logger().info('STT service not available, waiting again...')
         
