@@ -30,13 +30,13 @@ class TTSNode(Node):
 
         self.active_model = None
 
-        self.get_all_srv = self.create_service(TTSGetModels, 'sancho_hri.speech/tts/get_all_models', self.handle_get_all_models)
-        self.get_active_srv = self.create_service(TTSGetActiveModel, 'sancho_hri.speech/tts/get_active_model', self.handle_get_active_model)
-        self.get_available_srv = self.create_service(TTSGetModels, 'sancho_hri.speech/tts/get_available_models', self.handle_get_available_models)
-        self.tts_srv = self.create_service(TTS, 'sancho_hri.speech/tts', self.handle_tts)
-        self.load_model_srv = self.create_service(SpeechLoadModel, 'sancho_hri.speech/tts/load_model', self.handle_load_model)
-        self.unload_model_srv = self.create_service(SpeechUnloadModel, 'sancho_hri.speech/tts/unload_model', self.handle_unload_model)
-        self.set_active_model_srv = self.create_service(TTSSetActiveModel, 'sancho_hri.speech/tts/set_active_model', self.handle_set_active_model)
+        self.get_all_srv = self.create_service(TTSGetModels, 'sancho_hri/speech/tts/get_all_models', self.handle_get_all_models)
+        self.get_active_srv = self.create_service(TTSGetActiveModel, 'sancho_hri/speech/tts/get_active_model', self.handle_get_active_model)
+        self.get_available_srv = self.create_service(TTSGetModels, 'sancho_hri/speech/tts/get_available_models', self.handle_get_available_models)
+        self.tts_srv = self.create_service(TTS, 'sancho_hri/speech/tts', self.handle_tts)
+        self.load_model_srv = self.create_service(SpeechLoadModel, 'sancho_hri/speech/tts/load_model', self.handle_load_model)
+        self.unload_model_srv = self.create_service(SpeechUnloadModel, 'sancho_hri/speech/tts/unload_model', self.handle_unload_model)
+        self.set_active_model_srv = self.create_service(TTSSetActiveModel, 'sancho_hri/speech/tts/set_active_model', self.handle_set_active_model)
 
         self._init_from_parameters()
 

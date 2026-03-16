@@ -27,13 +27,13 @@ class STTNode(Node):
 
         self.vad = SileroVAD()
 
-        self.get_all_srv = self.create_service(STTGetModels, 'sancho_hri.speech/stt/get_all_models', self.handle_get_all_models)
-        self.get_active_srv = self.create_service(STTGetActiveModel, 'sancho_hri.speech/stt/get_active_model', self.handle_get_active_model)
-        self.get_available_srv = self.create_service(STTGetModels, 'sancho_hri.speech/stt/get_available_models', self.handle_get_available_models)
-        self.stt_srv = self.create_service(STT, 'sancho_hri.speech/stt', self.handle_stt)
-        self.load_model_srv = self.create_service(SpeechLoadModel, 'sancho_hri.speech/stt/load_model', self.handle_load_model)
-        self.unload_model_srv = self.create_service(SpeechUnloadModel, 'sancho_hri.speech/stt/unload_model', self.handle_unload_model)
-        self.set_active_model_srv = self.create_service(STTSetActiveModel, 'sancho_hri.speech/stt/set_active_model', self.handle_set_active_model)
+        self.get_all_srv = self.create_service(STTGetModels, 'sancho_hri/speech/stt/get_all_models', self.handle_get_all_models)
+        self.get_active_srv = self.create_service(STTGetActiveModel, 'sancho_hri/speech/stt/get_active_model', self.handle_get_active_model)
+        self.get_available_srv = self.create_service(STTGetModels, 'sancho_hri/speech/stt/get_available_models', self.handle_get_available_models)
+        self.stt_srv = self.create_service(STT, 'sancho_hri/speech/stt', self.handle_stt)
+        self.load_model_srv = self.create_service(SpeechLoadModel, 'sancho_hri/speech/stt/load_model', self.handle_load_model)
+        self.unload_model_srv = self.create_service(SpeechUnloadModel, 'sancho_hri/speech/stt/unload_model', self.handle_unload_model)
+        self.set_active_model_srv = self.create_service(STTSetActiveModel, 'sancho_hri/speech/stt/set_active_model', self.handle_set_active_model)
 
         self._init_from_parameters()
 

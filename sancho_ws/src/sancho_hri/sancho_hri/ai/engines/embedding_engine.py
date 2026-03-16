@@ -11,7 +11,7 @@ class EmbeddingEngine(ServiceEngine):
 
         load_dotenv()
 
-        self.embeddings_cli = self.create_client(Embedding, "llm_tools/embedding")
+        self.embeddings_cli = self.create_client(Embedding, "sancho_hri/llm/embedding")
 
         self.node.get_logger().info("Embedding Engine initializated succesfully")
     

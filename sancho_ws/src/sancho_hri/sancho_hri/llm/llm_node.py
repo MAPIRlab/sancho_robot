@@ -37,15 +37,15 @@ class LLMNode(Node):
         self.active_llm = None
         self.active_embedding = None
 
-        self.get_all_srv = self.create_service(GetModels, 'sancho_hri.llm/get_all_models', self.handle_get_all_models)
-        self.get_active_srv = self.create_service(GetActiveModels, 'sancho_hri.llm/get_active_models', self.handle_get_active_models)
-        self.get_available_srv = self.create_service(GetModels, 'sancho_hri.llm/get_available_models', self.handle_get_available_models)
-        self.prompt_srv = self.create_service(Prompt, 'sancho_hri.llm/prompt', self.handle_prompt)
-        self.embedding_srv = self.create_service(Embedding, 'sancho_hri.llm/embedding', self.handle_embedding)
-        self.load_model_srv = self.create_service(LLMLoadModel, 'sancho_hri.llm/load_model', self.handle_load_model)
-        self.unload_model_srv = self.create_service(LLMUnloadModel, 'sancho_hri.llm/unload_model', self.handle_unload_model)
-        self.set_active_llm_srv = self.create_service(SetActiveModel, 'sancho_hri.llm/set_active_llm', self.handle_set_active_llm)
-        self.set_active_embedding_srv = self.create_service(SetActiveModel, 'sancho_hri.llm/set_active_embedding', self.handle_set_active_embedding)
+        self.get_all_srv = self.create_service(GetModels, 'sancho_hri/llm/get_all_models', self.handle_get_all_models)
+        self.get_active_srv = self.create_service(GetActiveModels, 'sancho_hri/llm/get_active_models', self.handle_get_active_models)
+        self.get_available_srv = self.create_service(GetModels, 'sancho_hri/llm/get_available_models', self.handle_get_available_models)
+        self.prompt_srv = self.create_service(Prompt, 'sancho_hri/llm/prompt', self.handle_prompt)
+        self.embedding_srv = self.create_service(Embedding, 'sancho_hri/llm/embedding', self.handle_embedding)
+        self.load_model_srv = self.create_service(LLMLoadModel, 'sancho_hri/llm/load_model', self.handle_load_model)
+        self.unload_model_srv = self.create_service(LLMUnloadModel, 'sancho_hri/llm/unload_model', self.handle_unload_model)
+        self.set_active_llm_srv = self.create_service(SetActiveModel, 'sancho_hri/llm/set_active_llm', self.handle_set_active_llm)
+        self.set_active_embedding_srv = self.create_service(SetActiveModel, 'sancho_hri/llm/set_active_embedding', self.handle_set_active_embedding)
 
         self._init_from_parameters()
 

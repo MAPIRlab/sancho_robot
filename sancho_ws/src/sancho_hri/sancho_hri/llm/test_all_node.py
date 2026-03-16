@@ -17,10 +17,10 @@ class TestAllModelsNode(Node):
         super().__init__("test_all_models")
         load_dotenv()
 
-        self.cli_prompt = self.create_client(Prompt, 'sancho_hri.llm/prompt')
-        self.cli_embedding = self.create_client(Embedding, 'sancho_hri.llm/embedding')
-        self.cli_load = self.create_client(LLMLoadModel, 'sancho_hri.llm/load_model')
-        self.cli_unload = self.create_client(LLMUnloadModel, 'sancho_hri.llm/unload_model')
+        self.cli_prompt = self.create_client(Prompt, 'sancho_hri/llm/prompt')
+        self.cli_embedding = self.create_client(Embedding, 'sancho_hri/llm/embedding')
+        self.cli_load = self.create_client(LLMLoadModel, 'sancho_hri/llm/load_model')
+        self.cli_unload = self.create_client(LLMUnloadModel, 'sancho_hri/llm/unload_model')
 
         self.successful_tests = []
         self.failed_tests = []
