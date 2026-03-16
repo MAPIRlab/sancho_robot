@@ -21,7 +21,7 @@ def generate_launch_description():
     prefix_cmd = LaunchConfiguration('prefix')
 
     #llm = Node(
-    #    package='llm_tools',
+    #    package='sancho_hri',
     #    executable='llm',
     #    name='llm',
     #    parameters=[{
@@ -32,7 +32,7 @@ def generate_launch_description():
     #)
 
     llm = Node(
-        package='llm_tools',
+        package='sancho_hri',
         executable='llm',
         name='mapirbot',
         parameters=[{
@@ -43,7 +43,7 @@ def generate_launch_description():
     )
 
     tts = Node(
-        package='speech_tools',
+        package='sancho_hri',
         executable='tts',
         name='tts',
         parameters=[{
@@ -54,7 +54,7 @@ def generate_launch_description():
     )
 
     stt = Node(
-        package='speech_tools',
+        package='sancho_hri',
         executable='stt',
         name='stt',
         parameters=[{
@@ -108,7 +108,7 @@ def generate_launch_description():
     )
 
     sancho_ai = Node(
-        package='sancho_ai',
+        package='sancho_hri',
         executable='sancho_ai',
         name='sancho_ai',
         output='screen',
@@ -117,7 +117,7 @@ def generate_launch_description():
     )
 
     database_manager = Node(
-        package='sancho_web_assistant',
+        package='sancho_web_bridge',
         executable='database_manager',
         name='database_manager',
         output='screen',

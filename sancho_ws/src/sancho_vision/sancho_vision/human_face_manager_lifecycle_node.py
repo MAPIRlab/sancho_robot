@@ -11,11 +11,11 @@ from rclpy.executors import MultiThreadedExecutor
 
 from std_msgs.msg import String, Empty
 from std_srvs.srv import SetBool, Empty as EmptySrv
-from hri_msgs.srv import Training, TriggerUserInteraction
-from hri_msgs.msg import Log, FaceNameResponse, FaceQuestionResponse
-from rumi_msgs.msg import SessionMessage
-from sancho_msgs.msg import FaceRecognitionArray, InputTTS
-from sancho_msgs.srv import AskUser
+from sancho_interfaces.srv import Training, TriggerUserInteraction
+from sancho_interfaces.msg import Log, FaceNameResponse, FaceQuestionResponse
+from sancho_interfaces.msg import SessionMessage
+from sancho_interfaces.msg import FaceRecognitionArray, InputTTS
+from sancho_interfaces.srv import AskUser
 
 from sancho_web_assistant.database.system_database import CONSTANTS
 from sancho_audio.assistant_node import QUESTION

@@ -1,0 +1,5 @@
+string[] providers # If empty, returns all providers and models
+---
+sancho_interfaces/ProviderItem[] llm_models
+sancho_interfaces/ProviderItem[] embedding_models
+string[] providers

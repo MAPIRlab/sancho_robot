@@ -12,7 +12,7 @@
   <depend>cv_bridge</depend>
   <depend>std_msgs</depend>
   <depend>geometry_msgs</depend>
-  <depend>sancho_msgs</depend>
+  
   <depend>numpy</depend>
   <depend>mediapipe</depend>
   <depend>dlib</depend>
@@ -29,4 +29,5 @@
   <export>
     <build_type>ament_python</build_type>
   </export>
+  <depend>sancho_interfaces</depend>
 </package>

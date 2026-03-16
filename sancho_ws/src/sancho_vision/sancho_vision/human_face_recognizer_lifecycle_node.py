@@ -9,10 +9,10 @@ from rclpy.qos import QoSProfile
 from std_msgs.msg import String
 from std_srvs.srv import SetBool, Empty
 from sensor_msgs.msg import Image
-from sancho_msgs.msg import FaceDetection, FaceDetectionArray, FaceRecognition, FaceRecognitionArray
+from sancho_interfaces.msg import FaceDetection, FaceDetectionArray, FaceRecognition, FaceRecognitionArray
 from geometry_msgs.msg import Point
-from hri_msgs.msg import FaceprintEvent
-from hri_msgs.srv import Recognition, Training, GetString
+from sancho_interfaces.msg import FaceprintEvent
+from sancho_interfaces.srv import Recognition, Training, GetString
 
 from .hri_bridge import HRIBridge
 from .aligners.aligner_dlib import align_face

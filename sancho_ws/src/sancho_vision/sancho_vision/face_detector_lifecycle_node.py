@@ -17,7 +17,7 @@ from cv_bridge import CvBridge, CvBridgeError
 from geometry_msgs.msg import Point
 from rclpy.lifecycle import LifecycleNode, TransitionCallbackReturn
 from rclpy.qos import QoSProfile
-from sancho_msgs.msg import Face, FaceArray
+from sancho_interfaces.msg import Face, FaceArray
 from sensor_msgs.msg import Image
 
 package_path = get_package_share_directory("sancho_vision")

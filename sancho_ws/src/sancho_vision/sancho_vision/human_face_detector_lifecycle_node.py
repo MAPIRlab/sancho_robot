@@ -7,8 +7,8 @@ from rclpy.qos import QoSProfile
 from sensor_msgs.msg import Image
 from std_msgs.msg import Header
 from geometry_msgs.msg import Point
-from sancho_msgs.msg import FaceDetection, FaceDetectionArray
-from hri_msgs.srv import Detection
+from sancho_interfaces.msg import FaceDetection, FaceDetectionArray
+from sancho_interfaces.srv import Detection
 
 from .hri_bridge import HRIBridge
 from .detectors import load_detector, BaseDetector

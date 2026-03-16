@@ -1,4 +1,0 @@
-string[] models
----
-speech_msgs/ModelSpeaker[] speakers
-string[] models

@@ -25,7 +25,7 @@ from tf2_ros import (
 )
 from tf_transformations import quaternion_from_euler
 
-from sancho_msgs.srv import SetHome
+from sancho_interfaces.srv import SetHome
 
 
 class RoamingNode(Node):

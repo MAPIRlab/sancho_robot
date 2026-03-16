@@ -11,8 +11,8 @@ from rclpy.duration import Duration  # <<< necesario para lifetime
 from geometry_msgs.msg import Point
 from visualization_msgs.msg import Marker, MarkerArray
 
-from sancho_msgs.msg import FaceRecognitionArray, FaceDetection, FaceRecognition
-from sancho_msgs.srv import GetCentralFaceCluster
+from sancho_interfaces.msg import FaceRecognitionArray, FaceDetection, FaceRecognition
+from sancho_interfaces.srv import GetCentralFaceCluster
 
 try:
     from sklearn.cluster import DBSCAN

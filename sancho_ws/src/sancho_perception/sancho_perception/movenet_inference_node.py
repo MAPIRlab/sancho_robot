@@ -16,7 +16,7 @@ from sensor_msgs.msg import Image
 from std_msgs.msg import Float32
 from visualization_msgs.msg import MarkerArray
 
-from sancho_msgs.msg import PersonPose, PersonsPoses
+from sancho_interfaces.msg import PersonPose, PersonsPoses
 
 from .movenet_utils import load_model, process_detections, run_inference_on_image
 

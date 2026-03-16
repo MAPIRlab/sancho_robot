@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from rumi_msgs.msg import SessionMessage
+from sancho_interfaces.msg import SessionMessage
 
 
 class PeopleManager:

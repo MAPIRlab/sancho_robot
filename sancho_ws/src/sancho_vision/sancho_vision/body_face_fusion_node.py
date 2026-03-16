@@ -8,7 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 
-from sancho_msgs.msg import FaceDetectionArray, FaceDetection, FaceRecognitionArray, FaceRecognition
+from sancho_interfaces.msg import FaceDetectionArray, FaceDetection, FaceRecognitionArray, FaceRecognition
 from geometry_msgs.msg import Point
 
 from .detectors import load_detector

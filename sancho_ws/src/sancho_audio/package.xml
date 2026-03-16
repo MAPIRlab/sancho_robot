@@ -9,7 +9,7 @@
 
   <depend>rclpy</depend>
   <depend>lifecycle_msgs</depend>
-  <depend>sancho_msgs</depend>
+  
   <depend>std_msgs</depend>
   <depend>numpy</depend>
   <depend>pyaudio</depend>
@@ -27,4 +27,5 @@
   <export>
     <build_type>ament_python</build_type>
   </export>
+  <depend>sancho_interfaces</depend>
 </package>

@@ -1,5 +1,0 @@
-string[] providers # If empty, returns all providers and models
----
-llm_msgs/ProviderItem[] llm_models
-llm_msgs/ProviderItem[] embedding_models
-string[] providers

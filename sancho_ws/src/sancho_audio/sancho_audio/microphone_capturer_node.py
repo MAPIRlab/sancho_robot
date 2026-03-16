@@ -7,8 +7,8 @@ import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Header
 
-from sancho_msgs.msg import AudioData
-from sancho_msgs.srv import GetNoiseFloor
+from sancho_interfaces.msg import AudioData
+from sancho_interfaces.srv import GetNoiseFloor
 
 
 class MicrophoneNode(Node):

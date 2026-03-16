@@ -6,7 +6,7 @@ import numpy as np
 from std_msgs.msg import String
 from cv_bridge import CvBridge
 
-from hri_msgs.msg import FacePosition
+from sancho_interfaces.msg import FacePosition
 
 
 class HRIBridge:

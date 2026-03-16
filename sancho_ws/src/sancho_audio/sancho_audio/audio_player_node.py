@@ -5,7 +5,7 @@ from playsound import PlaysoundException, playsound
 from rclpy.action import ActionServer, CancelResponse, GoalResponse
 from rclpy.lifecycle import LifecycleNode, State, TransitionCallbackReturn
 
-from sancho_msgs.action import PlayAudio
+from sancho_interfaces.action import PlayAudio
 
 
 class AudioPlayer(LifecycleNode):

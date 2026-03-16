@@ -20,7 +20,7 @@ def generate_launch_description():
 
     face_node = Node(
         namespace='',
-        package='sancho_emotions',
+        package='sancho_hardware',
         executable='face_node',
         name='face_node',
         output='screen',

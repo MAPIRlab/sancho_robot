@@ -12,7 +12,7 @@ from rclpy.qos import QoSPresetProfiles
 from sensor_msgs.msg import CameraInfo, JointState
 from std_msgs.msg import Header
 
-from sancho_msgs.msg import FaceDetectionArray
+from sancho_interfaces.msg import FaceDetectionArray
 
 
 class FaceTrackerLifecycle(LifecycleNode):
