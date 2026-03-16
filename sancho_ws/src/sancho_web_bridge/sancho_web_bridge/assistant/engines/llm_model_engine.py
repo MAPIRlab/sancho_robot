@@ -1,4 +1,4 @@
-from sancho_interfaces.msg import ProviderModel, LLMLoadModel as LoadModelMsg
+from sancho_interfaces.msg import ProviderModel, LLMLoadModelMsg as LoadModelMsg
 from sancho_interfaces.srv import GetModels, LLMLoadModel, LLMUnloadModel, GetActiveModels, SetActiveModel
 
 from .service_engine import ServiceEngine
