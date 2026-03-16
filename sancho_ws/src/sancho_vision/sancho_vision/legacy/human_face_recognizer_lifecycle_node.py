@@ -14,11 +14,11 @@ from geometry_msgs.msg import Point
 from sancho_interfaces.msg import FaceprintEvent
 from sancho_interfaces.srv import Recognition, Training, GetString
 
-from .hri_bridge import HRIBridge
-from .aligners.aligner_dlib import align_face
-from .classifiers.complex_classifier import ComplexClassifier
-from .encoders import load_encoder
-from .api.gui_utils import mark_face
+from sancho_vision.hri_bridge import HRIBridge
+from sancho_vision.aligners.aligner_dlib import align_face
+from sancho_vision.classifiers.complex_classifier import ComplexClassifier
+from sancho_vision.encoders import load_encoder
+from sancho_vision.api.gui_utils import mark_face
 
 class HumanFaceRecognizerLifecycleNode(LifecycleNode):
 

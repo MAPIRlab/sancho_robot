@@ -10,7 +10,7 @@ from std_msgs.msg import Empty, String, Bool
 from sancho_interfaces.msg import FaceNameResponse, FaceQuestionResponse
 from sancho_interfaces.srv import TriggerUserInteraction
 
-from .gui import AppController
+from sancho_vision.gui import AppController
 
 def encode_image_base64(path):
     with open(path, "rb") as img_file:

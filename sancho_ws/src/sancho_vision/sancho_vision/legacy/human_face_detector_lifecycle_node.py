@@ -10,9 +10,9 @@ from geometry_msgs.msg import Point
 from sancho_interfaces.msg import FaceDetection, FaceDetectionArray
 from sancho_interfaces.srv import Detection
 
-from .hri_bridge import HRIBridge
-from .detectors import load_detector, BaseDetector
-from .trackers import load_tracker, BaseTracker
+from sancho_vision.hri_bridge import HRIBridge
+from sancho_vision.detectors import load_detector, BaseDetector
+from sancho_vision.trackers import load_tracker, BaseTracker
 
 class HumanFaceDetectorLifecycleNode(LifecycleNode):
     def __init__(self):

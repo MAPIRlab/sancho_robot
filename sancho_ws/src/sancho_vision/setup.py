@@ -29,18 +29,17 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'face_cluster_node = sancho_vision.face_cluster_node:main',
-            'central_faces_cluster_node = sancho_vision.central_faces_cluster_node:main',
-            'human_face_tracker_lifecycle = sancho_vision.human_face_tracker_lifecycle_node:main',
-            'human_face_detector_lifecycle = sancho_vision.human_face_detector_lifecycle_node:main',       
-            'human_face_recognizer_lifecycle = sancho_vision.human_face_recognizer_lifecycle_node:main',
-            'human_face_manager_lifecycle = sancho_vision.human_face_manager_lifecycle_node:main',
-            'gui = sancho_vision.hri_gui:main',
+            'face_cluster_node = sancho_vision.tools.face_cluster_node:main',
+            'central_faces_cluster_node = sancho_vision.tools.central_faces_cluster_node:main',
+            'human_face_tracker_lifecycle = sancho_vision.nodes.head_control_node:main',
+            'human_face_detector_lifecycle = sancho_vision.legacy.human_face_detector_lifecycle_node:main',       
+            'human_face_recognizer_lifecycle = sancho_vision.legacy.human_face_recognizer_lifecycle_node:main',
+            'human_face_manager_lifecycle = sancho_vision.nodes.human_face_manager_lifecycle_node:main',
+            'gui = sancho_vision.nodes.hri_gui:main',
 
-            'camera = sancho_vision.camera_node:main',
-            'video = sancho_vision.video_node:main',
-            'body_face_fusion_node = sancho_vision.body_face_fusion_node:main',
-            'face_visualizer_node = sancho_vision.face_visualizer_node:main',
+            'video = sancho_vision.tools.video_node:main',
+            'body_face_fusion_node = sancho_vision.nodes.body_face_fusion_node:main',
+            'face_visualizer_node = sancho_vision.nodes.face_visualizer_node:main',
         ],
     },
 )

@@ -19,8 +19,8 @@ from sancho_interfaces.srv import AskUser
 
 from sancho_web_bridge.assistant.database.system_database import CONSTANTS
 from sancho_audio.assistant_node import QUESTION
-from .database.people_manager import PeopleManager
-from .hri_bridge import HRIBridge
+from sancho_vision.database.people_manager import PeopleManager
+from sancho_vision.hri_bridge import HRIBridge
 
 
 def _call_service_sync(node, client, request, timeout=5.0):

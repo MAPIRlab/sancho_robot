@@ -5,7 +5,7 @@ from cv_bridge import CvBridge
 import cv2
 
 from sancho_interfaces.msg import FaceRecognitionArray
-from .api.gui_utils import mark_face
+from sancho_vision.api.gui_utils import mark_face
 
 class FaceVisualizerNode(Node):
     def __init__(self):

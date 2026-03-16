@@ -12,10 +12,10 @@ from cv_bridge import CvBridge
 from sancho_interfaces.msg import FaceDetectionArray, FaceDetection, FaceRecognitionArray, FaceRecognition
 from geometry_msgs.msg import Point
 
-from .detectors import load_detector
-from .encoders import load_encoder
-from .classifiers.complex_classifier import ComplexClassifier
-from .aligners.aligner_dlib import align_face
+from sancho_vision.detectors import load_detector
+from sancho_vision.encoders import load_encoder
+from sancho_vision.classifiers.complex_classifier import ComplexClassifier
+from sancho_vision.aligners.aligner_dlib import align_face
 
 from sancho_interfaces.srv import Training, GetString
 from sancho_interfaces.srv import Detection, Recognition
