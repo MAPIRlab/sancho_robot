@@ -4,7 +4,7 @@ import numpy as np
 
 from std_msgs.msg import Empty
 from std_srvs.srv import SetBool
-from hri_msgs.msg import ChunkMono
+from sancho_interfaces.msg import ChunkMono
 
 try:
     from .utils.openwakeword_hotword import OpenWakeWordHotword

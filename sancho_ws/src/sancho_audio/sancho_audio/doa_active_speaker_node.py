@@ -7,7 +7,7 @@ from rclpy.node import Node
 
 from std_msgs.msg import Float32, String
 from sensor_msgs.msg import Image, JointState, CameraInfo
-from sancho_msgs.msg import FaceRecognitionArray, FaceRecognition
+from sancho_interfaces.msg import FaceRecognitionArray, FaceRecognition
 from cv_bridge import CvBridge
 
 

@@ -7,8 +7,8 @@ from rclpy.node import Node
 
 from std_msgs.msg import String
 from std_srvs.srv import SetBool
-from hri_msgs.msg import ChunkMono
-from speech_msgs.srv import STT
+from sancho_interfaces.msg import ChunkMono
+from sancho_interfaces.srv import STT
 
 IMPORTS_SUCCESSFUL = True
 IMPORT_ERROR_MSG = ""
@@ -71,7 +71,7 @@ class VADTranscriptorNode(Node):
 
         self.transcription_pub = self.create_publisher(String, transcription_topic, 10)
         self.mic_sub = self.create_subscription(ChunkMono, mic_topic, self.on_audio_chunk, 10)
-        self.stt_client = self.create_client(STT, 'speech_tools/stt')
+        self.stt_client = self.create_client(STT, 'sancho_hri/speech/stt')
 
         self.enable_srv = self.create_service(SetBool, '~/enable_recording', self.enable_callback)
 

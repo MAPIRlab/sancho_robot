@@ -7,8 +7,8 @@ from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
 # Assuming you also have a TTS_MODELS enum in speech_tools.models
-from speech_tools.models import STT_MODELS, TTS_MODELS, TTS_SPEAKERS
-from llm_tools.models import PROVIDER, MODELS
+from sancho_hri.speech.models import STT_MODELS, TTS_MODELS, TTS_SPEAKERS
+from sancho_hri.llm.models import PROVIDER, MODELS
 
 load_dotenv()
 GOOGLE_STT_API_KEY = os.environ.get("GOOGLE_STT_API_KEY")
@@ -44,7 +44,7 @@ def generate_launch_description():
     # ------------ Transcription ----------------
     # STT Node
     stt_node = Node(
-        package='speech_tools',
+        package='sancho_hri',
         executable='stt',
         name='stt_node',
         output='screen',
@@ -77,7 +77,7 @@ def generate_launch_description():
 
     # LLM Node
     llm_node = Node(
-        package='llm_tools',
+        package='sancho_hri',
         executable='llm',
         name='mapirbot',
         output='screen',
@@ -92,9 +92,9 @@ def generate_launch_description():
 
     # TTS Node
     tts_node = Node(
-        package='speech_tools',
+        package='sancho_hri',
         executable='tts',
-        name='tts',
+        name='tts_node',
         output='screen',
         emulate_tty=True,
         parameters=[{

@@ -12,20 +12,15 @@ from rclpy.executors import MultiThreadedExecutor
 
 from std_msgs.msg import String, Empty
 from std_srvs.srv import SetBool
-from sancho_msgs.msg import ConversationTurn
-from sancho_msgs.srv import StartInteraction, EndInteraction, ForceAttention
-from speech_msgs.srv import TTS
+from sancho_interfaces.msg import ConversationTurn
+from sancho_interfaces.srv import StartInteraction, EndInteraction, ForceAttention
+from sancho_interfaces.srv import TTS
 
 try:
     from .utils.sound import play
     from .utils.sounds import ACTIVATION_SOUND
 except ImportError:
     pass
-
-class QuestionState(int, Enum):
-    NO_QUESTION = 0
-    GET_NAME = 1
-    CONFIRM_NAME = 2
 
 class DialogManagerNode(Node):
     """
@@ -44,7 +39,6 @@ class DialogManagerNode(Node):
         self.transcriptor_node = self.get_parameter("transcriptor_node").get_parameter_value().string_value
         self.mapirbot_url = self.get_parameter("mapirbot_url").get_parameter_value().string_value
 
-        self.question_state = QuestionState.NO_QUESTION
         self.current_speaker_id = "0"
         self.current_speaker_name = "Unknown"
         self.latest_doa_angle = 0.0
@@ -62,7 +56,7 @@ class DialogManagerNode(Node):
         self.speaker_sub = self.create_subscription(String, "/active_speaker_info", self.on_speaker_update, 10)
 
         # Service Clients
-        self.tts_client = self.create_client(TTS, 'speech_tools/tts', callback_group=self.cb_group)
+        self.tts_client = self.create_client(TTS, 'sancho_hri/speech/tts', callback_group=self.cb_group)
         self.hotword_enable_client = self.create_client(SetBool, f'/{self.hotword_node}/enable_listening', callback_group=self.cb_group)
         self.transcriptor_enable_client = self.create_client(SetBool, f'/{self.transcriptor_node}/enable_recording', callback_group=self.cb_group)
 
@@ -97,34 +91,6 @@ class DialogManagerNode(Node):
 
         response = future.result()
         return response.success if response else False
-
-    # ------- Communication with Attention Manager -----------
-    def start_interaction_cb(self, request, response):
-        self._waiting_for_attention = False # Cancelamos el watchdog si existía
-        
-        names_list = request.user_names
-        user_name = names_list[0] if names_list else "Desconocido"
-
-        threading.Thread(target=self.play_tts, args=(f"¡Hola {user_name}! Dime algo", "happy", True), daemon=True).start()
-
-        response.success = True
-        response.message = "Interacción aceptada."
-        return response
-    
-    def end_interaction(self, reason="unknown"):
-        self.get_logger().info(f"Terminando interacción. Motivo: {reason}")
-        self._waiting_for_attention = False
-
-        # 1. Apagamos el micro (por si acaso) y encendemos escucha pasiva
-        self.set_node_state(self.transcriptor_enable_client, False, self.transcriptor_node)
-        self.set_node_state(self.hotword_enable_client, True, self.hotword_node)
-        self.face_mode_pub.publish(String(data="idle"))
-
-        # 2. Devolvemos el control al cuerpo
-        req = EndInteraction.Request()
-        req.reason = reason
-        self.end_interaction_client.call_async(req)
-    # ------------------------------------------------------------------
 
     def on_speaker_update(self, msg: String):
         try:
@@ -166,38 +132,13 @@ class DialogManagerNode(Node):
         self.get_logger().info(f"[USER -> SANCHO] {self.current_speaker_name}: {text}")
         self.face_mode_pub.publish(String(data="thinking"))
 
-        threading.Thread(target=self.echo, args=(text,), daemon=True).start()
+        threading.Thread(target=self.process_user_transcription, args=(text,), daemon=True).start()
 
     def process_user_transcription(self, user_text):
         ai_response, emotion = self.call_mapirbot(user_text)
         self.log_conversation(user_text, ai_response, emotion)
 
-        keep_asking = False
-        if self.question_state == QuestionState.GET_NAME:
-            keep_asking = False
-            self.question_state = QuestionState.NO_QUESTION
-
-        self.play_tts(ai_response, emotion, keep_asking)
-
-    def echo(self, user_text):
-        self.get_logger().info("Modo echo...")
-        
-        texto_minusculas = user_text.lower()
-        
-        # 1. Comprobamos si el usuario se quiere despedir
-        if "adiós" in texto_minusculas or "hasta luego" in texto_minusculas or "terminar" in texto_minusculas:
-            ai_response = f"¡Ayps!"
-            emotion = "happy"
-            end_conversation = True
-            
-        # 2. Si no se despide, hacemos de loro
-        else:
-            ai_response = user_text
-            emotion = "neutral"
-            end_conversation = False
-            
-        # Reproducimos la respuesta generada localmente
-        self.play_tts(ai_response, emotion, keep_asking=(not end_conversation))
+        self.play_tts(ai_response, emotion, keep_asking=True)
 
     def call_mapirbot(self, text):
         payload = {"query": text, "thread_id": self.current_speaker_id}
@@ -242,7 +183,6 @@ class DialogManagerNode(Node):
 
     def reset_to_idle(self):
         self.face_mode_pub.publish(String(data="idle"))
-        self.question_state = QuestionState.NO_QUESTION
         self.set_node_state(self.hotword_enable_client, True, self.hotword_node)
 
     def log_conversation(self, user_text, assistant_text, emotion):
@@ -259,6 +199,35 @@ class DialogManagerNode(Node):
         turn.assistant_value_json = json.dumps({"emotion": emotion})
         
         self.log_pub.publish(turn)
+
+    # ------- Communication with Attention Manager -----------
+
+    def start_interaction_cb(self, request, response):
+        self._waiting_for_attention = False # Cancelamos el watchdog si existía
+        
+        names_list = request.user_names
+        user_name = names_list[0] if names_list else "Desconocido"
+
+        threading.Thread(target=self.play_tts, args=(f"Hola {user_name}", "happy", True), daemon=True).start()
+
+        response.success = True
+        response.message = "Interacción aceptada."
+        return response
+    
+    def end_interaction(self, reason="unknown"):
+        self.get_logger().info(f"Terminando interacción. Motivo: {reason}")
+        self._waiting_for_attention = False
+
+        # 1. Apagamos el micro (por si acaso) y encendemos escucha pasiva
+        self.set_node_state(self.transcriptor_enable_client, False, self.transcriptor_node)
+        self.set_node_state(self.hotword_enable_client, True, self.hotword_node)
+        self.face_mode_pub.publish(String(data="idle"))
+
+        # 2. Devolvemos el control al cuerpo
+        req = EndInteraction.Request()
+        req.reason = reason
+        self.end_interaction_client.call_async(req)
+
 
 def main(args=None):
     rclpy.init(args=args)

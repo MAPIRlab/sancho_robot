@@ -11,12 +11,12 @@ from lifecycle_msgs.msg import Transition
 from tf_transformations import quaternion_from_euler
 
 # Mensajes de visión
-from sancho_msgs.msg import FaceRecognitionArray
-from sancho_msgs.srv import GetCentralFaceCluster
+from sancho_interfaces.msg import FaceRecognitionArray
+from sancho_interfaces.srv import GetCentralFaceCluster
 
 # (NUEVO) Servicios de comunicación con el Dialog Manager
 # Asegúrate de haber definido estos .srv en tu paquete sancho_msgs
-from sancho_msgs.srv import StartInteraction, EndInteraction, ForceAttention
+from sancho_interfaces.srv import StartInteraction, EndInteraction, ForceAttention
 
 # ============================================================================
 # MÁQUINA DE ESTADOS (BASE)
@@ -146,39 +146,64 @@ class IdentifyUserState(AttentionState):
         future.add_done_callback(self._on_cluster_response)
         self.request_sent = True
 
+    def filter_cluster_by_confidence(self, cluster_response, confidence_threshold):
+        filtered_ids = []
+        filtered_names = []
+
+        for uid, name, idx in zip(cluster_response.ids, cluster_response.names, cluster_response.indices):
+            if idx < len(self.manager.recognitions):
+                conf = self.manager.recognitions[idx].distance
+                
+                if conf >= confidence_threshold:
+                    filtered_ids.append(uid)
+                    filtered_names.append(name)
+                else:
+                    self.manager.get_logger().debug(
+                        f"Descartando a '{name}' del grupo por baja confianza ({conf:.2f} < 0.8)"
+                    )
+
+        return filtered_ids, filtered_names
+
     def _on_cluster_response(self, future):
         try:
             response = future.result()
             
-            # 1. Comprobamos que el servicio haya devuelto datos y que sepamos sus índices
+            # Check that we have a valid response
             if response and response.ids and hasattr(response, 'indices') and len(response.indices) > 0:
                 
-                # 2. Cogemos el índice de la primera cara del clúster (la más central)
-                main_face_idx = response.indices[0]
+                filtered_ids, filtered_names = self.filter_cluster_by_confidence(response, confidence_threshold=0.7)
                 
-                # 3. Verificamos por seguridad que el índice exista en nuestra lista de caras
-                if main_face_idx < len(self.manager.recognitions):
-                    confidence = self.manager.recognitions[main_face_idx].distance
+                # Check if we have anyone after filtering
+                if not filtered_ids:
+                    self.manager.get_logger().info("Nadie en el grupo superó el umbral de confianza. Ignorando.")
+                    self.manager.transition_to(IdleState)
+                    return
+                
+                # Check cooldown
+                now = self.manager.get_clock().now().nanoseconds / 1e9
+                all_in_cooldown = True
+                
+                for uid in filtered_ids:
+                    last_interaction_time = self.manager.user_cooldowns.get(uid, 0.0)
+                    if (now - last_interaction_time) >= self.manager.cooldown_seconds:
+                        all_in_cooldown = False
+                        break # There is at least one person without cooldown
+                
+                if all_in_cooldown:
+                    self.manager.get_logger().info(f"El grupo filtrado {filtered_names} está en cooldown. Ignorando.")
+                    self.manager.transition_to(IdleState)
+                    return
                     
-                    # 4. Validamos la confianza
-                    if confidence >= 0.7:
-                        self.manager.target_ids = list(response.ids)
-                        self.manager.target_names = list(response.names)
-                        self.manager.get_logger().info(
-                            f"Objetivo fijado: {self.manager.target_names} (Confianza: {confidence:.2f})"
-                        )
-                        self.manager.transition_to(EngagedState)
-                        return
-                    
-                    else:
-                        self.manager.get_logger().info(
-                            f"Identidad dudosa (Confianza: {confidence:.2f}). Ignorando."
-                        )
-                else:
-                    self.manager.get_logger().warn("Fallo de sincronización: El clúster devolvió un índice antiguo.")
-            
-            # 5. Si algo de lo anterior falla o la confianza es baja, cancelamos todo y volvemos a Idle
-            self.manager.get_logger().info("No se pudo identificar a nadie con suficiente claridad.")
+                # Update targets
+                self.manager.target_ids = filtered_ids
+                self.manager.target_names = filtered_names
+                
+                self.manager.get_logger().info(f"Objetivo fijado: {self.manager.target_names}")
+                self.manager.transition_to(EngagedState)
+                return  
+                
+            # No valid response
+            self.manager.get_logger().info("El clúster no contenía caras reconocibles.")
             self.manager.transition_to(IdleState)
             
         except Exception as e:
@@ -230,6 +255,9 @@ class AttentionManagerNode(Node):
     def __init__(self):
         super().__init__("attention_manager")
 
+        # Parametros
+        self.declare_parameter("cooldown_seconds", 60.0)
+
         self.cb_group = ReentrantCallbackGroup()
 
         # Variables de estado y contexto
@@ -239,6 +267,8 @@ class AttentionManagerNode(Node):
         self.target_angle = 0.0
         self.target_ids = []
         self.target_names = []
+        self.cooldown_seconds = self.get_parameter("cooldown_seconds").value
+        self.user_cooldowns = {}
 
         # Publishers / Subscribers Sensoriales
         self.head_pub = self.create_publisher(PoseStamped, "/head_goal", 10)
@@ -315,6 +345,11 @@ class AttentionManagerNode(Node):
     def _interaction_finished_cb(self, request, response):
         """Llamado cuando el humano se despide o el LLM corta la charla."""
         self.get_logger().info(f"El Dialog Manager ha terminado la interacción. Motivo: {request.reason}")
+
+        now = self.get_clock().now().nanoseconds / 1e9
+        for uid in self.target_ids:
+            self.user_cooldowns[uid] = now
+
         if isinstance(self.current_state, EngagedState):
             self.transition_to(IdleState)
         
