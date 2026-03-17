@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import numpy as np
 import random
 from enum import Enum
 
@@ -207,8 +208,8 @@ class HRIHeadNode(Node):
             self.tracking_timer = None
 
     def move_head(self, pan: float, tilt: float):
-        pan = np.clip(pan, -self.pan_limit_rad, self.pan_limit_rad)
-        tilt = np.clip(tilt, -self.tilt_limit_rad, self.tilt_limit_rad)
+        pan = np.clip(pan, self.pan_min, self.pan_max)
+        tilt = np.clip(tilt, self.tilt_min, self.tilt_max)
         
         cmd = JointGroupCommand()
         cmd.name = self.joint_group
