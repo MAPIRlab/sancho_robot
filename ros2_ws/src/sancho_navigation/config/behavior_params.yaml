@@ -12,8 +12,6 @@ bt_navigator:
 
     # This should be overwritten by launch file argument, but providing a safe default relative to share dir logic is hard in YAML.
     # We will rely on the launch file to provide 'default_nav_to_pose_bt_xml' via param substitution.
-    # If strictly needed here for fallback, we would keep it, but stripped of user path.
-    # default_nav_to_pose_bt_xml: "home/mapir/sancho_robot/sancho_ws/src/sancho_navigation/bt/dummy.xml"
     default_nav_to_pose_bt_xml: ""
 
     plugin_lib_names:

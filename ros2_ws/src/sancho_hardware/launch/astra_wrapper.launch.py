@@ -9,19 +9,16 @@ def generate_launch_description():
     astra_camera_path = get_package_share_directory('astra_camera')
     
     return LaunchDescription([
-        GroupAction([
-            PushRosNamespace('astra_camera'),
-            IncludeLaunchDescription(
-                XMLLaunchDescriptionSource(
-                    os.path.join(astra_camera_path, 'launch', 'astra.launch.xml')
-                ),
-                launch_arguments={
-                    'serial_number': "'20070830098'",
-                    'camera_name': 'camera',
-                    'color_fps': '15',
-                    'depth_fps': '15',
-                    'ir_fps': '15'
-                }.items()
-            )
-        ])
+        IncludeLaunchDescription(
+            XMLLaunchDescriptionSource(
+                os.path.join(astra_camera_path, 'launch', 'astra.launch.xml')
+            ),
+            launch_arguments={
+                'serial_number': "'20070830098'",
+                'camera_name': 'astra_camera',  # This will be the ONLY namespace
+                'color_fps': '15',
+                'depth_fps': '15',
+                'ir_fps': '15'
+            }.items()
+        )
     ])

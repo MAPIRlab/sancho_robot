@@ -109,7 +109,6 @@ htmlcov/
 .pybuilder/
 .mypy_cache/
 .dmypy.json
-sancho_ws/src/sancho_vision/sancho_vision/database/faceprints_db.json
 .pyre/
 .pytype/
 .ruff_cache/
@@ -140,7 +139,7 @@ cython_debug/
 # ===================
 # Archivos específicos del proyecto
 # ===================
-sancho_ws/src/sancho_vision/sancho_vision/database/faceprints_db.json
+**/faceprints_db.json
 marimo/_static/
 marimo/_lsp/
 __marimo__/

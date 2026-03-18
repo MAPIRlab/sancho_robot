@@ -6,7 +6,7 @@ import rclpy
 from rclpy.node import Node
 from sancho_interfaces.msg import ChunkMono, ChunkStereo
 
-OUTPUT_PATH = "/home/mapir/sancho_robot/sancho_ws/src/sancho_audio/sancho_audio/tests/record_test.wav"
+OUTPUT_PATH = "tests/record_test.wav"
 
 def rms_dbfs_int16(x: np.ndarray) -> float:
     """RMS en dBFS para señal int16 (±32768)."""

@@ -7,7 +7,7 @@ from .base_detector import BaseDetector
 class DLIBCNNDetector(BaseDetector):
 
     def __init__(self):
-        self.cnn_face_detector = dlib.cnn_face_detection_model_v1('/home/mapir/sancho_robot/sancho_ws/src/sancho_vision/sancho_vision/models/mmod_human_face_detector.dat')
+        self.cnn_face_detector = dlib.cnn_face_detection_model_v1('/home/mapir/sancho_refactor/ros2_ws/src/sancho_vision/sancho_vision/models/mmod_human_face_detector.dat')
 
     def get_faces(self, frame, verbose=False):
         frame_copy = frame.copy()
