@@ -8,7 +8,9 @@
   <license>TODO</license>
 
   <depend>rclpy</depend>
+
   <depend>sancho_interfaces</depend>
+  <depend>sancho_lifecycle_utils</depend>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>

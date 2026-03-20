@@ -19,6 +19,9 @@
   <depend>scipy</depend>
   <depend>requests</depend>
 
+  <depend>sancho_interfaces</depend>
+  <depend>sancho_lifecycle_utils</depend>
+
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>
   <test_depend>ament_pep257</test_depend>
@@ -27,5 +30,4 @@
   <export>
     <build_type>ament_python</build_type>
   </export>
-  <depend>sancho_interfaces</depend>
 </package>
