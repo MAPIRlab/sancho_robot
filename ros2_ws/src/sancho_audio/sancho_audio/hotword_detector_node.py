@@ -30,13 +30,17 @@ class HotwordDetectorNode(LifecycleNode):
         self._detected = False
 
     def on_configure(self, state: State) -> TransitionCallbackReturn:
-        self.get_logger().info("Configuring Hotword Detector (loading model)...")
-        self.hotword_detector = OpenWakeWordHotword()
-        
-        event_topic = self.get_parameter("hotword_event_topic").get_parameter_value().string_value
-        self._event_pub = self.create_lifecycle_publisher(Empty, event_topic, 10)
-        
-        return TransitionCallbackReturn.SUCCESS
+        try:
+            self.get_logger().info("Configuring Hotword Detector (loading model)...")
+            self.hotword_detector = OpenWakeWordHotword()
+            
+            event_topic = self.get_parameter("hotword_event_topic").get_parameter_value().string_value
+            self._event_pub = self.create_lifecycle_publisher(Empty, event_topic, 10)
+            
+            return TransitionCallbackReturn.SUCCESS
+        except Exception as e:
+            print(f"Error al configurar Hotword Detector: {e}")
+            return TransitionCallbackReturn.FAILURE
 
     def on_activate(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info(">>> HOTWORD DETECTOR ACTIVATED <<<")

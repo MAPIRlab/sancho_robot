@@ -14,7 +14,7 @@ def generate_launch_description():
                 name="slam_toolbox",
                 output="screen",
                 parameters=[
-                    {"use_sim_time": False, "slam_toolbox.scan_topic": "/scan_merged"}
+                    {"use_sim_time": False, "scan_topic": "/scan_merged"}
                 ],
             )
         ]

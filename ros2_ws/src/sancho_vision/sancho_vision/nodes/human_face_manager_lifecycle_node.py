@@ -206,10 +206,10 @@ class HumanFaceManagerLifecycleNode(LifecycleNode):
 
 
 class HumanFaceManager:
-    LOWER_BOUND = 0.70 
+    LOWER_BOUND = 0.50 
     MIDDLE_BOUND = 0.80
     UPPER_BOUND = 0.90
-    DETECTOR_BOUND = 0.50
+    DETECTOR_BOUND = 0.40
 
     def __init__(self, node: HumanFaceManagerLifecycleNode, ask_unknowns=True):
         self.ask_unknowns = ask_unknowns

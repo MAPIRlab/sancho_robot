@@ -1,0 +1,15 @@
+# Request
+# Lista de IDs y nombres de las personas detectadas en el clúster central
+string[] user_ids
+string[] user_names
+
+# Contexto opcional para que el LLM sepa por qué inicia la charla 
+# (ej: "proactive_greeting", "hotword_detected", "unknown_person")
+string context
+---
+# Response
+# True si el dialog_manager acepta tomar el control, False si está ocupado o falla
+bool success
+
+# Mensaje de información o error
+string message

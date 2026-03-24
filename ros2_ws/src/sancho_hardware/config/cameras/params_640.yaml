@@ -3,12 +3,12 @@ usb_cam_node:
       video_device: "/dev/nose_cam"
       framerate: 15.0
       io_method: "mmap"
-      frame_id: "camera"
+      frame_id: "nose_camera_link"
       pixel_format: "mjpeg2rgb" # rgb8, yuyv, yuyv2rgb, uyvy, uyvy2rgb, mono8, mono16, y102mono8, raw_mjpeg, mjpeg2rgb, m4202rgb
       #av_device_format: "YUV422P" 
       image_width: 640
       image_height: 480
-      camera_name: "calibrated_camera"
+      camera_name: "nose_camera"
       camera_info_url: "package://sancho_hardware/config/cameras/camera_info_640.yaml"
       brightness: -1
       contrast: -1

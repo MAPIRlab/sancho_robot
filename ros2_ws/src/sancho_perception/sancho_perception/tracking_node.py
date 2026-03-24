@@ -9,8 +9,9 @@ import sys
 import os
 from sancho_interfaces.msg import FaceDetectionArray, FaceDetection
 from geometry_msgs.msg import Point
-
 from ament_index_python.packages import get_package_share_directory
+from sancho_perception.ego_motion import RotationalEgoMotion
+import time
 
 # 1. Rutas del sistema
 pkg_share = get_package_share_directory('sancho_perception')
@@ -58,6 +59,14 @@ class SanchoTrackingNode(Node):
         self.rgb_means = (0.485, 0.456, 0.406)
         self.std = (0.229, 0.224, 0.225)
 
+        self.ego_motion = RotationalEgoMotion(
+            node=self, 
+            camera_info_topic='/sancho_camera/camera_info', # Ensure this is correct
+            camera_frame="nose_camera_link",
+            base_frame="odom"
+        )
+        self.ego_motion_times = []
+
         # 4. Suscriptores y Publicadores
         self.subscription = self.create_subscription(
             Image, '/sancho_camera/image_rect', self.image_callback, 10)
@@ -75,7 +84,6 @@ class SanchoTrackingNode(Node):
             return
             
         # Create a deep copy of the original frame to send to the Fusion node
-        # This prevents the tracking boxes from being drawn onto the face recognition input
         original_frame = frame.copy()
         
         # A. Preprocesamiento oficial
@@ -87,10 +95,36 @@ class SanchoTrackingNode(Node):
             outputs = self.model(img)
             outputs = postprocess(outputs, self.exp.num_classes, self.exp.test_conf, self.exp.nmsthre)
         
-        # Initialize lists at the top of the logic block to prevent UnboundLocalError
+        # Initialize lists at the top of the logic block
         online_tlwhs = []
         online_ids = []
         
+        # --- START EGO-MOTION COMPENSATION ---
+        # 1. Gather all active and temporarily lost tracks from ByteTrack's internal state
+        all_active_tracks = self.tracker.tracked_stracks + self.tracker.lost_stracks
+        
+        # 2. Apply rotational homography to shift their predicted bounding boxes.
+        # We do this every frame, even if there are no new YOLOX detections, 
+        # to ensure the Kalman Filter states stay aligned with the camera movement.
+        start_time = time.perf_counter()
+    
+        self.ego_motion.compensate(all_active_tracks, msg.header.stamp)
+    
+        end_time = time.perf_counter()
+        # --- END TIMING ---
+
+        # Calculate duration in milliseconds
+        duration_ms = (end_time - start_time) * 1000
+        self.ego_motion_times.append(duration_ms)
+
+        # Log the average every 30 frames
+        if len(self.ego_motion_times) >= 30:
+            avg_time = sum(self.ego_motion_times) / len(self.ego_motion_times)
+            self.get_logger().info(f"Ego-Motion Avg Execution Time: {avg_time:.3f} ms")
+            self.ego_motion_times.clear() # Reset for the next batch
+
+        # --- END EGO-MOTION COMPENSATION ---
+
         if outputs[0] is not None:
             # C. Filtrar para clase 0 (Persona)
             output = outputs[0].cpu().numpy()
@@ -99,6 +133,7 @@ class SanchoTrackingNode(Node):
 
             if len(filtered_output) > 0:
                 # D. Actualizar Tracker
+                # ByteTrack will now match these new detections against the shifted tracks
                 online_targets = self.tracker.update(
                     torch.from_numpy(filtered_output), 
                     frame.shape[:2], 

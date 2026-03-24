@@ -283,8 +283,8 @@
     <child link="laser_back"/>
   </joint>
 
-  <!-- Cámara -->
-  <link name="camera_link">
+  <!-- Astra Cámara -->
+  <link name="astra_camera_link">
       <visual>
           <geometry>
               <box size="0.05 0.05 0.05"/> <!-- Representación visual de la cámara -->
@@ -298,7 +298,7 @@
   <!-- Unión de la cámara con la base -->
   <joint name="base_to_camera" type="fixed">
       <parent link="base_link"/>
-      <child link="camera_link"/>
+      <child link="astra_camera_link"/>
       <origin xyz="0.375 0 0.68" rpy="0 0 0"/> <!-- Posición y orientación de la cámara -->
   </joint>
 <!-- Cuadro Negro (desde el centro hasta el borde superior, hasta la cámara) -->
@@ -385,6 +385,22 @@
   <parent link="turret_tilt_link"/>
   <child link="head_link"/>
   <origin xyz="0 0 0" rpy="0 0 0"/>
+</joint>
+
+<link name="nose_camera_link">
+  <visual>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <geometry>
+      <box size="0.03 0.03 0.03"/>
+    </geometry>
+    <material name="red"><color rgba="1 0 0 1"/></material>
+  </visual>
+</link>
+
+<joint name="head_to_nose_camera" type="fixed">
+  <parent link="head_link"/>
+  <child link="nose_camera_link"/>
+  <origin xyz="0.037 0.0 0.061" rpy="0 0 0"/>
 </joint>
 
 

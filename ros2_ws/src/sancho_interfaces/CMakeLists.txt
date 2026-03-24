@@ -46,6 +46,8 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/SpeechLoadUnloadResult.msg"
   "msg/UserTranscription.msg"
   "msg/VADSegment.msg"
+  "srv/StartInteraction.srv"
+  "srv/EndInteraction.srv"
   "srv/AskUser.srv"
   "srv/Detection.srv"
   "srv/Embedding.srv"

@@ -5,7 +5,6 @@ find_package(ament_cmake REQUIRED)
 
 install(
   DIRECTORY
-    models
     worlds
     media
   DESTINATION
