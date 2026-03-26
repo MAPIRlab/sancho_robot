@@ -82,7 +82,11 @@ def generate_launch_description():
 
     declare_bt_xml_cmd = DeclareLaunchArgument(
         'default_nav_to_pose_bt_xml',
+<<<<<<< HEAD:ros2_ws/src/sancho_navigation/launch/navigation_launch.py
         default_value=os.path.join(pkg_share, 'bt', 'nav_to_pose.xml'),
+=======
+        default_value=os.path.join(pkg_share, 'bt', 'auto_loc.xml'),
+>>>>>>> 3dec19d (Moved snacho_bt plugins to dedicated package):ros2_ws/src/sancho_navigation/launch/navigation.launch.py
         description='Full path to the behavior tree xml file to use'
     )
 
