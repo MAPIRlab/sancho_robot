@@ -33,7 +33,7 @@ global_costmap:
       resolution: 0.01
       downsample_costmap: false
 
-      footprint_padding: 0.03
+      footprint_padding: 0.005
       transform_tolerance: 0.2
 
       update_frequency: 1.0
@@ -59,7 +59,7 @@ global_costmap:
         footprint_clearing_enabled: true
         max_obstacle_height: 2.0
         combination_method: 1
-        observation_sources: "laser_front laser_back semantic_scan_persistent semantic_scan_non_persistent"
+        observation_sources: "laser_front laser_back semantic_scan_non_persistent"
         allow_unknown: true
 
         laser_front:
@@ -94,7 +94,7 @@ global_costmap:
         plugin: "nav2_costmap_2d::InflationLayer"
         enabled: true
         inflation_radius: 0.75
-        cost_scaling_factor: 10.0
+        cost_scaling_factor: 14.0
         inflate_unknown: true
         inflate_around_unknown: true
       

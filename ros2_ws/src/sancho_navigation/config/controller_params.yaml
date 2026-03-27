@@ -37,9 +37,9 @@ controller_server:
       # --- PARAMETROS SHIM ---
       # Engancha el modo rotación con margen y no lo suelta hasta estar bien alineado
       angular_dist_threshold: 1.20         
-      angular_disengage_threshold: 0.20    
-      rotate_to_heading_angular_vel: 1.0   
-      max_angular_accel: 3.0               
+      angular_disengage_threshold: 0.10    
+      rotate_to_heading_angular_vel: 1.5   
+      max_angular_accel: 1.0               
       simulate_ahead_time: 0.0             
       rotate_to_goal_heading: true        
 
@@ -48,17 +48,17 @@ controller_server:
       model_dt: 0.05
       batch_size: 2000
 
-      vx_std: 0.2
+      vx_std: 0.3
       vy_std: 0.0
       wz_std: 0.4
 
-      vx_max: 0.4
+      vx_max: 0.6
       vx_min: 0.0
       vy_max: 0.0
       vy_min: -0.0
       wz_max: 1.0
 
-      ax_max: 0.5
+      ax_max: 0.3
       ax_min: -0.5
       az_max: 1.0
 
@@ -154,7 +154,7 @@ controller_server:
       angular_dist_threshold: 0.5  # Se activa con menos error para asegurar alineación perfecta
       angular_disengage_threshold: 0.05
       rotate_to_heading_angular_vel: 1.0 # Rotación más lenta y precisa
-      max_angular_accel: 2.0
+      max_angular_accel: 1.0
       simulate_ahead_time: 0.0
       rotate_to_goal_heading: true
 
@@ -273,80 +273,3 @@ local_costmap:
         cost_scaling_factor: 5.0 
         inflate_unknown: true
         inflate_around_unknown: true
-
-
-# local_costmap:
-#   local_costmap:
-#     ros__parameters:
-#       use_sim_time: False
-#       global_frame: "odom"
-#       robot_base_frame: "base_footprint"
-#       resolution: 0.05
-#       transform_tolerance: 0.2
-
-#       rolling_window: true
-#       width: 5
-#       height: 5
-
-#       update_frequency: 20.0
-#       publish_frequency: 10.0
-
-#       footprint: "[[-0.375, -0.275], [-0.375, 0.275], [0.375, 0.275], [0.375, -0.275]]"
-#       footprint_padding: 0.03
-
-#       plugins:
-#         - "voxel_layer"
-#         - "obstacle_layer"
-#         - "inflation_layer"
-
-#       voxel_layer:
-#         plugin: "nav2_costmap_2d::VoxelLayer"
-#         enabled: true
-#         voxel_decay: 0.5
-#         decay_model: 0
-#         voxel_size: 0.05
-#         z_voxels: 10
-#         max_obstacle_height: 2.0
-#         mark_threshold: 0
-#         observation_sources: "camera_depth"
-#         publish_voxel_map: true
-#         camera_depth:
-#           topic: "/astra_camera/camera/depth/points"
-#           data_type: "PointCloud2"
-#           marking: true
-#           clearing: true
-#           obstacle_range: 5.0
-#           raytrace_range: 5.5
-#           min_obstacle_height: 0.1
-#           max_obstacle_height: 1.8
-
-#       obstacle_layer:
-#         plugin: "nav2_costmap_2d::ObstacleLayer"
-#         enabled: True
-#         footprint_clearing_enabled: true
-#         max_obstacle_height: 2.0
-#         combination_method: 1
-#         observation_sources: "laser_front laser_back"
-#         observation_persistence: 0.2
-#         obstacle_range: 5.0
-#         raytrace_range: 5.5
-
-#         laser_front:
-#           topic: "/scan_1st"
-#           max_obstacle_height: 2.0
-#           clearing: True
-#           marking: True
-#         laser_back:
-#           topic: "/scan_2nd"
-#           max_obstacle_height: 2.0
-#           clearing: True
-#           marking: True
-#         # Camera removed from here as it is in voxel_layer
-
-#       inflation_layer:
-#         plugin: "nav2_costmap_2d::InflationLayer"
-#         enabled: true
-#         inflation_radius: 0.35 # Kept at 0.35m as requested
-#         cost_scaling_factor: 3.0
-#         inflate_unknown: true
-#         inflate_around_unknown: true

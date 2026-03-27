@@ -61,7 +61,6 @@ def generate_launch_description():
         convert_types=True
     )
 
-
     declare_use_sim_time = DeclareLaunchArgument(
         "use_sim_time", default_value="false", description="Use simulation time"
     )
@@ -76,21 +75,16 @@ def generate_launch_description():
     
     declare_map_yaml_cmd = DeclareLaunchArgument(
         'map',
-        default_value=os.path.join(pkg_share, 'maps', 'mapir_lab_navigation.yaml'),
+        default_value=os.path.join(pkg_share, 'maps', 'module2.3.yaml'),
         description='Full path to map configuration file to load'
     )
 
     declare_bt_xml_cmd = DeclareLaunchArgument(
         'default_nav_to_pose_bt_xml',
-<<<<<<< HEAD:ros2_ws/src/sancho_navigation/launch/navigation_launch.py
-        default_value=os.path.join(pkg_share, 'bt', 'nav_to_pose.xml'),
-=======
-        default_value=os.path.join(pkg_share, 'bt', 'auto_loc.xml'),
->>>>>>> 3dec19d (Moved snacho_bt plugins to dedicated package):ros2_ws/src/sancho_navigation/launch/navigation.launch.py
+        default_value=os.path.join(pkg_share, 'bt', 'main.xml'),
         description='Full path to the behavior tree xml file to use'
     )
 
-    # Common remappings
     remappings = [
         ("cmd_vel_in", "cmd_vel_raw"),
         ("cmd_vel_out", "cmd_vel_nav2"),
