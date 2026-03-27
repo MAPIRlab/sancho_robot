@@ -44,10 +44,16 @@ class IdleState(AttentionState):
         self.manager.get_logger().info("[ESTADO] IDLE: Esperando estímulos...")
         self.manager.hotword_lc.set_state(True)
         self.idle_time = 0.0
+        
+        # NUEVO: Pequeño tiempo de gracia para no re-evaluar caras inmediatamente
+        # y evitar el micro-bucle si la persona enfrente está en cooldown.
+        self.ignore_faces_until = self.manager.get_clock().now().nanoseconds / 1e9 + 2.0
 
     def execute(self):
-        # 1. ¿Vemos una cara por casualidad?
-        if self.manager.has_valid_faces():
+        now = self.manager.get_clock().now().nanoseconds / 1e9
+        
+        # 1. ¿Vemos una cara por casualidad? (Respetando el tiempo de gracia)
+        if now > self.ignore_faces_until and self.manager.has_valid_faces():
             self.manager.get_logger().info("Cara detectada pasivamente. Investigando...")
             self.manager.transition_to(IdentifyUserState)
             return
@@ -85,7 +91,7 @@ class ScanningState(AttentionState):
         self.manager.rotate_head(angle)
         self.current_scan_idx += 1
         
-        # Esperar 2 segundos a que el cuello termine de girar (sin bloquear el hilo)
+        # Esperar 2 segundos a que el cuello termine de girar
         self.waiting_for_rotation = True
         self.timer = self.manager.create_timer(2.0, self._on_rotation_done, callback_group=self.manager.cb_group)
 
@@ -94,8 +100,10 @@ class ScanningState(AttentionState):
         self.waiting_for_rotation = False
 
     def _cancel_timer(self):
-        if self.timer:
+        # NUEVO: Prevenir memory leaks destruyendo el timer
+        if hasattr(self, 'timer') and self.timer:
             self.timer.cancel()
+            self.manager.destroy_timer(self.timer)
             self.timer = None
 
     def exit(self):
@@ -111,8 +119,7 @@ class OrientingState(AttentionState):
         self.timer = self.manager.create_timer(3.0, self._on_rotation_done, callback_group=self.manager.cb_group)
 
     def _on_rotation_done(self):
-        if self.timer:
-            self.timer.cancel()
+        self._cancel_timer()
         
         if self.manager.has_valid_faces():
             self.manager.transition_to(IdentifyUserState)
@@ -120,9 +127,15 @@ class OrientingState(AttentionState):
             self.manager.get_logger().info("Falsa alarma. No hay nadie en esa dirección.")
             self.manager.transition_to(IdleState)
 
-    def exit(self):
+    def _cancel_timer(self):
+        # NUEVO: Prevenir memory leaks destruyendo el timer
         if hasattr(self, 'timer') and self.timer:
             self.timer.cancel()
+            self.manager.destroy_timer(self.timer)
+            self.timer = None
+
+    def exit(self):
+        self._cancel_timer()
 
 
 class IdentifyUserState(AttentionState):
@@ -198,7 +211,9 @@ class IdentifyUserState(AttentionState):
                 # Update targets
                 self.manager.target_ids = filtered_ids
                 self.manager.target_names = filtered_names
-                self.hotword_triggered = False
+                
+                # CORRECCIÓN: Hacemos referencia al manager, no a la clase local
+                self.manager.hotword_triggered = False 
                 
                 self.manager.get_logger().info(f"Objetivo fijado: {self.manager.target_names}")
                 self.manager.transition_to(EngagedState)
@@ -243,8 +258,11 @@ class EngagedState(AttentionState):
     def _on_interaction_started(self, future):
         response = future.result()
         if response.success:
-            self.manager.get_logger().info("¡Dialog Manager tomó el control! Manteniendo contacto visual...")
+            self.manager.get_logger().info("¡Dialog Manager tomó el control! Manteniendo contacto visual y rearmando oídos...")
             self.manager.tracker_lc.set_state(True)
+            
+            # NUEVO: Rearmamos el hotword para que el robot sea interrumpible
+            self.manager.hotword_lc.set_state(True)
         else:
             self.manager.get_logger().warn("Dialog Manager rechazó la interacción.")
             self.manager.transition_to(IdleState)
@@ -276,7 +294,7 @@ class AttentionManagerNode(Node):
         self.recognitions = []
         self.last_face_time = 0.0
 
-        self.last_doa_angle = 0.0
+        self.latest_doa_angle = 0.0
         
         self.target_angle = 0.0
         self.target_ids = []
