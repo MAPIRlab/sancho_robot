@@ -181,3 +181,4 @@ src/sancho_perception/sancho_perception/metrics_node.py
 # Large Assets
 *.dae
 *.onnx
+**/*.tar
