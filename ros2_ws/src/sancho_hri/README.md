@@ -1,69 +1,104 @@
+[← Back to Main README](../../../README.md)
+
 # sancho_hri
 
-**Role:** The `sancho_hri` package centralizes all AI and speech intelligence capabilities of the Sancho robot. It provides dynamically loadable, provider-agnostic services for Large Language Models (LLMs), Speech-to-Text (STT), and Text-to-Speech (TTS). It also contains the high-level conversational AI logic (`sancho_ai`) that processes intents, manages per-user memory, and orchestrates multi-turn dialogues.
-
-## Core Nodes
-
-### `llm` (LLM Node)
-- **Specific Function:** A provider-agnostic gateway to multiple LLM backends. It supports on-demand loading/unloading of models from providers including OpenAI, Mistral, LLaMA, Phi, Qwen, DeepSeek, Gemini, Gemma, Falcon, YI, and a custom Mapirbot provider. It also supports embedding generation via SBERT, E5, and BAAI providers. Models can be pre-loaded via parameters or loaded at runtime through services.
-
-### `stt` (Speech-to-Text Node)
-- **Specific Function:** Converts audio (float arrays with sample rate) into text. Supports Whisper (local) and Google (cloud API) backends. Includes an integrated Silero VAD pre-filter to reject non-speech audio before running inference, saving compute. Models are dynamically loadable via services.
-
-### `tts` (Text-to-Speech Node)
-- **Specific Function:** Synthesizes speech audio from text. Supports Bark, CSS10, Google, Piper, Tacotron2, XTTS, and YourTTS engines, each with configurable speaker voices. Returns raw audio data and sample rate. Models are dynamically loadable via services.
-
-### `sancho_ai` (Conversational AI Node)
-- **Specific Function:** The robot's conversational brain. Receives prompts with a `mode` indicator (e.g., `normal`, `get_name`, `confirm_name`, `all_known`) and dispatches to the appropriate AI task. In `normal` mode, it maintains per-chat history (last 10 turns), retrieves per-user long-term memory via `MemoryManager`, performs intent classification, and publishes structured `ConversationTurn` logs. Memory updates happen asynchronously in background threads.
-
-### `embedding_generator` / `test_*` nodes
-- **Specific Function:** Utility and testing entry points for evaluating LLM classification accuracy and embedding-based classification approaches.
+The `sancho_hri` package centralizes all AI and speech intelligence capabilities. It provides dynamically loadable, provider-agnostic services for Large Language Models (LLMs), Speech-to-Text (STT), and Text-to-Speech (TTS). It also contains the `sancho_ai` conversational brain that processes intents, manages per-user memory, and orchestrates multi-turn dialogues.
 
 ---
 
-## API (Topics/Services)
+## Nodes
 
-### Services (LLM Node)
-- `sancho_hri/llm/prompt` (`Prompt`): Send a prompt with system instructions, message history, and parameters; receive the LLM response.
-- `sancho_hri/llm/embedding` (`Embedding`): Generate embedding vectors for input text.
-- `sancho_hri/llm/load_model` / `unload_model` (`LLMLoadModel`, `LLMUnloadModel`): Dynamically load/unload provider models.
-- `sancho_hri/llm/get_all_models` / `get_available_models` / `get_active_models` (`GetModels`, `GetActiveModels`): Query model availability.
-- `sancho_hri/llm/set_active_llm` / `set_active_embedding` (`SetActiveModel`): Set the default model for subsequent requests.
+| Node | Description |
+|------|-------------|
+| `llm` | Provider-agnostic LLM gateway supporting OpenAI, Mistral, LLaMA, Phi, Qwen, DeepSeek, Gemini, Gemma, Falcon, YI, and Mapirbot. Also supports embeddings via SBERT, E5, and BAAI. |
+| `stt` | Speech-to-Text service with Whisper (local) and Google (cloud) backends. Includes Silero VAD pre-filter. |
+| `tts` | Text-to-Speech service supporting Bark, CSS10, Google, Piper, Tacotron2, XTTS, and YourTTS engines. |
+| `sancho_ai` | Conversational brain with mode-based dispatch (`normal`, `get_name`, `confirm_name`, `all_known`), per-user memory via `MemoryManager`, chat history, and intent classification. |
 
-### Services (STT Node)
-- `sancho_hri/speech/stt` (`STT`): Transcribe audio to text.
-- `sancho_hri/speech/stt/load_model` / `unload_model` / `set_active_model` / `get_*` services.
+---
 
-### Services (TTS Node)
-- `sancho_hri/speech/tts` (`TTS`): Synthesize text to audio.
-- `sancho_hri/speech/tts/load_model` / `unload_model` / `set_active_model` / `get_*` services.
+## ROS 2 API
 
-### Services (SanchoAI Node)
-- `sancho_hri/ai/prompt` (`SanchoPrompt`): Main conversational endpoint with mode-based dispatch.
-- `sancho_hri/ai/get_memories` / `update_memory` (`GetString`): Per-user memory CRUD.
+### Services (LLM)
+
+| Service | Type | Description |
+|---------|------|-------------|
+| `sancho_hri/llm/prompt` | `sancho_interfaces/srv/Prompt` | Send prompt with system instructions and history |
+| `sancho_hri/llm/embedding` | `sancho_interfaces/srv/Embedding` | Generate embedding vectors |
+| `sancho_hri/llm/load_model` | `sancho_interfaces/srv/LLMLoadModel` | Load a provider model at runtime |
+| `sancho_hri/llm/unload_model` | `sancho_interfaces/srv/LLMUnloadModel` | Unload a model |
+| `sancho_hri/llm/get_all_models` | `sancho_interfaces/srv/GetModels` | Query all registered models |
+| `sancho_hri/llm/get_active_models` | `sancho_interfaces/srv/GetActiveModels` | Query active models |
+| `sancho_hri/llm/set_active_llm` | `sancho_interfaces/srv/SetActiveModel` | Set default LLM model |
+| `sancho_hri/llm/set_active_embedding` | `sancho_interfaces/srv/SetActiveModel` | Set default embedding model |
+
+### Services (STT)
+
+| Service | Type | Description |
+|---------|------|-------------|
+| `sancho_hri/speech/stt` | `sancho_interfaces/srv/STT` | Transcribe audio to text |
+| `sancho_hri/speech/stt/load_model` | *(speech model services)* | Load/unload/set STT models |
+
+### Services (TTS)
+
+| Service | Type | Description |
+|---------|------|-------------|
+| `sancho_hri/speech/tts` | `sancho_interfaces/srv/TTS` | Synthesize text to audio |
+| `sancho_hri/speech/tts/load_model` | *(speech model services)* | Load/unload/set TTS models |
+
+### Services (SanchoAI)
+
+| Service | Type | Description |
+|---------|------|-------------|
+| `sancho_hri/ai/prompt` | `sancho_interfaces/srv/SanchoPrompt` | Main conversational endpoint |
+| `sancho_hri/ai/get_memories` | `sancho_interfaces/srv/GetString` | Per-user memory retrieval |
+| `sancho_hri/ai/update_memory` | `sancho_interfaces/srv/GetString` | Per-user memory update |
 
 ### Published Topics
-- `conversation_log/add` (`sancho_interfaces/msg/ConversationTurn`): Structured log of every user↔assistant exchange.
+
+| Topic | Type | Description |
+|-------|------|-------------|
+| `conversation_log/add` | `sancho_interfaces/msg/ConversationTurn` | Structured log of every exchange |
 
 ---
 
-## Key Parameters
+## Parameters
 
 ### `llm`
-- `llm_load_models` (string, default: "[]"): List of `[provider, models, api_key]` to pre-load on startup.
-- `llm_active_provider` / `llm_active_model` (string): Default provider/model for prompt requests.
-- `embedding_load_models` / `embedding_active_provider` / `embedding_active_model`: Same pattern for embeddings.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `llm_load_models` | string | `"[]"` | JSON list of `[provider, models, api_key]` to pre-load |
+| `llm_active_provider` | string | — | Default LLM provider |
+| `llm_active_model` | string | — | Default LLM model |
+| `embedding_load_models` | string | `"[]"` | JSON list of embedding models to pre-load |
+| `embedding_active_provider` | string | — | Default embedding provider |
+| `embedding_active_model` | string | — | Default embedding model |
 
 ### `stt`
-- `load_models` (string, default: "[]"): List of `[model_name, api_key]` to pre-load.
-- `active_model` (string): Default STT model.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `load_models` | string | `"[]"` | JSON list of `[model_name, api_key]` to pre-load |
+| `active_model` | string | — | Default STT model |
 
 ### `tts`
-- `load_models` (string, default: "[]"): List of `[model_name, api_key]` to pre-load.
-- `active_model` / `active_speaker` (string): Default TTS model and speaker voice.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `load_models` | string | `"[]"` | JSON list of `[model_name, api_key]` to pre-load |
+| `active_model` | string | — | Default TTS model |
+| `active_speaker` | string | — | Default speaker voice |
 
 ---
 
 ## Lifecycle Information
 
-All nodes in this package are standard `rclpy.node.Node` implementations and do not use the ROS 2 Lifecycle architecture. They are active immediately upon startup.
+All nodes are standard `rclpy.node.Node` implementations — they do not use the ROS 2 Lifecycle architecture and are active immediately on startup.
+
+---
+
+## Dependencies
+
+- **Internal:** `sancho_interfaces`
+- **External:** `rclpy`

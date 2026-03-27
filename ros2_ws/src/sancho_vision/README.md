@@ -1,102 +1,133 @@
+[← Back to Main README](../../../README.md)
+
 # sancho_vision
 
-**Role:** The `sancho_vision` package handles human face detection, face recognition, facial tracking, and integrates with the human-robot interaction GUI. It maintains a database of recognized people, tracks them spatially, and provides the core logic to identify users and initiate dialogs if a user is unknown or needs confirmation.
-
-## Core Nodes
-
-### `body_face_fusion_node`
-- **Specific Function:** Fuses robust body tracking with face recognition. It subscribes to human body tracks, crops the head region dynamically, and performs face detection/recognition (using MTCNN and EfficientFace) on the cropped image. It publishes the final `FaceRecognitionArray` maintaining the identity over the body track ID.
-
-### `face_visualizer_node`
-- **Specific Function:** Subscribes to face recognition results and publishes an annotated image stream (`/face_recognitions/visual`) with bounding boxes, names, and distances.
-
-### `human_face_manager_lifecycle_node`
-- **Specific Function:** A LifecycleNode that acts as the interaction brain for faces. It tracks when people are seen, maintains the "currently seen people" list, and triggers the `hri_gui` and voice assistant to ask for names when a face is unknown or uncertain. It also logs these interactions.
-
-### `hri_gui`
-- **Specific Function:** Manages the local Qt-based or web-based graphical interface for face interactions. Displays prompts to the user asking "What is your name?" or "Are you X?", capturing the input and returning it to the face manager.
-
-### `face_cluster_node`
-- **Specific Function:** Projects detected faces from camera 2D pixels into a pseudo-3D space (using TF and simplified depth from face scale). It tracks the faces temporally using a Kalman filter and SORT algorithm, and clusters them using DBSCAN to group people spatially. Essential for interactive group behaviors.
-
-### `central_faces_cluster_node`
-- **Specific Function:** Simplistic clustering node that groups faces in pixel space using DBSCAN and returns the centroid of the most central face cluster (useful for attention mechanisms or head panning).
-
-### `video_node`
-- **Specific Function:** Development tool that acts as a mock camera by publishing frames from a local `.mp4` video file to `camera/color/image_raw`.
-
-### `human_face_detector_lifecycle_node` (Legacy)
-- **Specific Function:** A standalone LifecycleNode for generic face detection (e.g., using `dlib` or `mtcnn`). Publishes `FaceDetectionArray` without recognition.
-
-### `human_face_recognizer_lifecycle_node` (Legacy)
-- **Specific Function:** A standalone LifecycleNode for face recognition. Takes `/face_detections`, aligns the faces, generates embeddings (using models like `facenet`), classifies them against the local database, and publishes `FaceRecognitionArray`.
+The `sancho_vision` package handles human face detection, recognition, body-face fusion tracking, spatial clustering, and the HRI graphical interface. It maintains a database of recognized people, tracks them spatially, and provides the logic to identify users and initiate dialogs when a user is unknown.
 
 ---
 
-## API (Topics/Services)
+## Launch Files
+
+| Launch File | Description |
+|-------------|-------------|
+| `identification.launch.py` | Launches the body-face fusion pipeline, face manager, visualizer, and GUI |
+
+---
+
+## Nodes
+
+| Node | Type | Description |
+|------|------|-------------|
+| `body_face_fusion_node` | Standard | Fuses body tracking with face recognition: crops head region, runs MTCNN + EfficientFace, publishes `FaceRecognitionArray` |
+| `face_visualizer_node` | Standard | Annotates image with bounding boxes, names, and distances |
+| `human_face_manager_lifecycle_node` | Lifecycle | Tracks "currently seen" people, triggers GUI/voice for unknown faces |
+| `hri_gui` | Standard | Qt/web GUI for face interaction prompts ("What is your name?") |
+| `face_cluster_node` | Standard | Projects faces to 3D via TF, tracks with Kalman/SORT, clusters via DBSCAN |
+| `central_faces_cluster_node` | Standard | Pixel-space DBSCAN clustering, returns most central face cluster centroid |
+| `video_node` | Standard | Dev tool: mock camera from `.mp4` file |
+| `human_face_detector_lifecycle_node` | Lifecycle (Legacy) | Standalone face detection via `dlib`/`mtcnn` |
+| `human_face_recognizer_lifecycle_node` | Lifecycle (Legacy) | Standalone face recognition with `facenet` embeddings |
+
+---
+
+## ROS 2 API
 
 ### Subscribed Topics
-- `/sancho_perception/human_tracking` (`sancho_interfaces/msg/FaceDetectionArray`): Input body tracks.
-- `/face_recognitions` (`sancho_interfaces/msg/FaceRecognitionArray`): Analyzed faces with IDs.
-- `/gui/face_name_response` (`sancho_interfaces/msg/FaceNameResponse`): User input from GUI (new name).
-- `/gui/face_question_response` (`sancho_interfaces/msg/FaceQuestionResponse`): Confirmation (Yes/No) from GUI.
-- `/gui/face_timeout_response` (`std_msgs/msg/Empty`): Timeout signal if user doesn't answer GUI.
-- `/gui/name_answer` (`std_msgs/msg/String`), `/gui/confirm_name` (`std_msgs/msg/Bool`): Raw GUI inputs.
-- `/sancho_camera/camera_info` (`sensor_msgs/msg/CameraInfo`): Intrinsics for 3D projection.
-- `/sancho_camera/image_raw` (`sensor_msgs/msg/Image`), `/face_detections` (`sancho_interfaces/msg/FaceDetectionArray`): Inputs for legacy pipelines.
+
+| Topic | Type | Description |
+|-------|------|-------------|
+| `/sancho_perception/human_tracking` | `sancho_interfaces/msg/FaceDetectionArray` | Body tracks (input to fusion) |
+| `/face_recognitions` | `sancho_interfaces/msg/FaceRecognitionArray` | Recognition results |
+| `/gui/face_name_response` | `sancho_interfaces/msg/FaceNameResponse` | User name from GUI |
+| `/gui/face_question_response` | `sancho_interfaces/msg/FaceQuestionResponse` | Confirmation from GUI |
+| `/gui/face_timeout_response` | `std_msgs/msg/Empty` | GUI timeout signal |
+| `/gui/name_answer` | `std_msgs/msg/String` | Raw GUI name input |
+| `/gui/confirm_name` | `std_msgs/msg/Bool` | Raw GUI confirmation |
+| `/sancho_camera/camera_info` | `sensor_msgs/msg/CameraInfo` | Intrinsics for 3D projection |
+| `/sancho_camera/image_raw` | `sensor_msgs/msg/Image` | Camera images (legacy pipeline) |
+| `/face_detections` | `sancho_interfaces/msg/FaceDetectionArray` | Face detections (legacy pipeline) |
 
 ### Published Topics
-- `/face_recognitions` (`sancho_interfaces/msg/FaceRecognitionArray`): Main output of fused/recognized face data.
-- `/face_recognitions/visual` (`sensor_msgs/msg/Image`): Image containing debug bounding boxes.
-- `/logs/add` (`sancho_interfaces/msg/Log`): System logs about database additions or encounters.
-- `/logic/info/actual_people` (`std_msgs/msg/String`): JSON string with currently active people's IDs and timestamps.
-- `/input_tts` (`sancho_interfaces/msg/InputTTS`): Commands to speak (e.g., greetings).
-- `face_markers` (`visualization_msgs/msg/MarkerArray`): RViz markers for 2D tracked faces.
-- `recognition/event` (`sancho_interfaces/msg/FaceprintEvent`): Database update events.
-- `/gui/face_name_response`, `/gui/face_question_response`: Bridged outputs from GUI forms.
 
-### Services
-- `/recognition/training` (`sancho_interfaces/srv/Training`): Interface to add, rename, or delete faces in the database (`add_class`, `add_features`, `delete_all`, etc.).
-- `/recognition/get_faceprint` (`sancho_interfaces/srv/GetString`): Retrieve database entries.
-- `/recognition/clear_no_name` (`std_srvs/srv/Empty`): Removes temporary or unnamed faces.
-- `/gui/request` (`sancho_interfaces/srv/TriggerUserInteraction`): Used by logic to popup GUI dialogs (`get_name`, `ask_if_name`).
-- `sancho_audio/ask_user` (`sancho_interfaces/srv/AskUser`): Client to trigger voice assistant questions.
-- `compute_cluster` (`std_srvs/srv/Empty`): Request current 2D spatial clusters from SORT tracker.
-- `~/get_central_cluster` (`sancho_interfaces/srv/GetCentralFaceCluster`): Get the center of the main face cluster in screen space.
-- `detection` / `recognition`: Synchronous API calls to run inference directly for a single frame.
+| Topic | Type | Description |
+|-------|------|-------------|
+| `/face_recognitions` | `sancho_interfaces/msg/FaceRecognitionArray` | Fused/recognized face data |
+| `/face_recognitions/visual` | `sensor_msgs/msg/Image` | Debug image with bounding boxes |
+| `/logs/add` | `sancho_interfaces/msg/Log` | System logs (DB additions, encounters) |
+| `/logic/info/actual_people` | `std_msgs/msg/String` | JSON with currently active people |
+| `/input_tts` | `sancho_interfaces/msg/InputTTS` | Speech commands (greetings, etc.) |
+| `face_markers` | `visualization_msgs/msg/MarkerArray` | RViz markers for tracked faces |
+| `recognition/event` | `sancho_interfaces/msg/FaceprintEvent` | Database update events |
+
+### Services Provided
+
+| Service | Type | Description |
+|---------|------|-------------|
+| `/recognition/training` | `sancho_interfaces/srv/Training` | Add, rename, or delete faces in DB |
+| `/recognition/get_faceprint` | `sancho_interfaces/srv/GetString` | Retrieve database entries |
+| `/recognition/clear_no_name` | `std_srvs/srv/Empty` | Remove unnamed faces |
+| `/gui/request` | `sancho_interfaces/srv/TriggerUserInteraction` | Popup GUI dialogs |
+| `compute_cluster` | `std_srvs/srv/Empty` | Request 2D spatial clusters |
+| `~/get_central_cluster` | `sancho_interfaces/srv/GetCentralFaceCluster` | Central face cluster |
+
+### Services Consumed
+
+| Service | Type | Description |
+|---------|------|-------------|
+| `sancho_audio/ask_user` | `sancho_interfaces/srv/AskUser` | Trigger voice questions |
 
 ---
 
-## Key Parameters
+## Parameters
 
 ### `body_face_fusion_node`
-- `detector_name` (string, default: "mtcnn"): Algorithm for face crops.
-- `encoder_name` (string, default: "efficientface"): Algorithm for embeddings.
-- `head_fraction` (double, default: 0.40): Top percentage of the body bounding box to search for a head.
-- `cache_ttl` (double, default: 15.0): Time-to-live for smart recognition cache.
-- `no_face_cooldown_sec` (double, default: 2.0): Backoff time before checking for a face again if none was found.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `detector_name` | string | `"mtcnn"` | Face detection algorithm |
+| `encoder_name` | string | `"efficientface"` | Embedding generation algorithm |
+| `head_fraction` | double | `0.40` | Top % of body bbox to search for head |
+| `cache_ttl` | double | `15.0` | Recognition cache time-to-live (s) |
+| `no_face_cooldown_sec` | double | `2.0` | Backoff before re-checking for face |
 
 ### `human_face_manager_lifecycle_node`
-- `processing_rate` (double, default: 10.0): Node tick rate in Hz.
-- `service_wait_attempts` (int, default: 10): Tries for connecting to required services.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `processing_rate` | double | `10.0` | Tick rate in Hz |
+| `service_wait_attempts` | int | `10` | Attempts for service connection |
 
 ### `face_cluster_node`
-- `camera_frame` (string, default: "camera_link") / `head_frame` (string, default: "base_link"): TF frames.
-- `dbscan.eps` (double, default: 0.35) / `dbscan.min_samples` (int, default: 2): Clustering settings.
-- `track.max_misses` (int, default: 60) / `track.dt` (double, default: 0.1): SORT KF parameters.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `camera_frame` | string | `"camera_link"` | TF frame for camera |
+| `head_frame` | string | `"base_link"` | TF base frame |
+| `dbscan.eps` | double | `0.35` | DBSCAN epsilon |
+| `dbscan.min_samples` | int | `2` | DBSCAN minimum points |
+| `track.max_misses` | int | `60` | SORT max missed frames |
+| `track.dt` | double | `0.1` | Kalman filter time step |
 
 ### `central_faces_cluster_node`
-- `eps_default` (double, default: 60.0) / `min_samples_default` (int, default: 1): Pixel-space DBSCAN settings.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `eps_default` | double | `60.0` | Pixel-space DBSCAN epsilon |
+| `min_samples_default` | int | `1` | Pixel-space DBSCAN min samples |
 
 ---
 
 ## Lifecycle Information
 
-Several key nodes orchestrate their initialization via `rclpy.lifecycle.LifecycleNode`:
+| Node | `on_configure` | `on_activate` |
+|------|----------------|---------------|
+| `human_face_manager_lifecycle_node` | Initializes QoS, action/service clients (TTS, GUI, Training) | Subscribes to GUI/recognitions, starts main spin timer |
+| `human_face_detector_lifecycle_node` (Legacy) | Loads AI models (`dlib`, `mtcnn`) | Opens camera subscriptions, starts inference |
+| `human_face_recognizer_lifecycle_node` (Legacy) | Loads embedding models (`facenet`), database files | Opens subscriptions, starts inference |
 
-- **`human_face_manager_lifecycle_node`**:
-  - `on_configure`: Initializes QoS profiles, sets up action/service clients (TTS, GUI, Training) and waits for them.
-  - `on_activate`: Subscribes to GUI responses and recognitions, starts the main `spin` timer to process human encounters.
-- **Legacy Detector/Recognizer (`human_face_detector_lifecycle_node`, `human_face_recognizer_lifecycle_node`)**:
-  - `on_configure`: Loads AI models (`dlib`, `facenet`) and database files into memory. 
-  - `on_activate`: Opens subscriptions to camera streams or tracking topics, starts inference timers.
+---
+
+## Dependencies
+
+- **Internal:** `sancho_interfaces`
+- **External:** `rclpy`, `sensor_msgs`, `cv_bridge`, `std_msgs`, `geometry_msgs`, `numpy`, `mediapipe`, `dlib`, `tf_transformations`, `filterpy`, `scikit-image`

@@ -1,43 +1,65 @@
+[← Back to Main README](../../../README.md)
+
 # sancho_control
 
-**Role:** The `sancho_control` package provides specific hardware-agnostic control logic for the Sancho robot. Currently, it houses the head tracking system, which translates 2D pixel coordinates of detected faces into kinematic pan and tilt joint commands to keep users centered in the camera's view.
-
-## Core Nodes
-
-### `head_control_face_tracker`
-- **Specific Function:** A LifecycleNode that visually tracks a target face. It computes an Exponential Moving Average (EMA) of the best detected face's pixel coordinates to smooth movements. Using camera intrinsic calibrations, it calculates the angular error from the center of the image and applies a Proportional (P) control algorithm to generate new Pan/Tilt goals, which are then enacted by the hardware interface.
+The `sancho_control` package provides hardware-agnostic control logic for the Sancho robot. It houses the head tracking system, which converts 2D pixel positions of detected faces into pan/tilt servo commands to keep users centered in the camera's field of view.
 
 ---
 
-## API (Topics/Services)
+## Nodes
+
+### `head_control_face_tracker` (Lifecycle)
+
+Visually tracks a target face using an Exponential Moving Average (EMA) pixel filter for smoothing. Computes angular error from the camera center using intrinsic calibrations, and applies a Proportional (P) controller to generate pan/tilt goals for the head servos.
+
+---
+
+## ROS 2 API
 
 ### Subscribed Topics
-- `/sancho_perception/human_tracking` (`sancho_interfaces/msg/FaceDetectionArray`): Input data of detected faces in the camera frame.
-- `/sancho_camera/camera_info` (`sensor_msgs/msg/CameraInfo`): Provides focal lengths ($f_x$, $f_y$) and optical centers ($c_x$, $c_y$) needed for converting pixel error to angular error.
-- `/wxxms/joint_states` (`sensor_msgs/msg/JointState`): Real-time feedback of the current positions of the head servos.
+
+| Topic | Type | Description |
+|-------|------|-------------|
+| `/sancho_perception/human_tracking` | `sancho_interfaces/msg/FaceDetectionArray` | Detected faces in camera frame |
+| `/sancho_camera/camera_info` | `sensor_msgs/msg/CameraInfo` | Focal lengths and optical center for angular error computation |
+| `/wxxms/joint_states` | `sensor_msgs/msg/JointState` | Current head servo positions |
 
 ### Published Topics
-- `/head_goal` (`geometry_msgs/msg/PoseStamped`): Kinematic targets representing the desired pan and tilt angles. The angles are encoded in the `Pose.orientation` quaternion.
+
+| Topic | Type | Description |
+|-------|------|-------------|
+| `/head_goal` | `geometry_msgs/msg/PoseStamped` | Desired pan/tilt angles encoded in quaternion orientation |
 
 ---
 
-## Key Parameters
+## Parameters
 
-- `face_topic` (string, default: "/sancho_perception/human_tracking"): Input topic for face detections.
-- `head_goal_topic` (string, default: "/head_goal"): Output topic for mechanical head goals.
-- `camera_frame` (string, default: "camera_frame"): ID used in the target message header.
-- `control_rate` (double, default: 10.0): Frequency in Hz of the internal PID tracking loop.
-- `ema_alpha` (double, default: 0.2): Smoothing factor for the Exponential Moving Average filter applied to the target's pixel coordinates. Lower means smoother but slower to react.
-- `p_gain_pan` (double, default: 0.8): Proportional gain for horizontal head tracking.
-- `p_gain_tilt` (double, default: 0.8): Proportional gain for vertical head tracking.
-- `timeout_no_detection` (double, default: 1.0): Time in seconds before giving up tracking if the target face is lost.
-- `pan_joint` / `tilt_joint` (string, defaults: "pan", "tilt"): The internal names identifying the servos in `joint_states`.
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `face_topic` | string | `"/sancho_perception/human_tracking"` | Input face detection topic |
+| `head_goal_topic` | string | `"/head_goal"` | Output head goal topic |
+| `camera_frame` | string | `"camera_frame"` | Frame ID in target message |
+| `control_rate` | double | `10.0` | Control loop frequency (Hz) |
+| `ema_alpha` | double | `0.2` | EMA smoothing factor (lower = smoother) |
+| `p_gain_pan` | double | `0.8` | Proportional gain for horizontal tracking |
+| `p_gain_tilt` | double | `0.8` | Proportional gain for vertical tracking |
+| `timeout_no_detection` | double | `1.0` | Seconds before abandoning track |
+| `pan_joint` | string | `"pan"` | Pan servo name in `joint_states` |
+| `tilt_joint` | string | `"tilt"` | Tilt servo name in `joint_states` |
 
 ---
 
 ## Lifecycle Information
 
-The node extends `rclpy.lifecycle.LifecycleNode`:
-- **`on_configure`**: Resolves parameters and sets up the unactivated publisher for `/head_goal`.
-- **`on_activate`**: Activates subscriptions to the camera, face, and joint state topics. It initiates the core continuous control loop timer running at `control_rate`. Expects `CameraInfo` to be received before performing any tracking calculations.
-- **`on_deactivate`**: Destroys the timers and subscriptions, safely halting physical robot movement commands.
+| Transition | Behavior |
+|------------|----------|
+| `on_configure` | Resolves parameters, creates publisher for `/head_goal` |
+| `on_activate` | Subscribes to camera, face, and joint state topics; starts control loop timer |
+| `on_deactivate` | Destroys timers and subscriptions, halts head commands |
+
+---
+
+## Dependencies
+
+- **Internal:** `sancho_interfaces`
+- **External:** `rclpy`, `geometry_msgs`, `sensor_msgs`, `std_msgs`, `lifecycle_msgs`, `tf_transformations`

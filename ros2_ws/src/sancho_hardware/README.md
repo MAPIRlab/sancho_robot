@@ -1,56 +1,85 @@
+[← Back to Main README](../../../README.md)
+
 # sancho_hardware
 
-**Role:** The `sancho_hardware` package serves as the Hardware Abstraction Layer (HAL) for the entire Sancho robot. It consolidates the initiation of all physical hardware drivers. This includes customized wrapper launch files for off-the-shelf sensors (LiDARs, Realsense/Astra cameras, mobile base) that inject Sancho-specific configurations, as well as custom C++ and Python nodes required to interface with bespoke hardware components like the animated face and the WidowX-based pan-tilt head.
+The `sancho_hardware` package serves as the Hardware Abstraction Layer (HAL) for the Sancho robot. It consolidates the initiation of all physical hardware drivers with Sancho-specific configurations, and provides custom nodes for bespoke hardware components (animated face, pan-tilt head).
 
-## Core Nodes
+---
+
+## Launch Files
+
+| Launch File | Description |
+|-------------|-------------|
+| `ranger_wrapper.launch.py` | Launches the AgileX Ranger Mini v3 base chassis controller |
+| `lidars_wrapper.launch.py` | Launches dual Hokuyo URG LiDAR instances (front + rear) |
+| `astra_wrapper.launch.py` | Launches the Orbbec Astra RGB-D camera driver |
+| `nose_cam.launch.py` | Launches the `usb_cam` driver for the head-mounted camera |
+| `head.launch.py` | Initializes the `head_controller_node` + lower-level servo drivers |
+| `face.launch.py` | Initializes the `face_node` C++ daemon |
+
+---
+
+## Nodes
 
 ### `face_node` (C++)
-- **Specific Function:** Controls an external LED/LCD animated face driven by an ESP32 microcontroller over a serial connection (`/dev/esp32`). It operates in two dimensions:
-   1. **State machine mapping:** Subscribes to logical face states ("idle", "listening", "thinking") or emotions ("happy", "surprised", "sad") and sends the corresponding string commands to the ESP32.
-   2. **Live Lip-Syncing:** When in the "speaking" state, the node uses PortAudio to actively monitor the PulseAudio output monitor (the sound physically leaving the robot's speakers). It calculates the RMS volume of the outgoing audio chunk every ~0.1s and sends discrete volume levels ("low", "medium", "high", etc.) to the ESP32, allowing the physical face to animate its mouth perfectly in sync with the spoken text-to-speech.
+
+Controls an ESP32-driven animated face display over serial (`/dev/esp32`). Maps logical face states ("idle", "listening", "happy") to ESP32 commands. In "speaking" state, uses PortAudio to monitor PulseAudio output and sends RMS volume levels ("low", "medium", "high") for lip-sync animation.
 
 ### `head_controller_node` (Python)
-- **Specific Function:** Controls the physical servos of the robot's head (e.g., Dynamixel motors accessed via `interbotix_xs` interfaces). It manages two distinct modes:
-  - **IDLE mode:** If no targets are being tracked, the head autonomously performs random, natural-looking micro-movements (pan/tilt) within predefined parameterized limits and time intervals, making the robot feel "alive."
-  - **TRACKING mode:** When a target is received (e.g., from the `sancho_control` face tracker), it seamlessly interrupts the idle behavior, converts the requested `PoseStamped` orientation into raw joint position commands, and commands the hardware to look at the target. If the goal stream stops, it times out and reverts to IDLE mode.
+
+Controls the WidowX WXXMS head servos in two modes:
+- **IDLE:** Autonomous random micro-movements within parameterized limits.
+- **TRACKING:** Converts incoming `PoseStamped` targets to joint commands. Reverts to IDLE after timeout.
 
 ---
 
-## Core Launch Files (`/launch`)
-
-These files wrap third-party driver nodes, injecting the specific configurations found in the `config/` directory.
-
-- `astra_wrapper.launch.py`: Launches the RGB-D camera driver (e.g., Orbbec Astra).
-- `lidars_wrapper.launch.py`: Launches dual instances of `rplidar_ros` for the front and rear scanning lasers.
-- `ranger_wrapper.launch.py`: Launches the core base chassis controller (e.g., AgileX Ranger/Scout).
-- `nose_cam.launch.py`: Launches the standard `usb_cam` driver for a secondary high-resolution camera.
-- `head.launch.py`: Initializes the `head_controller_node` alongside any necessary lower-level servo drivers.
-- `face.launch.py`: Initializes the `face_node` C++ daemon.
-
----
-
-## API (Topics/Services)
+## ROS 2 API
 
 ### Subscribed Topics
-- `/face/mode` (`std_msgs/msg/String`): Mode commands ("idle", "listening", "happy", etc.) consumed by `face_node`.
-- `/head_goal` (`geometry_msgs/msg/PoseStamped`): Semantic kinematic targets consumed by `head_controller_node`.
-- `/wxxms/joint_states` (`sensor_msgs/msg/JointState`): Feedback consumed by `head_controller_node` tracking logic.
+
+| Topic | Type | Description |
+|-------|------|-------------|
+| `/face/mode` | `std_msgs/msg/String` | Face state commands ("idle", "listening", "happy", etc.) |
+| `/head_goal` | `geometry_msgs/msg/PoseStamped` | Kinematic targets for the pan/tilt head |
+| `/wxxms/joint_states` | `sensor_msgs/msg/JointState` | Servo feedback for tracking logic |
 
 ### Published Topics
-- `/wxxms/commands/joint_group` (`interbotix_xs_msgs/msg/JointGroupCommand`): Low-level position commands sent to the hardware servos by the `head_controller_node`.
+
+| Topic | Type | Description |
+|-------|------|-------------|
+| `/wxxms/commands/joint_group` | `interbotix_xs_msgs/msg/JointGroupCommand` | Low-level position commands to head servos |
 
 ### Services Used
-- `/wxxms/set_operating_modes` (`interbotix_xs_msgs/srv/OperatingModes`): Used by the `head_controller_node` setup phase to explicitly lock the head servos into position-control mode.
+
+| Service | Type | Description |
+|---------|------|-------------|
+| `/wxxms/set_operating_modes` | `interbotix_xs_msgs/srv/OperatingModes` | Sets head servos to position-control mode |
 
 ---
 
-## Key Parameters
+## Parameters
 
 ### `face_node`
-- `send_interval_sec` (double, default: 0.1): How frequently to sample the outgoing audio buffer and send an RMS string update to the ESP32.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `send_interval_sec` | double | `0.1` | Audio sampling interval for lip-sync |
 
 ### `head_controller_node`
-- `idle_move_min_interval` / `idle_move_max_interval` (doubles, default: 5.0, 8.0): Boundaries in seconds for the random IDLE mode gaze shifts.
-- `pan_limit` / `tilt_limit` (float arrays): Safety boundaries for kinematics, used for both random IDLE moves and clamping incoming TRACKING goals.
-- `tracking_timeout` (double, default: 5.0): Seconds without a received `/head_goal` before the node gracefully drops back into IDLE mode.
-- `profile_velocity` / `profile_acceleration` (ints): Motor profile dynamics applied when setting the operating mode on the servos.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `idle_move_min_interval` | double | `5.0` | Min seconds between random IDLE gaze shifts |
+| `idle_move_max_interval` | double | `8.0` | Max seconds between random IDLE gaze shifts |
+| `pan_limit` | float[] | — | Pan safety limits |
+| `tilt_limit` | float[] | — | Tilt safety limits |
+| `tracking_timeout` | double | `5.0` | Seconds without `/head_goal` before reverting to IDLE |
+| `profile_velocity` | int | — | Motor profile velocity |
+| `profile_acceleration` | int | — | Motor profile acceleration |
+
+---
+
+## Dependencies
+
+- **Internal:** `sancho_interfaces`
+- **External:** `rclpy`, `rclcpp`, `std_msgs`, `portaudio`, `fftw3`, `interbotix_xs_msgs`

@@ -1,98 +1,218 @@
-# Sancho Robot — ROS 2 Workspace
+# Sancho Robot — Workspace Setup Guide
 
-**Sancho** is a socially-aware mobile robot built on ROS 2 Humble. It autonomously navigates indoor environments, detects and recognizes people, engages in multi-turn conversations using LLMs, and expresses itself through an animated face and a motorized pan-tilt head.
+[← Back to Main README](../README.md)
 
-## Architecture Overview
+---
 
-```mermaid
-graph TD
-    subgraph Hardware Layer
-        HW[sancho_hardware] --> |"/scan_1st, /scan_2nd"| PROC
-        HW --> |"/sancho_camera/image_raw"| VISION
-        HW --> |"/wxxms/joint_states"| DESC
-        HW --> |"/face/mode"| HW
-    end
+## Prerequisites
 
-    subgraph Robot Model
-        DESC[sancho_description] --> |"/tf, /joint_states_merged"| NAV
-    end
+| Requirement | Version |
+|-------------|---------|
+| **OS** | Ubuntu 22.04 LTS (Jammy Jellyfish) |
+| **ROS 2** | Humble Hawksbill |
+| **Build Tool** | `colcon` |
+| **Python** | 3.10+ |
+| **CMake** | 3.22+ |
 
-    subgraph Perception
-        CLIFF[cliff_detector] --> |"depth obstacle points"| NAV
-        VISION[sancho_vision] --> |"/face_recognitions"| BEHAV
-        AUDIO[sancho_audio] --> |"/audio/vad_segment, /audio/angle"| BEHAV
-    end
+### System Dependencies
 
-    subgraph Intelligence
-        HRI[sancho_hri] --> |"LLM/STT/TTS services"| AUDIO
-        HRI --> |"SanchoPrompt service"| BEHAV
-    end
-
-    subgraph Planning & Behavior
-        BEHAV[sancho_behavior] --> |"lifecycle transitions"| VISION
-        BEHAV --> |"/head_goal"| CTRL
-        BEHAV --> |"NavigateToPose"| NAV[sancho_navigation]
-    end
-
-    subgraph Control
-        CTRL[sancho_control] --> |"/head_goal"| HW
-    end
-
-    subgraph Processing
-        PROC[sancho_bringup] --> |"/scan_merged"| NAV
-    end
-
-    subgraph Web
-        WEB[sancho_web_bridge] --> |"WebSocket"| HRI
-    end
+```bash
+sudo apt update && sudo apt install -y \
+  python3-colcon-common-extensions \
+  python3-rosdep \
+  python3-vcstool \
+  ros-humble-nav2-bringup \
+  ros-humble-navigation2 \
+  ros-humble-robot-state-publisher \
+  ros-humble-joint-state-publisher \
+  ros-humble-tf2-ros \
+  ros-humble-cv-bridge \
+  ros-humble-image-transport \
+  ros-humble-pointcloud-to-laserscan \
+  ros-humble-depthimage-to-laserscan \
+  ros-humble-message-filters \
+  ros-humble-tf-transformations \
+  ros-humble-behaviortree-cpp-v3 \
+  ros-humble-nav2-behavior-tree \
+  portaudio19-dev \
+  libfftw3-dev
 ```
 
-## Packages
+### Python Dependencies
 
-| Package | Role | Build Type |
-|---------|------|------------|
-| [cliff_detector](src/cliff_detector/) | Depth-based obstacle/cliff detection | `ament_cmake` |
-| [sancho_audio](src/sancho_audio/) | Audio capture, VAD, DOA, wake-word, STT relay | `ament_python` |
-| [sancho_behavior](src/sancho_behavior/) | High-level FSM orchestrator + BT plugins | `ament_python` + `ament_cmake` (bt_plugins) |
-| [sancho_bringup](src/sancho_bringup/) | Top-level launch files and sensor fusion | `ament_python` |
-| [sancho_control](src/sancho_control/) | Head tracking (P-control) | `ament_python` |
-| [sancho_description](src/sancho_description/) | URDF, meshes, TF broadcasting | `ament_python` |
-| [sancho_hardware](src/sancho_hardware/) | Hardware drivers (face LED, head servos, camera/LiDAR wrappers) | `ament_cmake` |
-| [sancho_hri](src/sancho_hri/) | LLM, STT, TTS services + conversational AI | `ament_python` |
-| [sancho_interfaces](src/sancho_interfaces/) | Custom msgs (33), srvs (31), actions (1) | `ament_cmake` |
-| [sancho_lifecycle_utils](src/sancho_lifecycle_utils/) | Automatic lifecycle node configurator | `ament_python` |
-| [sancho_navigation](src/sancho_navigation/) | Roaming, CBF safety filter, scan filter, Nav2 configs | `ament_python` |
-| [sancho_perception](src/sancho_perception/) | MoveNet body detection, 3D pose estimation, group/person tracking | `ament_python` |
-| [sancho_vision](src/sancho_vision/) | Face detection, recognition, tracking, HRI GUI | `ament_python` |
-| [sancho_web_bridge](src/sancho_web_bridge/) | WebSocket bridge, REST API, web assistant | `ament_python` |
-| [third_party_pkgs](src/third_party_pkgs/) | Vendored dependencies (ByteTrack, Astra, Interbotix, etc.) | Mixed |
+Several packages require Python libraries beyond the ROS 2 defaults:
+
+```bash
+pip3 install \
+  pyaudio playsound soundfile pyannote.audio scipy requests \
+  mediapipe dlib filterpy scikit-image \
+  tensorflow tensorflow_hub scikit-learn \
+  numpy opencv-python cvxopt
+```
+
+> **Note:** Some packages ship a `requirements.txt` (e.g., `sancho_audio`, `sancho_vision`, `sancho_perception`). Install them individually with `pip3 install -r <package>/requirements.txt` if needed.
+
+---
+
+## Build Instructions
+
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/MAPIRlab/sancho_robot.git
+cd sancho_robot/ros2_ws
+```
+
+### 2. Install ROS Dependencies
+
+```bash
+# Initialize rosdep if not already done
+sudo rosdep init  # only needed once
+rosdep update
+
+# Install all declared dependencies
+rosdep install --from-paths src --ignore-src -r -y
+```
+
+### 3. Build the Workspace
+
+```bash
+source /opt/ros/humble/setup.bash
+colcon build --symlink-install
+```
+
+> **Tip:** To build a specific package only:
+> ```bash
+> colcon build --symlink-install --packages-select sancho_bringup
+> ```
+
+### 4. Source the Workspace
+
+```bash
+source install/setup.bash
+```
+
+Add this to your `~/.bashrc` for persistence:
+
+```bash
+echo "source ~/sancho_robot/ros2_ws/install/setup.bash" >> ~/.bashrc
+```
+
+---
+
+## Environment Variables
+
+The robot requires API keys for certain HRI services. Copy the provided `.env` template at the repository root and ensure the variables are exported before launching:
+
+```bash
+set -a && source ../env && set +a
+```
+
+Key variables:
+- `OPENAI_API_KEY` — OpenAI LLM access
+- `GEMINI_API_KEY` — Google Gemini LLM access
+- `HUGGING_FACE_API_KEY` — Hugging Face model access
+- `PICOVOICE_API_KEY_SANCHO` — Wake-word engine
+
+---
 
 ## Quick Start
 
+### Physical Robot (Full Bringup)
+
+This launches the complete physical robot stack: URDF, all hardware drivers, and the sensor processing layer.
+
 ```bash
-# 1. Install ROS 2 Humble and source it
-source /opt/ros/humble/setup.bash
-
-# 2. Install dependencies
-cd sancho_ws
-rosdep install --from-paths src --ignore-src -r -y
-
-# 3. Build
-colcon build --symlink-install
-
-# 4. Source the workspace
-source install/setup.bash
-
-# 5. Launch the full robot
 ros2 launch sancho_bringup sancho_full_bringup.launch.py
 ```
 
-## Key Data Flows
+### Navigation Stack
 
-1. **Perception → Behavior**: Camera images flow through `sancho_vision` (face detection/recognition) and `sancho_audio` (VAD/DOA), producing structured face identities and audio angles that feed the `sancho_behavior` orchestrator.
+After bringup, launch the navigation stack in a separate terminal:
 
-2. **Behavior → Navigation**: The orchestrator generates waypoints for Nav2 via `NavigateToPose`, while the CBF safety filter in `sancho_navigation` ensures collision-free motion.
+```bash
+# Localization (AMCL with a pre-built map)
+ros2 launch sancho_navigation localization.launch.py map:=/path/to/map.yaml
 
-3. **Behavior → HRI**: During social interactions, the behavior layer triggers `sancho_hri` services (LLM prompts, TTS synthesis) to engage in natural conversation, while controlling the robot's animated face and head orientation.
+# Full navigation (planner + controller + collision monitor)
+ros2 launch sancho_navigation navigation.launch.py
+```
 
-4. **Web → Robot**: External web clients connect through `sancho_web_bridge` to monitor the robot's state, view camera feeds, and interact with the conversational assistant remotely.
+### SLAM (Map Creation)
+
+```bash
+ros2 launch sancho_navigation map_creation.launch.py
+```
+
+### Perception Pipeline
+
+```bash
+# Body pose detection + 3D projection + group detection
+# (Lifecycle nodes — configure & activate via sancho_lifecycle_utils)
+```
+
+### Vision Pipeline (Face Recognition)
+
+```bash
+ros2 launch sancho_vision identification.launch.py
+```
+
+### Audio & Voice Assistant
+
+```bash
+# Hardware audio (mic capture)
+ros2 launch sancho_audio audio_hardware.launch.py
+
+# Audio processing (VAD, DOA)
+ros2 launch sancho_audio audio_processing.launch.py
+
+# Dialog core (assistant helper + assistant)
+ros2 launch sancho_audio dialog_core.launch.py
+```
+
+### Behavioral Orchestrator
+
+```bash
+# Social interaction orchestrator
+ros2 launch sancho_behavior sancho_interaction.launch.py
+```
+
+---
+
+## Package Overview
+
+The workspace contains **15 first-party packages** and **12 vendored third-party packages**:
+
+```
+src/
+├── sancho_bringup/          ← 🚀 Start here
+├── sancho_description/
+├── sancho_hardware/
+├── sancho_interfaces/
+├── sancho_perception/
+├── sancho_vision/
+├── sancho_audio/
+├── sancho_control/
+├── sancho_navigation/
+├── sancho_behavior/
+├── sancho_bt_plugins/
+├── sancho_hri/
+├── sancho_web_bridge/
+├── sancho_lifecycle_utils/
+├── cliff_detector/
+└── third_party_pkgs/
+    ├── astra_camera/            ← Orbbec Astra driver
+    ├── astra_camera_msgs/       ← Astra custom messages
+    ├── interbotix_ptu/          ← WidowX pan-tilt driver
+    ├── laser_scan_merger/       ← Multi-LiDAR fusion
+    ├── urg_node2/               ← Hokuyo URG driver
+    ├── usb_cam/                 ← USB camera driver
+    ├── ranger_ros2/             ← AgileX Ranger ROS 2 driver
+    ├── ugv_sdk/                 ← AgileX UGV SDK
+    ├── ByteTrack/               ← Multi-object tracker
+    ├── image_pipeline/          ← ROS 2 image processing
+    ├── nav2_social_costmap_plugin/ ← Social-aware costmap layer
+    └── people_msgs/             ← People-tracking messages
+```
+
+For detailed documentation on each package, see the [Repository Map](../README.md#repository-map) in the main README.

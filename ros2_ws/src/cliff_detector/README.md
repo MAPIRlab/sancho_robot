@@ -1,40 +1,76 @@
+[← Back to Main README](../../../README.md)
+
 # cliff_detector
 
-**Role:** The `cliff_detector` package is responsible for processing depth images to detect positive obstacles and drops (cliffs) such as stairs. It processes raw depth streams and publishes the detected obstacles as polygon points, useful for robot navigation safety.
+The `cliff_detector` package processes depth images to detect positive obstacles and drops (cliffs) such as stairs. It analyzes raw depth streams and publishes detected obstacle points for navigation safety.
 
-## Core Nodes
+---
 
-### `cliff_detector`
-Extracts cliff points from depth images.
-- **Specific Function:** Analyzes incoming depth images block by block, comparing pixel depths against a ground model based on the sensor's mount height and tilt angle. It detects and extracts areas that differ significantly from the expected ground (e.g., stairs/cliffs).
+## Launch Files
 
-## API (Topics/Services)
+| Launch File | Description |
+|-------------|-------------|
+| `cliff_detector.launch.py` | Launches the cliff detector node with parameters from `config/params.yaml` |
+
+---
+
+## Nodes
+
+### `cliff_detector` (C++)
+
+Analyzes incoming depth images block by block, comparing pixel depths against a ground model based on the sensor's mount height and tilt angle. Detects areas that differ significantly from the expected ground plane (e.g., stairs, cliffs, ledges).
+
+---
+
+## ROS 2 API
 
 ### Subscribed Topics
-- `/camera/depth/image_raw` (`sensor_msgs/msg/Image`) - The raw depth image stream from the depth camera.
-- `/camera/depth/camera_info` (`sensor_msgs/msg/CameraInfo`) - Camera info corresponding to the depth image (handled automatically by `image_transport`).
+
+| Topic | Type | Description |
+|-------|------|-------------|
+| `/camera/depth/image_raw` | `sensor_msgs/msg/Image` | Raw depth image stream |
+| `/camera/depth/camera_info` | `sensor_msgs/msg/CameraInfo` | Depth camera intrinsics (via `image_transport`) |
 
 ### Published Topics
-- `points` (`geometry_msgs/msg/PolygonStamped`) - The extracted obstacle/cliff points.
-- `depth` (`sensor_msgs/msg/Image`) - Debug depth image with overlaid detected cliffs (only published if `publish_depth` is true).
+
+| Topic | Type | Description |
+|-------|------|-------------|
+| `points` | `geometry_msgs/msg/PolygonStamped` | Extracted obstacle/cliff points |
+| `depth` | `sensor_msgs/msg/Image` | Debug depth image with cliff overlay (if `publish_depth` is true) |
 
 ### Services
-- None
 
-## Key Parameters
+*None*
 
-- `range_min` (double, default: 0.5): Minimum range in meters to consider.
-- `range_max` (double, default: 5.0): Maximum range in meters to consider.
-- `depth_img_row_step` (int, default: 2): Row step for depth image processing.
-- `depth_img_col_step` (int, default: 2): Column step for depth image processing.
-- `cam_model_update` (bool, default: false): Whether to continuously update the camera model from incoming info.
-- `sensor_mount_height` (double, default: 0.4): Height of the depth sensor from the ground in meters.
-- `sensor_tilt_angle` (double, default: 0.0): Tilt angle of the depth sensor in radians.
-- `ground_margin` (double, default: 0.05): Allowed margin for depth measurements to still be considered ground.
-- `block_size` (int, default: 2): Size of the block for image processing.
-- `publish_depth` (bool, default: false): Enables publishing of the debug depth image.
-- `used_depth_height` (int, default: 200): Subregion height of the depth image used for detection.
-- `block_points_thresh` (int, default: 10): Threshold for number of points in a block to consider it an obstacle.
+---
+
+## Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `range_min` | double | `0.5` | Minimum range to consider (m) |
+| `range_max` | double | `5.0` | Maximum range to consider (m) |
+| `depth_img_row_step` | int | `2` | Row step for processing |
+| `depth_img_col_step` | int | `2` | Column step for processing |
+| `cam_model_update` | bool | `false` | Continuously update camera model |
+| `sensor_mount_height` | double | `0.4` | Sensor height from ground (m) |
+| `sensor_tilt_angle` | double | `0.0` | Sensor tilt (rad) |
+| `ground_margin` | double | `0.05` | Margin for ground classification (m) |
+| `block_size` | int | `2` | Block size for image processing |
+| `publish_depth` | bool | `false` | Enable debug depth image output |
+| `used_depth_height` | int | `200` | Depth image subregion height |
+| `block_points_thresh` | int | `10` | Min points in a block to flag obstacle |
+
+---
 
 ## Lifecycle Information
-This node is natively an `rclcpp::Node` and not implemented as a Lifecycle node.
+
+This node is a standard `rclcpp::Node` — it does not implement the Lifecycle architecture.
+
+---
+
+## Dependencies
+
+- **Internal:** *(none)*
+- **External:** `rclcpp`, `sensor_msgs`, `image_geometry`, `image_transport`, `cv_bridge`, `geometry_msgs`
+- **Build type:** `ament_cmake`
