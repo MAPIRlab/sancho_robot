@@ -1,0 +1,8 @@
+numpy<2
+opencv-python
+cv_bridge
+tensorflow==2.15.0
+tensorflow_hub
+tf2_ros
+tf-transformations
+scikit-learn

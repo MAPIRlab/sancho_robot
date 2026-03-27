@@ -1,8 +1,0 @@
-int16[] audio
-int32 sample_rate
-string model
----
-string text
-string model_used
-string message
-bool success

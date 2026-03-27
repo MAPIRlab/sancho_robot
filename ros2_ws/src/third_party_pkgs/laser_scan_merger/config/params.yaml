@@ -1,0 +1,67 @@
+/laser_scan_merger:
+  ros__parameters:
+    flip1: true
+    flip2: true
+    inverse1: false
+    inverse2: false
+    laser1Alpha: -45.0
+    laser1AngleMax: 135.0
+    laser1AngleMin: -135.0
+    laser1B: 0
+    laser1G: 0
+    laser1R: 255
+    laser1XOff: -0.3
+    laser1YOff: -0.475
+    laser1ZOff: 0.176
+    laser2Alpha: 135.0
+    laser2AngleMax: 135.0
+    laser2AngleMin: -135.0
+    laser2B: 255
+    laser2G: 0
+    laser2R: 0
+    laser2XOff: 0.3
+    laser2YOff: 0.475
+    laser2ZOff: 0.176
+    pointCloudTopic: cloud_in
+    pointCloutFrameId: merged_laser_frame
+    qos_overrides:
+      /parameter_events:
+        publisher:
+          depth: 1000
+          durability: volatile
+          history: keep_last
+          reliability: best_effort
+    # qos_overrides./parameter_events.publisher.durability: volatile
+    # qos_overrides./parameter_events.publisher.history: keep_last
+    #qos_overrides./parameter_events.publisher.reliability: best_effort
+    scanTopic1: scanHF
+    scanTopic2: scanHB
+    show1: true
+    show2: true
+    use_sim_time: false
+
+/pointcloud_to_laserscan:
+  ros__parameters:
+    angle_increment: 0.0087
+    # angle_max: 1.5708
+    # angle_min: -1.5708
+    angle_max: 3.14
+    angle_min: -3.14
+    inf_epsilon: 1.0
+    max_height: 1.0
+    min_height: 0.0
+    qos_overrides:
+      /parameter_events:
+        publisher:
+          depth: 1000
+          durability: volatile
+          history: keep_last
+          reliability: best_effort
+    queue_size: 16
+    range_max: 20.0
+    range_min: 0.35
+    scan_time: 0.3333
+    target_frame: merged_laser_frame
+    transform_tolerance: 10.0
+    use_inf: true
+    use_sim_time: false

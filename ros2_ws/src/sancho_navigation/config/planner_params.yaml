@@ -1,0 +1,101 @@
+planner_server:
+  ros__parameters:
+    use_sim_time: False
+    planner_plugins: ["GridBased"]
+    GridBased:
+      plugin: "nav2_smac_planner/SmacPlanner2D"
+      tolerance: 0.20
+      allow_unknown: true
+      max_iterations: 1000000
+      max_on_approach_iterations: 1500
+      terminal_checking_interval: 4000
+      max_planning_time: 1.0
+      downsample_costmap: true
+      downsampling_factor: 2
+      cost_travel_multiplier: 3.0 # Prioritize paths with lower cost
+      use_final_approach_orientation: false
+      smooth_path: true
+      smoother:
+        max_iterations: 1000
+        w_smooth: 0.35
+        w_data: 0.20
+        tolerance: 1.0e-10
+        do_refinement: true
+        refinement_num: 2
+
+global_costmap:
+  global_costmap:
+    ros__parameters:
+      use_sim_time: False
+      global_frame: "map"
+      track_unknown_space: false
+      robot_base_frame: "base_footprint"
+      resolution: 0.01
+      downsample_costmap: false
+
+      footprint_padding: 0.005
+      transform_tolerance: 0.2
+
+      update_frequency: 1.0
+      publish_frequency: 1.0
+
+      footprint: "[[-0.35, -0.25], [-0.35, 0.25], [0.35, 0.25], [0.35, -0.25]]"
+
+      plugins:
+        - "static_layer"
+        - "obstacle_layer"
+        - "inflation_layer"
+
+      static_layer:
+        plugin: "nav2_costmap_2d::StaticLayer"
+        enabled: true
+        map_subscribe_transient_local: true
+        subscribe_to_updates: false
+        transform_tolerance: 0.2
+
+      obstacle_layer:
+        plugin: "nav2_costmap_2d::ObstacleLayer"
+        enabled: True
+        footprint_clearing_enabled: true
+        max_obstacle_height: 2.0
+        combination_method: 1
+        observation_sources: "laser_front laser_back semantic_scan_non_persistent"
+        allow_unknown: true
+
+        laser_front:
+          topic: "/scan_1st"
+          max_obstacle_height: 2.0
+          clearing: True
+          marking: True
+          observation_persistence: 0.5  
+
+        laser_back:
+          topic: "/scan_2nd"
+          max_obstacle_height: 2.0
+          clearing: True
+          marking: True
+          observation_persistence: 0.5
+
+        semantic_scan_persistent:
+          topic: "/scan_persistent"
+          max_obstacle_height: 2.0
+          clearing: True
+          marking: True
+          observation_persistence: 30.0
+
+        semantic_scan_non_persistent:
+          topic: "/scan_non_persistent"
+          max_obstacle_height: 2.0
+          clearing: True
+          marking: True
+          observation_persistence: 0.5
+        
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        enabled: true
+        inflation_radius: 0.75
+        cost_scaling_factor: 14.0
+        inflate_unknown: true
+        inflate_around_unknown: true
+      
+      always_send_full_costmap: True

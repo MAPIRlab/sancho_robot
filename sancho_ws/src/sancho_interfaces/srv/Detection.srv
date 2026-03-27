@@ -1,4 +1,0 @@
-sensor_msgs/Image frame
----
-sancho_interfaces/FacePosition[] positions
-float32[] scores

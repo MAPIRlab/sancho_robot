@@ -1,3 +1,0 @@
-recursive-include sancho_audio/sounds *
-recursive-include sancho_audio/sounds **/*
-include package.xml

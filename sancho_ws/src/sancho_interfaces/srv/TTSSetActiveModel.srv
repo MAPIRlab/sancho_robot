@@ -1,5 +1,0 @@
-string model
-string speaker
----
-string message
-bool success

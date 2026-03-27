@@ -1,8 +1,0 @@
-# Request
-# Motivo por el que termina la interacción
-# (ej: "user_said_goodbye", "timeout", "error", "interrupted")
-string reason
----
-# Response
-# True si el attention_manager ha recibido la señal y vuelve a Idle/Scanning
-bool success

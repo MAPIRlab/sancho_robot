@@ -1,9 +1,0 @@
-string provider
-string model
-string user_input
----
-float32[] embedding
-string provider_used
-string model_used
-string message
-bool success

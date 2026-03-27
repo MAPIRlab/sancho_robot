@@ -1,0 +1,6 @@
+# Request
+geometry_msgs/PoseStamped home
+---
+# Response
+bool    success   # true si se pudo fijar Home
+string  message   # texto explicativo (error o confirmación)

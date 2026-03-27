@@ -1,0 +1,6 @@
+laser_scan_merger:
+  ros__parameters:
+    destination_frame: base_footprint
+    scan_destination_topic: /scan_merged
+    scan_topic: /scan_1st
+    scan_topic1: /scan_2nd

@@ -1,9 +1,0 @@
-# Request: parámetros de DBSCAN en píxeles
-float64 eps # radio de vecindad (default si 0: usa param "eps_default")
-int32 min_samples # mínimo de puntos por clúster (default si 0: usa param "min_samples_default")
----
-# Response
-geometry_msgs/Point cluster_center # centro medio del clúster elegido (pixeles, z=0)
-string[] ids # classified_id de las caras del clúster
-string[] names # classified_name de las caras del clúster
-int32[] indices # índices (en el array original) de las caras del clúster

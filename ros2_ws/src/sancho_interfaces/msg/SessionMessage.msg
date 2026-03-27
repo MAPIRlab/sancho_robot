@@ -1,0 +1,3 @@
+string faceprint_id
+float32 detection_score
+float32 classification_score

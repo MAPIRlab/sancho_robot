@@ -1,4 +1,0 @@
-openwakeword==0.6.0
-numpy==1.26.4
-# Si necesitas torch, descomenta y elige la build adecuada:
-# torch==2.3.1 --index-url https://download.pytorch.org/whl/cpu

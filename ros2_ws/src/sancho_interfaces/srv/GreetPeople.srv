@@ -1,0 +1,4 @@
+string[] ids
+string[] names
+---
+bool accepted

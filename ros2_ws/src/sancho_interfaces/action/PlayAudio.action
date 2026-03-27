@@ -1,0 +1,11 @@
+# Goal
+string filename  # Ruta o nombre del archivo de audio a reproducir
+
+---
+# Result
+bool success     # Indicador de éxito de la reproducción
+string message   # Mensaje adicional de resultado
+
+---
+# Feedback
+# (Opcional - dejar en blanco si no se necesita)

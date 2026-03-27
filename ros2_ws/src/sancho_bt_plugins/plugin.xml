@@ -1,0 +1,8 @@
+<library path="sancho_bt_plugins">
+  <class
+    name="sancho_bt_plugins::IsLocalizedCondition"
+    type="sancho_bt_plugins::IsLocalizedCondition"
+    base_class_type="BT::ConditionNode">
+    <description>Check if robot is localized</description>
+  </class>
+</library>

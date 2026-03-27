@@ -1,8 +1,0 @@
-depthimage_to_laserscan:
-  ros__parameters:
-    range_min: 0.4
-    range_max: 10.0
-    scan_time: 0.033
-    scan_height:  300               # Capas verticales sin techo/suelo
-    output_frame: "camera_link"     # El LaserScan será en este frame
-    use_sim_time: false
