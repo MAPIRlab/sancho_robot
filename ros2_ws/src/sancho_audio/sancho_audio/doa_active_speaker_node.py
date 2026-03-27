@@ -1,3 +1,4 @@
+import numpy as np
 import math
 import cv2
 import json
@@ -83,7 +84,7 @@ class DOAActiveSpeakerNode(Node):
         doa_deg = msg.data
         yaw_off = self.head_yaw_deg or 0.0
 
-        self.last_angle = float(doa_deg) + float(yaw_off)
+        self.last_angle = float(doa_deg) - float(yaw_off)
         self.last_audio_time = self.get_clock().now()
 
     def on_joint_states(self, msg: JointState):
@@ -137,7 +138,7 @@ class DOAActiveSpeakerNode(Node):
         if self.last_angle and self.fx and self.cx:
             angle_deg = max(-89.9, min(self.last_angle, 89.9))
             angle_rad = math.radians(angle_deg)
-            angle_x = int(self.cx + self.fx * math.tan(angle_rad)) # pinhole model
+            angle_x = int(self.cx - self.fx * math.tan(angle_rad)) # pinhole model
         
         return angle_x
 

@@ -63,7 +63,7 @@ def generate_launch_description():
         emulate_tty=True,
         parameters=[
             {'transcriptor_node': 'vad_transcriptor'},
-            {"mapirbot_url": "https://experiments-suspension-predictions-mid.trycloudflare.com/ask"}
+            {"mapirbot_url": "ws://warrant-cure-hostel-railway.trycloudflare.com/ws/robot"}
         ]
     )
 
