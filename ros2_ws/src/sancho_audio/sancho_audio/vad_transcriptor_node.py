@@ -3,16 +3,9 @@ from enum import Enum
 import numpy as np
 
 import rclpy
-<<<<<<< HEAD:sancho_ws/src/sancho_audio/sancho_audio/vad_transcriptor_node.py
-from rclpy.node import Node
-
-from std_msgs.msg import String
-from std_srvs.srv import SetBool
-=======
 from rclpy.lifecycle import LifecycleNode, State, TransitionCallbackReturn
 
 from std_msgs.msg import String
->>>>>>> refactor:ros2_ws/src/sancho_audio/sancho_audio/vad_transcriptor_node.py
 from sancho_interfaces.msg import ChunkMono
 from sancho_interfaces.srv import STT
 
@@ -33,11 +26,7 @@ class AudioState(int, Enum):
     END_AUDIO = 1
 
 
-<<<<<<< HEAD:sancho_ws/src/sancho_audio/sancho_audio/vad_transcriptor_node.py
-class VADTranscriptorNode(Node):
-=======
 class VADTranscriptorNode(LifecycleNode):
->>>>>>> refactor:ros2_ws/src/sancho_audio/sancho_audio/vad_transcriptor_node.py
     """
     Listens to the microphone when active, groups audio using VAD,
     and sends it to the STT service once the user finishes speaking.
@@ -59,18 +48,6 @@ class VADTranscriptorNode(LifecycleNode):
         self.previous_chunk = []
         self.start_listening_time = 0.0
         self.silence_timer = 0.0
-<<<<<<< HEAD:sancho_ws/src/sancho_audio/sancho_audio/vad_transcriptor_node.py
-        self._is_listening = False
-
-        mic_topic = self.get_parameter("mic_topic").get_parameter_value().string_value
-        transcription_topic = self.get_parameter("transcription_topic").get_parameter_value().string_value
-        criterion = self.get_parameter("vad_criterion").get_parameter_value().string_value
-        threshold = self.get_parameter("intensity_threshold").get_parameter_value().integer_value
-
-        if not IMPORTS_SUCCESSFUL:
-            self.get_logger().fatal(f"Could not import VAD models: {IMPORT_ERROR_MSG}")
-            raise RuntimeError("Missing dependencies. Node cannot initialize properly.")
-=======
         
         # Bandera para ignorar audio mientras esperamos respuesta del STT
         self._processing = False
@@ -88,45 +65,12 @@ class VADTranscriptorNode(LifecycleNode):
 
         criterion = self.get_parameter("vad_criterion").get_parameter_value().string_value
         threshold = self.get_parameter("intensity_threshold").get_parameter_value().integer_value
->>>>>>> refactor:ros2_ws/src/sancho_audio/sancho_audio/vad_transcriptor_node.py
 
         if criterion == "intensity":
             self.chunk_attach_criterion = IntensityAttachCriterion(threshold)
         elif criterion == "silero":
             self.chunk_attach_criterion = SileroVADAttachCriterion()
         else:
-<<<<<<< HEAD:sancho_ws/src/sancho_audio/sancho_audio/vad_transcriptor_node.py
-            error_msg = f"Unrecognized criterion: {criterion}"
-            self.get_logger().error(error_msg)
-            raise ValueError(error_msg)
-
-        self.transcription_pub = self.create_publisher(String, transcription_topic, 10)
-        self.mic_sub = self.create_subscription(ChunkMono, mic_topic, self.on_audio_chunk, 10)
-        self.stt_client = self.create_client(STT, 'sancho_hri/speech/stt')
-
-        self.enable_srv = self.create_service(SetBool, '~/enable_recording', self.enable_callback)
-
-        self.get_logger().info(f"{self.get_name()} initialized and ready.")
-
-    def enable_callback(self, request, response):
-        self._is_listening = request.data
-        if self._is_listening:
-            self.get_logger().info(">>> LISTENING FOR VOICE COMMAND <<<")
-            self.start_listening_time = time.time()
-            self.audio_state = AudioState.NO_AUDIO
-            self.audio_buffer = []
-            self.check_audio_buffer = []
-            self.previous_chunk = []
-            self.silence_timer = 0.0
-        else:
-            self.get_logger().info(">>> VAD TRANSCRIPTOR DEACTIVATED <<<")
-        
-        response.success = True
-        return response
-
-    def on_audio_chunk(self, msg: ChunkMono):
-        if not self._is_listening:
-=======
             self.get_logger().error(f"Unrecognized criterion: {criterion}")
             return TransitionCallbackReturn.FAILURE
 
@@ -166,7 +110,6 @@ class VADTranscriptorNode(LifecycleNode):
 
     def on_audio_chunk(self, msg: ChunkMono):
         if self._processing:
->>>>>>> refactor:ros2_ws/src/sancho_audio/sancho_audio/vad_transcriptor_node.py
             return
 
         new_audio = list([np.int16(x) for x in msg.chunk_mono])
@@ -180,11 +123,7 @@ class VADTranscriptorNode(LifecycleNode):
         if len(self.audio_buffer) == 0 and (time.time() - self.start_listening_time) > timeout:
             self.get_logger().warn("Timeout: No voice detected.")
             self._publish_transcription("")
-<<<<<<< HEAD:sancho_ws/src/sancho_audio/sancho_audio/vad_transcriptor_node.py
-            self._is_listening = False  # Auto-deactivate
-=======
             self._processing = True
->>>>>>> refactor:ros2_ws/src/sancho_audio/sancho_audio/vad_transcriptor_node.py
             return
 
         # VAD grouping logic
@@ -216,13 +155,8 @@ class VADTranscriptorNode(LifecycleNode):
             self.check_audio_buffer = []
 
         if self.audio_state == AudioState.END_AUDIO:
-<<<<<<< HEAD:sancho_ws/src/sancho_audio/sancho_audio/vad_transcriptor_node.py
-            self._process_stt(self.audio_buffer, sample_rate)
-            self._is_listening = False  # Auto-deactivate while processing
-=======
             self._processing = True
             self._process_stt(self.audio_buffer, sample_rate)
->>>>>>> refactor:ros2_ws/src/sancho_audio/sancho_audio/vad_transcriptor_node.py
 
     def _process_stt(self, audio_data, sample_rate):
         if not self.stt_client.wait_for_service(timeout_sec=1.0):

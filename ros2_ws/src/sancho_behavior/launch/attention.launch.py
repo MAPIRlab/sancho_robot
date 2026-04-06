@@ -37,9 +37,17 @@ def generate_launch_description():
         output='screen'
     )
 
+    configurator_node = Node(
+        package='sancho_lifecycle_utils',            
+        executable='node_configurator',          
+        name='tracker_configurator',
+        parameters=[{'activate': False, 'node_names': ['face_tracker_lifecycle']}]
+    )
+
     return LaunchDescription([
         person_recognition_launch,
         faces_cluster_node,
         face_tracker_node,
-        attention_manager_node
+        attention_manager_node,
+        configurator_node
     ])

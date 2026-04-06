@@ -1,32 +1,13 @@
-<<<<<<< HEAD:sancho_ws/src/sancho_behavior/sancho_behavior/interaction/attention_manager_node.py
-=======
 import os
->>>>>>> refactor:ros2_ws/src/sancho_behavior/sancho_behavior/interaction/attention_manager_node.py
 import math
 import rclpy
 from rclpy.node import Node
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
-<<<<<<< HEAD:sancho_ws/src/sancho_behavior/sancho_behavior/interaction/attention_manager_node.py
-
-from std_msgs.msg import Float32
-from geometry_msgs.msg import PoseStamped
-from lifecycle_msgs.srv import ChangeState
-from lifecycle_msgs.msg import Transition
-from tf_transformations import quaternion_from_euler
-
-# Mensajes de visión
-from sancho_interfaces.msg import FaceRecognitionArray
-from sancho_interfaces.srv import GetCentralFaceCluster
-
-# (NUEVO) Servicios de comunicación con el Dialog Manager
-# Asegúrate de haber definido estos .srv en tu paquete sancho_msgs
-from sancho_interfaces.srv import StartInteraction, EndInteraction, ForceAttention
-=======
 from rclpy.action import ActionClient
 from ament_index_python import get_package_share_directory
 
-from std_msgs.msg import Empty, Float32
+from std_msgs.msg import Empty, Float32, String
 from geometry_msgs.msg import PoseStamped
 from tf_transformations import quaternion_from_euler
 
@@ -34,7 +15,6 @@ from sancho_lifecycle_utils.lifecycle_client import ManagedLifecycleClient
 from sancho_interfaces.msg import FaceRecognitionArray
 from sancho_interfaces.srv import GetCentralFaceCluster, StartInteraction, EndInteraction
 from sancho_interfaces.action import PlayAudio
->>>>>>> refactor:ros2_ws/src/sancho_behavior/sancho_behavior/interaction/attention_manager_node.py
 
 # ============================================================================
 # MÁQUINA DE ESTADOS (BASE)
@@ -62,13 +42,6 @@ class AttentionState:
 class IdleState(AttentionState):
     def enter(self):
         self.manager.get_logger().info("[ESTADO] IDLE: Esperando estímulos...")
-<<<<<<< HEAD:sancho_ws/src/sancho_behavior/sancho_behavior/interaction/attention_manager_node.py
-        self.idle_time = 0.0
-
-    def execute(self):
-        # 1. ¿Vemos una cara por casualidad?
-        if self.manager.has_valid_faces():
-=======
         self.manager.hotword_lc.set_state(True)
         self.idle_time = 0.0
         
@@ -81,7 +54,6 @@ class IdleState(AttentionState):
         
         # 1. ¿Vemos una cara por casualidad? (Respetando el tiempo de gracia)
         if now > self.ignore_faces_until and self.manager.has_valid_faces():
->>>>>>> refactor:ros2_ws/src/sancho_behavior/sancho_behavior/interaction/attention_manager_node.py
             self.manager.get_logger().info("Cara detectada pasivamente. Investigando...")
             self.manager.transition_to(IdentifyUserState)
             return
@@ -119,11 +91,7 @@ class ScanningState(AttentionState):
         self.manager.rotate_head(angle)
         self.current_scan_idx += 1
         
-<<<<<<< HEAD:sancho_ws/src/sancho_behavior/sancho_behavior/interaction/attention_manager_node.py
-        # Esperar 2 segundos a que el cuello termine de girar (sin bloquear el hilo)
-=======
         # Esperar 2 segundos a que el cuello termine de girar
->>>>>>> refactor:ros2_ws/src/sancho_behavior/sancho_behavior/interaction/attention_manager_node.py
         self.waiting_for_rotation = True
         self.timer = self.manager.create_timer(2.0, self._on_rotation_done, callback_group=self.manager.cb_group)
 
@@ -132,15 +100,10 @@ class ScanningState(AttentionState):
         self.waiting_for_rotation = False
 
     def _cancel_timer(self):
-<<<<<<< HEAD:sancho_ws/src/sancho_behavior/sancho_behavior/interaction/attention_manager_node.py
-        if self.timer:
-            self.timer.cancel()
-=======
         # NUEVO: Prevenir memory leaks destruyendo el timer
         if hasattr(self, 'timer') and self.timer:
             self.timer.cancel()
             self.manager.destroy_timer(self.timer)
->>>>>>> refactor:ros2_ws/src/sancho_behavior/sancho_behavior/interaction/attention_manager_node.py
             self.timer = None
 
     def exit(self):
@@ -153,18 +116,10 @@ class OrientingState(AttentionState):
         self.manager.rotate_head(self.manager.target_angle)
         
         # Esperamos a que gire y miramos si hay alguien
-<<<<<<< HEAD:sancho_ws/src/sancho_behavior/sancho_behavior/interaction/attention_manager_node.py
-        self.timer = self.manager.create_timer(1.5, self._on_rotation_done, callback_group=self.manager.cb_group)
-
-    def _on_rotation_done(self):
-        if self.timer:
-            self.timer.cancel()
-=======
         self.timer = self.manager.create_timer(3.0, self._on_rotation_done, callback_group=self.manager.cb_group)
 
     def _on_rotation_done(self):
         self._cancel_timer()
->>>>>>> refactor:ros2_ws/src/sancho_behavior/sancho_behavior/interaction/attention_manager_node.py
         
         if self.manager.has_valid_faces():
             self.manager.transition_to(IdentifyUserState)
@@ -172,11 +127,6 @@ class OrientingState(AttentionState):
             self.manager.get_logger().info("Falsa alarma. No hay nadie en esa dirección.")
             self.manager.transition_to(IdleState)
 
-<<<<<<< HEAD:sancho_ws/src/sancho_behavior/sancho_behavior/interaction/attention_manager_node.py
-    def exit(self):
-        if hasattr(self, 'timer') and self.timer:
-            self.timer.cancel()
-=======
     def _cancel_timer(self):
         # NUEVO: Prevenir memory leaks destruyendo el timer
         if hasattr(self, 'timer') and self.timer:
@@ -186,7 +136,6 @@ class OrientingState(AttentionState):
 
     def exit(self):
         self._cancel_timer()
->>>>>>> refactor:ros2_ws/src/sancho_behavior/sancho_behavior/interaction/attention_manager_node.py
 
 
 class IdentifyUserState(AttentionState):
@@ -222,11 +171,7 @@ class IdentifyUserState(AttentionState):
                     filtered_names.append(name)
                 else:
                     self.manager.get_logger().debug(
-<<<<<<< HEAD:sancho_ws/src/sancho_behavior/sancho_behavior/interaction/attention_manager_node.py
-                        f"Descartando a '{name}' del grupo por baja confianza ({conf:.2f} < 0.8)"
-=======
                         f"Descartando a '{name}' del grupo por baja confianza ({conf:.2f} < {confidence_threshold})"
->>>>>>> refactor:ros2_ws/src/sancho_behavior/sancho_behavior/interaction/attention_manager_node.py
                     )
 
         return filtered_ids, filtered_names
@@ -246,22 +191,6 @@ class IdentifyUserState(AttentionState):
                     self.manager.transition_to(IdleState)
                     return
                 
-<<<<<<< HEAD:sancho_ws/src/sancho_behavior/sancho_behavior/interaction/attention_manager_node.py
-                # Check cooldown
-                now = self.manager.get_clock().now().nanoseconds / 1e9
-                all_in_cooldown = True
-                
-                for uid in filtered_ids:
-                    last_interaction_time = self.manager.user_cooldowns.get(uid, 0.0)
-                    if (now - last_interaction_time) >= self.manager.cooldown_seconds:
-                        all_in_cooldown = False
-                        break # There is at least one person without cooldown
-                
-                if all_in_cooldown:
-                    self.manager.get_logger().info(f"El grupo filtrado {filtered_names} está en cooldown. Ignorando.")
-                    self.manager.transition_to(IdleState)
-                    return
-=======
                 # If hotword is triggered, we ignore the cooldown
                 if not self.manager.hotword_triggered:
                     # Check cooldown
@@ -278,19 +207,21 @@ class IdentifyUserState(AttentionState):
                         self.manager.get_logger().info(f"El grupo filtrado {filtered_names} está en cooldown. Ignorando.")
                         self.manager.transition_to(IdleState)
                         return
->>>>>>> refactor:ros2_ws/src/sancho_behavior/sancho_behavior/interaction/attention_manager_node.py
                     
                 # Update targets
                 self.manager.target_ids = filtered_ids
                 self.manager.target_names = filtered_names
                 
-<<<<<<< HEAD:sancho_ws/src/sancho_behavior/sancho_behavior/interaction/attention_manager_node.py
-=======
                 # CORRECCIÓN: Hacemos referencia al manager, no a la clase local
                 self.manager.hotword_triggered = False 
                 
->>>>>>> refactor:ros2_ws/src/sancho_behavior/sancho_behavior/interaction/attention_manager_node.py
                 self.manager.get_logger().info(f"Objetivo fijado: {self.manager.target_names}")
+
+                # Publicar el ID principal al tracker
+                msg_id = String()
+                msg_id.data = self.manager.target_ids[0] # Cogemos a la persona principal del grupo
+                self.manager.tracker_target_pub.publish(msg_id)
+
                 self.manager.transition_to(EngagedState)
                 return  
                 
@@ -328,25 +259,16 @@ class EngagedState(AttentionState):
         self.request_sent = True
     
     def exit(self):
-<<<<<<< HEAD:sancho_ws/src/sancho_behavior/sancho_behavior/interaction/attention_manager_node.py
-        self.manager.set_face_tracker(False)
-=======
         self.manager.tracker_lc.set_state(False)
->>>>>>> refactor:ros2_ws/src/sancho_behavior/sancho_behavior/interaction/attention_manager_node.py
 
     def _on_interaction_started(self, future):
         response = future.result()
         if response.success:
-<<<<<<< HEAD:sancho_ws/src/sancho_behavior/sancho_behavior/interaction/attention_manager_node.py
-            self.manager.get_logger().info("¡Dialog Manager tomó el control! Manteniendo contacto visual...")
-            self.manager.set_face_tracker(True)
-=======
             self.manager.get_logger().info("¡Dialog Manager tomó el control! Manteniendo contacto visual y rearmando oídos...")
             self.manager.tracker_lc.set_state(True)
             
             # NUEVO: Rearmamos el hotword para que el robot sea interrumpible
             self.manager.hotword_lc.set_state(True)
->>>>>>> refactor:ros2_ws/src/sancho_behavior/sancho_behavior/interaction/attention_manager_node.py
         else:
             self.manager.get_logger().warn("Dialog Manager rechazó la interacción.")
             self.manager.transition_to(IdleState)
@@ -359,9 +281,6 @@ class AttentionManagerNode(Node):
     def __init__(self):
         super().__init__("attention_manager")
 
-<<<<<<< HEAD:sancho_ws/src/sancho_behavior/sancho_behavior/interaction/attention_manager_node.py
-        # Parametros
-=======
         try:
             audio_pkg_path = get_package_share_directory('sancho_audio')
             default_sound_path = os.path.join(audio_pkg_path, 'sounds', 'activation_sound.wav')
@@ -371,37 +290,10 @@ class AttentionManagerNode(Node):
 
         # Parameters
         self.declare_parameter("activation_sound_path", default_sound_path)
->>>>>>> refactor:ros2_ws/src/sancho_behavior/sancho_behavior/interaction/attention_manager_node.py
         self.declare_parameter("cooldown_seconds", 60.0)
 
         self.cb_group = ReentrantCallbackGroup()
 
-<<<<<<< HEAD:sancho_ws/src/sancho_behavior/sancho_behavior/interaction/attention_manager_node.py
-        # Variables de estado y contexto
-        self.current_state: AttentionState = None
-        self.recognitions = []
-        self.last_face_time = 0.0
-        self.target_angle = 0.0
-        self.target_ids = []
-        self.target_names = []
-        self.cooldown_seconds = self.get_parameter("cooldown_seconds").value
-        self.user_cooldowns = {}
-
-        # Publishers / Subscribers Sensoriales
-        self.head_pub = self.create_publisher(PoseStamped, "/head_goal", 10)
-        self.face_sub = self.create_subscription(FaceRecognitionArray, "/face_recognitions", self._face_cb, 10, callback_group=self.cb_group)
-
-        # Clientes de Servicio (Hacia otros nodos)
-        self.central_cluster_client = self.create_client(GetCentralFaceCluster, "/central_faces_cluster_node/get_central_cluster", callback_group=self.cb_group)
-        self.start_interaction_client = self.create_client(StartInteraction, "/dialog_manager/start_interaction", callback_group=self.cb_group)
-        self.tracker_client = self.create_client(ChangeState, "/face_tracker_lifecycle/change_state", callback_group=self.cb_group)
-
-        # Servidores de Servicio (Para que el Dialog Manager nos llame a nosotros)
-        self.end_interaction_srv = self.create_service(EndInteraction, "~/interaction_finished", self._interaction_finished_cb, callback_group=self.cb_group)
-        self.force_attention_srv = self.create_service(ForceAttention, "~/force_attention", self._force_attention_cb, callback_group=self.cb_group)
-
-        # Bucle principal de la Máquina de Estados (10 Hz)
-=======
         # State variables
         self.current_state: AttentionState = None
 
@@ -425,6 +317,7 @@ class AttentionManagerNode(Node):
         self.hotword_sub = self.create_subscription(Empty, "/voice_events/hotword_detected", self._hotword_cb, 10, callback_group=self.cb_group)
         self.doa_sub = self.create_subscription(Float32, "/sancho_audio/doa", self._doa_cb, 10, callback_group=self.cb_group)
         self.head_pub = self.create_publisher(PoseStamped, "/head_goal", 10)
+        self.tracker_target_pub = self.create_publisher(String, "/face_tracker/set_target", 10)
 
         # Clients
         self.central_cluster_client = self.create_client(GetCentralFaceCluster, "/central_faces_cluster_node/get_central_cluster", callback_group=self.cb_group)
@@ -439,19 +332,11 @@ class AttentionManagerNode(Node):
         self.end_interaction_srv = self.create_service(EndInteraction, "~/interaction_finished", self._interaction_finished_cb, callback_group=self.cb_group)
 
         # State Machine main loop (10 Hz)
->>>>>>> refactor:ros2_ws/src/sancho_behavior/sancho_behavior/interaction/attention_manager_node.py
         self.transition_to(IdleState)
         self.main_timer = self.create_timer(0.1, self._run_state, callback_group=self.cb_group)
 
         self.get_logger().info("Attention Manager inicializado y listo.")
 
-<<<<<<< HEAD:sancho_ws/src/sancho_behavior/sancho_behavior/interaction/attention_manager_node.py
-    # --- Callbacks de Sensores ---
-    def _face_cb(self, msg: FaceRecognitionArray):
-        self.recognitions = msg.recognitions
-        self.last_face_time = self.get_clock().now().nanoseconds / 1e9
-
-=======
     def _face_cb(self, msg: FaceRecognitionArray):
         """Keeps last recognition message updated"""
         self.recognitions = msg.recognitions
@@ -490,7 +375,6 @@ class AttentionManagerNode(Node):
         self.get_logger().info(f"Pidiendo reproducción de {goal_msg.filename}...")
         self.audio_client.send_goal_async(goal_msg)
 
->>>>>>> refactor:ros2_ws/src/sancho_behavior/sancho_behavior/interaction/attention_manager_node.py
     def has_valid_faces(self):
         now = self.get_clock().now().nanoseconds / 1e9
         if (now - self.last_face_time) > 1.0:
@@ -499,25 +383,6 @@ class AttentionManagerNode(Node):
 
         return self.recognitions and len(self.recognitions) > 0
 
-<<<<<<< HEAD:sancho_ws/src/sancho_behavior/sancho_behavior/interaction/attention_manager_node.py
-    def set_face_tracker(self, enable: bool):
-        """Activa o desactiva el nodo de seguimiento facial mediante Lifecycle."""
-        if not self.tracker_client.wait_for_service(timeout_sec=1.0):
-            self.get_logger().warn("Servicio Lifecycle del Face Tracker no disponible.")
-            return
-
-        req = ChangeState.Request()
-        if enable:
-            self.get_logger().info("Activando Face Tracker...")
-            req.transition.id = Transition.TRANSITION_ACTIVATE
-        else:
-            self.get_logger().info("Desactivando Face Tracker...")
-            req.transition.id = Transition.TRANSITION_DEACTIVATE
-
-        self.tracker_client.call_async(req)
-
-=======
->>>>>>> refactor:ros2_ws/src/sancho_behavior/sancho_behavior/interaction/attention_manager_node.py
     def rotate_head(self, angle_deg: float):
         angle_rad = max(min(math.radians(angle_deg), math.radians(100.0)), math.radians(-100.0))
         q = quaternion_from_euler(0.0, math.radians(-30.0), angle_rad) # Asume tilt -30
@@ -532,24 +397,9 @@ class AttentionManagerNode(Node):
 
         self.head_pub.publish(msg)
 
-<<<<<<< HEAD:sancho_ws/src/sancho_behavior/sancho_behavior/interaction/attention_manager_node.py
-    # --- Callbacks de Comunicación con Dialog Manager ---
-    def _force_attention_cb(self, request, response):
-        """Llamado cuando el humano grita '¡Sancho!' (Inicia interacción Reactiva)."""
-        self.get_logger().warn(f"¡Reclamo de atención! Girando de urgencia a {request.tdoa_angle}°")
-        self.target_angle = request.tdoa_angle
-        self.transition_to(OrientingState)
-        
-        response.success = True
-        return response
-
-    def _interaction_finished_cb(self, request, response):
-        """Llamado cuando el humano se despide o el LLM corta la charla."""
-=======
     # --- Communication Callback with Dialog Manager ---
     def _interaction_finished_cb(self, request, response):
         """Called when conversation is over"""
->>>>>>> refactor:ros2_ws/src/sancho_behavior/sancho_behavior/interaction/attention_manager_node.py
         self.get_logger().info(f"El Dialog Manager ha terminado la interacción. Motivo: {request.reason}")
 
         now = self.get_clock().now().nanoseconds / 1e9
@@ -562,16 +412,14 @@ class AttentionManagerNode(Node):
         response.success = True
         return response
 
-<<<<<<< HEAD:sancho_ws/src/sancho_behavior/sancho_behavior/interaction/attention_manager_node.py
-    # --- Motor de la Máquina de Estados ---
-=======
     # --- State Machine Motor ---
->>>>>>> refactor:ros2_ws/src/sancho_behavior/sancho_behavior/interaction/attention_manager_node.py
     def transition_to(self, state_class):
         if self.current_state:
             self.current_state.exit()
-        self.current_state = state_class(self)
-        self.current_state.enter()
+        
+        new_state = state_class(self)
+        new_state.enter()
+        self.current_state = new_state
 
     def _run_state(self):
         if self.current_state:
