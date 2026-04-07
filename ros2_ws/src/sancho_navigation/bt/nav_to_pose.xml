@@ -31,11 +31,11 @@
           </PathLongerOnApproach>
 
           <RecoveryNode name="FollowPathRecovery" number_of_retries="6">
-            <Fallback name="ControlStrategyFallback">
+            <ReactiveFallback name="ControlStrategyFallback">
               <FollowPath controller_id="GeneralMPPI" path="{path}"/>
               
               <FollowPath controller_id="TightRPP" path="{path}"/>
-            </Fallback>
+            </ReactiveFallback>
             
             <ClearEntireCostmap name="ClearLocalCostmap-Context" 
                                 service_name="local_costmap/clear_entirely_local_costmap"/>
