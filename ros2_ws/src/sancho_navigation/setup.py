@@ -19,7 +19,7 @@ setup(
         (os.path.join("share", package_name, "masks"), glob("masks/*")),
         (os.path.join("share", package_name, "bt"), glob("bt/*")),
     ],
-    install_requires=['setuptools', 'numpy', 'cvxopt'],
+    install_requires=['setuptools', 'numpy'],
     zip_safe=True,
     maintainer='antbaena',
     maintainer_email='antbaena@uma.es',
@@ -29,8 +29,6 @@ setup(
     entry_points={
         'console_scripts': [
             'roaming_node = sancho_navigation.roaming_node:main',
-            'sancho_cbf_node = sancho_navigation.sancho_cbf_node:main',
-            'semantic_scan_filter = sancho_navigation.semantic_scan_filter:main',
         ],
     },
 )

@@ -140,6 +140,17 @@ def generate_launch_description():
                 emulate_tty=True,
                 respawn=use_respawn,
             ),
+
+            Node(
+                package="nav2_map_server",
+                executable="costmap_filter_info_server",
+                name="costmap_filter_info_server",
+                parameters=[planner_params_path],
+                output="screen",
+                prefix=prefix_cmd,
+                emulate_tty=True,
+                respawn=use_respawn,
+            ),
             
             # --- Controller ---
             Node(
@@ -189,18 +200,6 @@ def generate_launch_description():
         ]
     )
 
-    semantic_scan_node = Node(
-        package="sancho_navigation", 
-        executable="semantic_scan_filter",
-        name="semantic_scan_filter",
-        remappings=[
-            ("/scan_persistent", "/scan_persistent"),
-            ("/scan_non_persistent", "/scan_non_persistent"),
-        ],
-        output="screen",
-        respawn=use_respawn,
-    )
-
     depth_scan_node = Node(
         package="depthimage_to_laserscan",
         executable="depthimage_to_laserscan_node",
@@ -226,6 +225,5 @@ def generate_launch_description():
         declare_map_yaml_cmd,
         declare_bt_xml_cmd,
         nav2_nodes,
-        depth_scan_node,
-        semantic_scan_node
+        depth_scan_node
     ])

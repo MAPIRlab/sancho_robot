@@ -155,17 +155,13 @@ class RoamingNode(Node):
         )
 
     def handle_set_home(self, request, response):
-        """Servicio que fija la posición de Home si es alcanzable."""
+        """Servicio que asíncronamente valida y fija la posición de Home."""
         new_home = request.home
-        # Validar con ComputePathToPose
-        if not self.path_action_client.wait_for_server(
-            timeout_sec=self.compute_path_timeout
-        ):
+        if not self.path_action_client.wait_for_server(timeout_sec=0.2):
             response.success = False
             response.message = "ComputePathToPose server no disponible."
             return response
 
-        # Construir goal de path desde la posición actual
         start = self._get_current_pose()
         if start is None:
             response.success = False
@@ -176,26 +172,48 @@ class RoamingNode(Node):
         path_goal.start = start
         path_goal.goal = new_home
 
-        send = self.path_action_client.send_goal_async(path_goal)
-        rclpy.spin_until_future_complete(
-            self, send, timeout_sec=self.compute_path_timeout
+        send_future = self.path_action_client.send_goal_async(path_goal)
+        send_future.add_done_callback(
+            lambda fut: self._on_home_path_goal_sent(fut, new_home)
         )
-        if not send.done() or not send.result().accepted:
-            response.success = False
-            response.message = "Home no es alcanzable (path rechazado)."
-            return response
-        get_res = send.result().get_result_async()
-        rclpy.spin_until_future_complete(
-            self, get_res, timeout_sec=self.compute_path_timeout
-        )
-        if get_res.result().result.path.poses:
-            self.home = new_home
-            response.success = True
-            response.message = "Home configurado correctamente."
-        else:
-            response.success = False
-            response.message = "Home no es alcanzable (sin path)."
+
+        response.success = True
+        response.message = "Validación de ruta iniciada asíncronamente."
         return response
+
+    def _on_home_path_goal_sent(self, future, new_home):
+        try:
+            handle = future.result()
+        except Exception as e:
+            self.get_logger().warn(f"Set Home: Error de Future: {e}")
+            return
+            
+        if not handle or not handle.accepted:
+            self.get_logger().warn("Set Home: Path rechazado, meta ignorada.")
+            return
+
+        result_future = handle.get_result_async()
+        result_future.add_done_callback(
+            lambda fut: self._on_home_path_result(fut, new_home)
+        )
+
+    def _on_home_path_result(self, future, new_home):
+        try:
+            result_msg = future.result()
+        except Exception:
+            self.get_logger().warn("Set Home: Validación de ruta fallida.")
+            return
+            
+        if not result_msg or not hasattr(result_msg, "result"):
+            self.get_logger().warn("Set Home: Falló validación de ruta (sin resultado).")
+            return
+            
+        path = result_msg.result.path
+        if len(path.poses) >= 2:
+            self.home = new_home
+            self.get_logger().info("Set Home: Validado y fijado correctamente.")
+        else:
+            self.get_logger().warn("Set Home: Meta inalcanzable, descartado.")
 
     def _get_current_pose(self):
         """Devuelve PoseStamped de la posición actual en frame_id, o None."""
@@ -261,13 +279,7 @@ class RoamingNode(Node):
         self.get_logger().info("Generando nueva meta aleatoria...")
         self._start_async_random_pose_generation()
 
-        # pose = self._generate_valid_random_pose()
-        # if pose:
-        #     goal = NavigateToPose.Goal()
-        #     goal.pose = pose
-        #     self._send_goal(goal)
-        # else:
-        #     self.get_logger().warn("No se generó pose válida.")
+        # Se invoca la generación asíncrona validada, descartando métodos sincrónicos.
 
     def _start_async_random_pose_generation(self):
         """Arranca una tanda de intentos asíncronos de validación de path."""
@@ -447,129 +459,7 @@ class RoamingNode(Node):
             length += math.hypot(dx, dy)
         return length
 
-    def _generate_valid_random_pose(self):
-        # Obtener pose actual
-        if self.home is not None:
-            start = self._get_current_pose()
 
-        for _ in range(self.max_attempts):
-            # Generación local o global según parámetro
-            if self.use_local_window:
-                # Ventana relativa
-                min_x = start.pose.position.x - self.local_range_x
-                max_x = start.pose.position.x + self.local_range_x
-                min_y = start.pose.position.y - self.local_range_y
-                max_y = start.pose.position.y + self.local_range_y
-            else:
-                # Ventana global configurable (mantener min/max originales si
-                # se desean)
-                min_x = self.get_parameter(
-                    "frame_id"
-                ).value  # placeholder si se implementa global
-                max_x = min_x
-                min_y = self.get_parameter("frame_id").value
-                max_y = min_y
-            x = random.uniform(min_x, max_x)
-            y = random.uniform(min_y, max_y)
-            yaw = random.uniform(-math.pi, math.pi)
-
-            goal = PoseStamped()
-            goal.header.frame_id = self.frame_id
-            goal.header.stamp = self.get_clock().now().to_msg()
-            goal.pose.position.x = x
-            goal.pose.position.y = y
-            goal.pose.position.z = 0.0
-            q = quaternion_from_euler(0, 0, yaw)
-            goal.pose.orientation.x = q[0]
-            goal.pose.orientation.y = q[1]
-            goal.pose.orientation.z = q[2]
-            goal.pose.orientation.w = q[3]
-
-            key = (round(x, 2), round(y, 2))
-            if key in self.recent_goals:
-                continue
-
-            # Calcular ruta para validar
-            if not self.path_action_client.wait_for_server(
-                timeout_sec=self.compute_path_timeout
-            ):
-                self.get_logger().error(
-                    "Action server compute_path_to_pose no disponible."
-                )
-                return None
-            path_goal = ComputePathToPose.Goal()
-
-            # calcular ángulo del robot hacia la meta
-            dx = goal.pose.position.x - start.pose.position.x
-            dy = goal.pose.position.y - start.pose.position.y
-            yaw_to_goal = math.atan2(dy, dx)
-
-            # actualizar la orientación del "start" pose
-            q = quaternion_from_euler(0, 0, yaw_to_goal)
-            start.pose.orientation.x = q[0]
-            start.pose.orientation.y = q[1]
-            start.pose.orientation.z = q[2]
-            start.pose.orientation.w = q[3]
-
-            goal.pose.orientation = start.pose.orientation
-
-            path_goal.start = start
-            path_goal.goal = goal
-            send_fut = self.path_action_client.send_goal_async(path_goal)
-            rclpy.spin_until_future_complete(
-                self, send_fut, timeout_sec=self.compute_path_timeout
-            )
-            if not send_fut.done():
-                self.get_logger().warn("Timeout al enviar ComputePathToPose.")
-                continue
-            handle = send_fut.result()
-            if not handle.accepted:
-                self.get_logger().warn("ComputePathToPose rechazado.")
-                continue
-            result_fut = handle.get_result_async()
-            rclpy.spin_until_future_complete(
-                self, result_fut, timeout_sec=self.compute_path_timeout
-            )
-            if result_fut.result() is None:
-                self.get_logger().warn("ComputePathToPose no devolvió resultado.")
-                continue
-
-            result_msg = result_fut.result()
-            if not hasattr(result_msg, "result"):
-                self.get_logger().warn(
-                    'El resultado de ComputePathToPose no contiene un campo "result".'
-                )
-                continue
-
-            path = result_msg.result.path
-
-            num_segments = len(path.poses)
-            self.get_logger().debug(f"Path segments: {num_segments}")
-            if num_segments < 2:
-                self.get_logger().info("Pose descartada: sin trayectoria válida.")
-                continue
-
-            length = 0.0
-            for i in range(num_segments - 1):
-                dx = path.poses[i + 1].pose.position.x - path.poses[i].pose.position.x
-                dy = path.poses[i + 1].pose.position.y - path.poses[i].pose.position.y
-                length += math.hypot(dx, dy)
-
-            if length <= self.min_path_length or length > self.max_path_length:
-                self.get_logger().info(
-                    f"Pose descartada: longitud inválida ({length:.2f}m)"
-                )
-                continue
-
-            # Aceptar meta válida
-            self.recent_goals.append(key)
-            if len(self.recent_goals) > self.history_size:
-                self.recent_goals.pop(0)
-            self.get_logger().info(
-                f"Pose aceptada: x={x:.2f}, y={y:.2f}, length={length:.2f}m dentro de ventana local"
-            )
-            return goal
-        return None
 
     def _send_goal(self, goal_msg):
         if not self.nav_action_client.wait_for_server(timeout_sec=5.0):
