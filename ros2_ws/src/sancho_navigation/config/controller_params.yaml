@@ -39,7 +39,7 @@ controller_server:
       angular_dist_threshold: 1.20         
       angular_disengage_threshold: 0.10    
       rotate_to_heading_angular_vel: 1.5   
-      max_angular_accel: 1.0               
+      max_angular_accel: 3.0               
       simulate_ahead_time: 0.0             
       rotate_to_goal_heading: true        
 
@@ -154,7 +154,7 @@ controller_server:
       angular_dist_threshold: 0.5  # Se activa con menos error para asegurar alineación perfecta
       angular_disengage_threshold: 0.05
       rotate_to_heading_angular_vel: 1.0 # Rotación más lenta y precisa
-      max_angular_accel: 0.5
+      max_angular_accel: 1.0
       simulate_ahead_time: 0.0
       rotate_to_goal_heading: true
 
