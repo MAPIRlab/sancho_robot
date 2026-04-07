@@ -33,6 +33,8 @@ def generate_launch_description():
 
     lifecycle_nodes = [
         "map_server",
+        "filter_mask_server",
+        "costmap_filter_info_server",
         "amcl",
         "planner_server",
         "controller_server",
@@ -141,13 +143,27 @@ def generate_launch_description():
                 respawn=use_respawn,
             ),
 
+            # --- Keepout Mask Server (The Image) ---
+            Node(
+                package="nav2_map_server",
+                executable="map_server",
+                name="filter_mask_server",
+                parameters=[{'yaml_filename': os.path.join(pkg_share, 'maps', 'module2.3_keepout.yaml')}],
+                remappings=[('map', 'keepout_filter_mask')],
+                output="screen",
+                prefix=prefix_cmd,
+                emulate_tty=True,
+                respawn=use_respawn,
+            ),
+            
+            # --- Costmap Filter Info Server (The Rules) ---
             Node(
                 package="nav2_map_server",
                 executable="costmap_filter_info_server",
                 name="costmap_filter_info_server",
-                parameters=[planner_params_path],
+                parameters=[planner_params_path], 
                 output="screen",
-                prefix=prefix_cmd,
+                prefix=prefix_cmd, 
                 emulate_tty=True,
                 respawn=use_respawn,
             ),
