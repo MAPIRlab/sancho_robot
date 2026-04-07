@@ -1,0 +1,12 @@
+# GOAL
+float32 target_angle_deg   # Ángulo objetivo en grados
+float32 timeout_sec        # Tiempo máximo permitido antes de abortar (ej. 5.0)
+---
+# RESULT
+bool success               # True si llegó, False si hubo timeout o se canceló
+string message             # Información adicional ("Llegó bien", "Timeout", etc.)
+float32 final_angle_deg    # El ángulo en el que se quedó finalmente
+---
+# FEEDBACK
+float32 current_angle_deg  # Por dónde va en este instante
+float32 distance_remaining # Cuántos grados le faltan

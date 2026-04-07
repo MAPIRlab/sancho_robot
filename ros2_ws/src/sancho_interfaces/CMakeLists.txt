@@ -48,10 +48,6 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/VADSegment.msg"
   "srv/StartInteraction.srv"
   "srv/EndInteraction.srv"
-<<<<<<< HEAD:sancho_ws/src/sancho_interfaces/CMakeLists.txt
-  "srv/ForceAttention.srv"
-=======
->>>>>>> refactor:ros2_ws/src/sancho_interfaces/CMakeLists.txt
   "srv/AskUser.srv"
   "srv/Detection.srv"
   "srv/Embedding.srv"
@@ -84,6 +80,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/Training.srv"
   "srv/TriggerUserInteraction.srv"
   "action/PlayAudio.action"
+  "action/RotateHead.action"
   DEPENDENCIES geometry_msgs sensor_msgs std_msgs action_msgs
 )
 

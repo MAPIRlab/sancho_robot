@@ -25,6 +25,7 @@ setup(
     entry_points={
         'console_scripts': [
             'head_control_face_tracker = sancho_control.head_control_face_tracker_node:main',
+            'head_action_server = sancho_control.head_action_server:main'
         ],
     },
 )
