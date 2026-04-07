@@ -2,7 +2,7 @@ head_controller_node:
   ros__parameters:
     idle_move_min_interval: 10.0
     idle_move_max_interval: 20.0
-    pan_limit: [-1.0, 1.0]
+    pan_limit: [-1.56, 1.56]
     tilt_limit: [-0.30, 0.0]
     tolerance: 0.001
     tracking_timeout: 5.0

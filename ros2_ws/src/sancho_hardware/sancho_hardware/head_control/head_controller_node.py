@@ -89,6 +89,7 @@ class HRIHeadNode(Node):
         self.declare_parameter("tracking_topic", "/head_goal")
         self.declare_parameter("profile_velocity", 2400)
         self.declare_parameter("profile_acceleration", 300)
+        self.declare_parameter("auto_move_enabled", True)
 
         self.idle_min = self.get_parameter("idle_move_min_interval").value
         self.idle_max = self.get_parameter("idle_move_max_interval").value
@@ -104,6 +105,7 @@ class HRIHeadNode(Node):
         tracking_topic = self.get_parameter("tracking_topic").value
         self.profile_velocity = self.get_parameter("profile_velocity").value
         self.profile_acceleration = self.get_parameter("profile_acceleration").value
+        self.auto_move_enabled = self.get_parameter("auto_move_enabled").value
 
         # Variables de estado
         self.state = State.IDLE
@@ -208,6 +210,8 @@ class HRIHeadNode(Node):
             self.tracking_timer = None
 
     def move_head(self, pan: float, tilt: float):
+        pan_limits = self.get_parameter("pan_limit").value
+        self.pan_min, self.pan_max = pan_limits
         pan = np.clip(pan, self.pan_min, self.pan_max)
         tilt = np.clip(tilt, self.tilt_min, self.tilt_max)
         
@@ -218,6 +222,8 @@ class HRIHeadNode(Node):
         self.get_logger().debug(f"Publishing head command: [{pan:.2f}, {tilt:.2f}]")
 
     def update(self):
+        if not self.auto_move_enabled:
+            return
         now = self.get_clock().now()
         if self.state == State.IDLE:
             elapsed = (now - self.last_idle_move_time).nanoseconds * 1e-9
