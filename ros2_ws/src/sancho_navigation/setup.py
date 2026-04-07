@@ -16,6 +16,7 @@ setup(
         (os.path.join("share", package_name, "launch"), glob("launch/*")),
         (os.path.join("share", package_name, "config"), glob("config/*")),
         (os.path.join("share", package_name, "maps"), glob("maps/*")),
+        (os.path.join("share", package_name, "masks"), glob("masks/*")),
         (os.path.join("share", package_name, "bt"), glob("bt/*")),
     ],
     install_requires=['setuptools', 'numpy', 'cvxopt'],
