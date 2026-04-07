@@ -14,11 +14,7 @@ def generate_launch_description():
                 name="slam_toolbox",
                 output="screen",
                 parameters=[
-<<<<<<< HEAD
                     {"use_sim_time": False, "scan_topic": "/scan_merged"}
-=======
-                    {"use_sim_time": False, "scan_topic": "/scan_merged", "mode": "mapping"}
->>>>>>> bea245f (Fix typo in map creation launch file)
                 ],
             )
         ]
