@@ -14,7 +14,8 @@ setup(
         ('share/ament_index/resource_index/packages', ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
         (os.path.join('share', package_name, 'launch'), glob('launch/*.launch.py')),
-        (os.path.join('share', package_name, 'sounds'), glob(package_name + '/sounds/*.wav'))
+        (os.path.join('share', package_name, 'sounds'), glob(package_name + '/sounds/*.wav')),
+        (os.path.join('share', package_name, 'utils', 'models'), glob(package_name + '/utils/models/*.onnx'))
     ],
     install_requires=['setuptools'],
     zip_safe=True,
