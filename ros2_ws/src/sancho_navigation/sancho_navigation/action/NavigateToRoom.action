@@ -1,0 +1,6 @@
+string room_label
+---
+bool success
+string message
+---
+string status

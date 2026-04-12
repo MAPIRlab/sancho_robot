@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<root main_tree_to_execute="NavigateToRoomTree" BTCPP_format="3">
+  <BehaviorTree ID="NavigateToRoomTree">
+    <Sequence name="NavigateSequence">
+      <InputPort name="room_label" default="room_a"/>
+      <NavigateToRoom room_label="{room_label}"/>
+    </Sequence>
+  </BehaviorTree>
+</root>

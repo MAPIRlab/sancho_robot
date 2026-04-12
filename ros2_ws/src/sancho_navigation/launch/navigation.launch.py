@@ -228,7 +228,26 @@ def generate_launch_description():
         ],
         output="screen",
     )
-
+    topology_localizer_node = Node(
+        package='sancho_navigation',
+        executable='topology_localizer',
+        name='topology_localizer',
+        parameters=[{'topology_file': os.path.join(pkg_share, 'maps', 'topology.yaml')}],
+        output='screen',
+        prefix=prefix_cmd,
+        emulate_tty=True,
+        respawn=use_respawn,
+    )
+    navigate_to_room_server_node = Node(
+        package='sancho_navigation',
+        executable='navigate_to_room_server',
+        name='navigate_to_room_server',
+        parameters=[{'topology_file': os.path.join(pkg_share, 'maps', 'topology.yaml')}],
+        output='screen',
+        prefix=prefix_cmd,
+        emulate_tty=True,
+        respawn=use_respawn,
+    )
     return LaunchDescription([
         DeclareLaunchArgument(
             'prefix',
