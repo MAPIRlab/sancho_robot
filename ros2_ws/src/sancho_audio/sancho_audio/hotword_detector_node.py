@@ -25,9 +25,6 @@ class HotwordDetectorNode(LifecycleNode):
         self.hotword_detector = None
         self._mic_sub = None
         self._event_pub = None
-        
-        # Bandera para evitar re-detectar el eco antes de que el manager nos desactive
-        self._detected = False
 
     def on_configure(self, state: State) -> TransitionCallbackReturn:
         try:
@@ -44,7 +41,6 @@ class HotwordDetectorNode(LifecycleNode):
 
     def on_activate(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info(">>> HOTWORD DETECTOR ACTIVATED <<<")
-        self._detected = False
         
         # Nos suscribimos al micrófono solo cuando estamos activos
         mic_topic = self.get_parameter("mic_topic").get_parameter_value().string_value
@@ -69,18 +65,12 @@ class HotwordDetectorNode(LifecycleNode):
         return TransitionCallbackReturn.SUCCESS
 
     def on_audio_chunk(self, msg: ChunkMono):
-        if self._detected:
-            return
-
         new_audio = list([np.int16(x) for x in msg.chunk_mono])
         sample_rate = msg.sample_rate
 
         if self.hotword_detector.detect(new_audio, sample_rate):
             self.get_logger().info("¡Hotword detected!")
             self._event_pub.publish(Empty())
-            
-            # Bloqueamos internamente hasta que el manager llame a Deactivate
-            self._detected = True
 
 
 def main(args=None):

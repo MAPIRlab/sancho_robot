@@ -1,0 +1,10 @@
+# GOAL
+float32 absolute_target_angle_deg
+---
+# RESULT
+bool success        # True si terminó con éxito
+string message      # Información adicional ("Llegó bien", "Timeout", etc.)
+---
+# FEEDBACK
+float32 current_base_angle_deg
+float32 distance_remaining

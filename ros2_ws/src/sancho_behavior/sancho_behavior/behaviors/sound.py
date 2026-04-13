@@ -5,39 +5,55 @@ import py_trees_ros
 from py_trees.blackboard import Client
 
 from nav2_msgs.action import Spin
-from sancho_interfaces.action import RotateHead
+
+from sancho_interfaces.action import RotateHead, TurnToAngle
 
 class IsAngleFar(py_trees.behaviour.Behaviour):
-    def __init__(self, name="IsAngleFar", limit=90.0):
+    def __init__(self, name="IsAngleFar?"):
         super().__init__(name)
-        self.limit = limit
         self.blackboard = Client(name=self.name)
+        self.blackboard.register_key(key="config/far_angle_limit", access=py_trees.common.Access.READ)
         self.blackboard.register_key(key="target_angle", access=py_trees.common.Access.READ)
+
+        self.limit = self.blackboard.get("config/far_angle_limit") if self.blackboard.exists("config/far_angle_limit") else 90.0
+    
     def update(self):
         angle = self.blackboard.target_angle if self.blackboard.exists("target_angle") else 0.0
+
         return py_trees.common.Status.SUCCESS if abs(angle) > self.limit else py_trees.common.Status.FAILURE
 
-class LockAngle(py_trees.behaviour.Behaviour):
-    """Nodo síncrono que congela el ángulo justo en el momento en que se activa."""
-    def __init__(self, name="LockAngle"):
+class LockTarget(py_trees.behaviour.Behaviour):
+    """Saves target angle (relative and absolute) to blackboard"""
+    def __init__(self, name="LockTarget"):
         super().__init__(name)
         self.blackboard = Client(name=self.name)
-        # Leemos el ángulo en vivo del sensor
         self.blackboard.register_key(key="last_angle", access=py_trees.common.Access.READ)
-        # Escribimos en una variable segura
+        self.blackboard.register_key(key="current_base_angle", access=py_trees.common.Access.READ)
+        
         self.blackboard.register_key(key="target_angle", access=py_trees.common.Access.WRITE)
+        self.blackboard.register_key(key="absolute_target_angle", access=py_trees.common.Access.WRITE)
         self.node = None
 
     def setup(self, **kwargs):
         self.node = kwargs['node']
 
     def update(self):
-        # Tomamos la "foto" del ángulo actual
-        angle = self.blackboard.last_angle if self.blackboard.exists("last_angle") else 0.0
-        self.blackboard.target_angle = angle
+        relative_doa = self.blackboard.last_angle if self.blackboard.exists("last_angle") else 0.0
+        current_base = self.blackboard.current_base_angle if self.blackboard.exists("current_base_angle") else 0.0
         
-        if self.node:
-            self.node.get_logger().info(f"Ángulo congelado en {angle:.2f} grados. Ignorando ruido de motores.")
+        # Relative angle
+        self.blackboard.target_angle = relative_doa
+        
+        # Absolute target
+        abs_target = current_base + relative_doa
+        
+        # Normalize between -180 and 180 degrees
+        abs_target_norm = math.degrees(math.atan2(
+            math.sin(math.radians(abs_target)), 
+            math.cos(math.radians(abs_target))
+        ))
+        
+        self.blackboard.absolute_target_angle = abs_target_norm
             
         return py_trees.common.Status.SUCCESS
 
@@ -50,6 +66,7 @@ class SpinBaseToSound(py_trees_ros.action_clients.FromBlackboard):
             key="spin_goal"
         )
         self.blackboard.register_key("target_angle", access=py_trees.common.Access.READ)
+        self.blackboard.register_key("spin_goal", access=py_trees.common.Access.WRITE)
     
     def initialise(self):
         angle_deg = self.blackboard.target_angle if self.blackboard.exists("target_angle") else 0.0
@@ -62,7 +79,7 @@ class SpinBaseToSound(py_trees_ros.action_clients.FromBlackboard):
         super().initialise()
 
 class RotateHeadToSound(py_trees_ros.action_clients.FromBlackboard):
-    def __init__(self, name="SpinBaseToSound"):
+    def __init__(self, name="RotateHeadToSound"):
         super().__init__(
             name=name,
             action_type=RotateHead,
@@ -70,6 +87,7 @@ class RotateHeadToSound(py_trees_ros.action_clients.FromBlackboard):
             key="head_goal"
         )
         self.blackboard.register_key("target_angle", access=py_trees.common.Access.READ)
+        self.blackboard.register_key("head_goal", access=py_trees.common.Access.WRITE)
     
     def initialise(self):
         angle_deg = self.blackboard.target_angle if self.blackboard.exists("target_angle") else 0.0
@@ -80,3 +98,23 @@ class RotateHeadToSound(py_trees_ros.action_clients.FromBlackboard):
         self.blackboard.head_goal = goal
         
         super().initialise()
+
+class TurnToSound(py_trees_ros.action_clients.FromBlackboard):
+    def __init__(self, name="TurnToSound"):
+        super().__init__(
+            name=name,
+            action_type=TurnToAngle,
+            action_name='/attention_controller/turn_to_angle',
+            key='turn_goal'
+        )
+        self.blackboard.register_key("absolute_target_angle", access=py_trees.common.Access.READ)
+        self.blackboard.register_key("turn_goal", access=py_trees.common.Access.WRITE)
+    
+    def initialise(self):
+        angle_deg = self.blackboard.absolute_target_angle if self.blackboard.exists("absolute_target_angle") else 0.0
+        
+        goal = TurnToAngle.Goal()
+        goal.absolute_target_angle_deg = angle_deg
+        self.blackboard.turn_goal = goal
+
+        return super().initialise()
