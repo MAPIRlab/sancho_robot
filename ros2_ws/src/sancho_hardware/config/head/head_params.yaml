@@ -10,5 +10,5 @@ head_controller_node:
     pan_joint: "pan"
     tilt_joint: "tilt"
     tracking_topic: "/head_goal"
-    profile_velocity: 2000
+    profile_velocity: 100
     profile_acceleration: 100

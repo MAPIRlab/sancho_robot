@@ -129,7 +129,7 @@ class HRIHeadNode(Node):
         self.op_srv = self.create_client(OperatingModes, "/wxxms/set_operating_modes")
         while not self.op_srv.wait_for_service(timeout_sec=1.0):
             self.get_logger().warning("Waiting for OperatingModes service...")
-        self.set_position_control_mode()
+        #self.set_position_control_mode()
 
         # Timer principal
         self.timer = self.create_timer(0.1, self.update)
@@ -143,7 +143,7 @@ class HRIHeadNode(Node):
         req.cmd_type = "group"
         req.name = self.joint_group
         req.mode = "position"
-        req.profile_type = "time"
+        req.profile_type = "velocity"
         req.profile_velocity = self.profile_velocity
         req.profile_acceleration = self.profile_acceleration
         
