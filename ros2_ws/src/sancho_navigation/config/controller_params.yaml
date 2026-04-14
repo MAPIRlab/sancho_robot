@@ -4,15 +4,15 @@
 controller_server:
   ros__parameters:
     use_sim_time: False
+    robot_base_frame: "base_footprint"
     controller_frequency: 20.0
 
-    # Subimos umbral mínimo para publicar omega y evitamos invertir por ruido
-    min_x_velocity_threshold: 0.05
-    min_y_velocity_threshold: 0.05
-    min_theta_velocity_threshold: 0.15   
+    # Esto afecta a la velocidad que publica el controlador, lo que puede afectar a la aceleracion
+    min_x_velocity_threshold: 0.01
+    min_y_velocity_threshold: 0.01
+    min_theta_velocity_threshold: 0.01   
 
-    # No declares fallo tan pronto ante dudas al inicio del giro
-    failure_tolerance: 0.8               # antes 0.3
+    failure_tolerance: 0.8
 
     progress_checker_plugin: "progress_checker"
     goal_checker_plugins: ["general_goal_checker"]
@@ -26,9 +26,11 @@ controller_server:
 
     general_goal_checker:
       stateful: True
-      plugin: "nav2_controller::SimpleGoalChecker"
-      xy_goal_tolerance: 0.2
-      yaw_goal_tolerance: 1.0
+      plugin: "nav2_controller::StoppedGoalChecker"
+      xy_goal_tolerance: 0.5
+      yaw_goal_tolerance: 0.3
+      rot_vel_tol: 0.1
+      lin_vel_tol: 0.05
 
     GeneralMPPI:
       plugin: "nav2_rotation_shim_controller::RotationShimController"
@@ -41,26 +43,23 @@ controller_server:
       rotate_to_heading_angular_vel: 1.5   
       max_angular_accel: 3.0               
       simulate_ahead_time: 0.0             
-      rotate_to_goal_heading: true        
+      rotate_to_goal_heading: true       
+      closed_loop: true 
 
       # --- MPPI ---
       time_steps: 56
       model_dt: 0.05
-      batch_size: 2000
+      batch_size: 1500
 
-      vx_std: 0.3
+      vx_std: 0.35    # Vel std dev
       vy_std: 0.0
-      wz_std: 0.4
+      wz_std: 0.2
 
-      vx_max: 0.9
-      vx_min: 0.0
+      vx_max: 0.4
+      vx_min: -0.3
       vy_max: 0.0
       vy_min: -0.0
       wz_max: 1.2
-
-      ax_max: 0.2
-      ax_min: -0.4
-      az_max: 1.0
 
       iteration_count: 1
       prune_distance: 1.7
@@ -68,7 +67,7 @@ controller_server:
       temperature: 0.5
       gamma: 0.015
       motion_model: "Ackermann"
-      visualize: true
+      visualize: false
       retry_attempt_limit: 3
 
       TrajectoryVisualizer:
@@ -80,7 +79,8 @@ controller_server:
 
       critics:
          - "ConstraintCritic"
-         - "CostCritic"
+         #- "CostCritic"
+         - "ObstaclesCritic"
          - "GoalCritic"
          - "PathAlignCritic"
          - "PathFollowCritic"
@@ -95,14 +95,14 @@ controller_server:
 
       GoalCritic:
         enabled: true
-        cost_power: 1
+        cost_power: 2
         cost_weight: 5.0
         threshold_to_consider: 1.4
 
       PathAlignCritic:
-        enabled: false
+        enabled: true
         cost_power: 1
-        cost_weight: 14.0
+        cost_weight: 10.0
         max_path_occupancy_ratio: 0.05
         trajectory_point_step: 4
         threshold_to_consider: 0.5
@@ -112,7 +112,7 @@ controller_server:
       PathFollowCritic:
         enabled: true
         cost_power: 1
-        cost_weight: 5.0
+        cost_weight: 10.0
         offset_from_furthest: 5
         threshold_to_consider: 1.4
 
@@ -128,20 +128,30 @@ controller_server:
       PreferForwardCritic:
         enabled: true
         cost_power: 1
-        cost_weight: 3.0   # antes 5.0: menos sesgo que puede “pelearse” con el giro
+        cost_weight: 1.0 
 
-      CostCritic:
+      # CostCritic:
+      #   enabled: true
+      #   cost_power: 1
+      #   cost_weight: 8.0
+      #   critical_cost: 300.0
+      #   consider_footprint: true
+      #   collision_cost: 1000000.0
+      #   near_goal_distance: 1.0
+      #   trajectory_point_step: 2
+
+      ObstaclesCritic:
         enabled: true
         cost_power: 1
-        cost_weight: 3.81
-        critical_cost: 300.0
+        repulsion_weight: 1.5      # Pushes the robot away from the inflation layer smoothly
+        critical_weight: 20.0      # Hard penalty for getting too close
         consider_footprint: true
-        collision_cost: 1000.0
-        near_goal_distance: 1.0
-        trajectory_point_step: 2
+        collision_cost: 1000000.0  # Keep this massive
+        collision_margin_distance: 0.10 # Distance to trigger critical_weight
+        near_goal_distance: 0.5
 
       VelocityDeadbandCritic:
-        enabled: true
+        enabled: false
         cost_power: 1
         cost_weight: 20.0
         deadband_velocities: [0.05, 0.00, 0.15]
@@ -161,7 +171,7 @@ controller_server:
       # --- Parámetros de Regulated Pure Pursuit ---
       desired_linear_vel: 0.15
       lookahead_dist: 0.4
-      min_lookahead_dist: 0.3
+      min_lookahead_dist: 0.1
       max_lookahead_dist: 0.6
       use_velocity_scaled_lookahead_dist: true
       use_cost_regulated_linear_velocity_scaling: true
@@ -176,11 +186,11 @@ controller_server:
       scale_velocities: false
       # Usa CLOSED_LOOP si tu odometría es buena; ayuda a amortiguar inversión de signo
       feedback: "CLOSED_LOOP"             # antes OPEN_LOOP
-      max_velocity: [1.0, 0.0, 1.5]
-      min_velocity: [0.05, 0.0, 0.1]
-      max_accel: [0.2, 0.0, 0.4]
-      max_decel: [-0.4, 0.0, -0.6]
-      deadband_velocity: [0.02, 0.0, 0.05]
+      max_velocity: [0.4, 0.0, 1.0]
+      min_velocity: [-0.1, 0.0, 1.0]     # antes 0.1
+      max_accel: [0.3, 0.0, 0.5]
+      max_decel: [-0.4, 0.0, -0.5]
+      deadband_velocity: [0.02, 0.0, 0.05]  # antes 0.1
       velocity_timeout: 1.0
 
     plugin_lib_names:
@@ -206,7 +216,7 @@ local_costmap:
       update_frequency: 20.0
       publish_frequency: 10.0
 
-      footprint: "[[-0.375, -0.275], [-0.375, 0.275], [0.375, 0.275], [0.375, -0.275]]"
+      footprint: "[[-0.375, -0.25], [-0.375, 0.25], [0.375, 0.25], [0.375, -0.25]]"
       footprint_padding: 0.005
 
       plugins:
@@ -269,7 +279,7 @@ local_costmap:
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         enabled: true
-        inflation_radius: 1.0      
-        cost_scaling_factor: 5.0 
+        inflation_radius: 2.0      
+        cost_scaling_factor: 5.0
         inflate_unknown: true
         inflate_around_unknown: true

@@ -26,6 +26,7 @@ def generate_launch_description():
     controller_params_path = os.path.join(pkg_share, "config", "controller_params.yaml")
     planner_params_path = os.path.join(pkg_share, "config", "planner_params.yaml")
     behavior_params_path = os.path.join(pkg_share, "config", "behavior_params.yaml")
+    smoother_params_path = os.path.join(pkg_share, "config", "smoother_params.yaml")
     collision_monitor_params_path = os.path.join(pkg_share, "config", "collision_monitor_params.yaml")
 
     nav2_params_path = os.path.join(pkg_share, "config", "old_nav2_params_ranger.yaml")
@@ -37,6 +38,7 @@ def generate_launch_description():
         "costmap_filter_info_server",
         "amcl",
         "planner_server",
+        "smoother_server",
         "controller_server",
         "behavior_server",
         "bt_navigator",
@@ -83,7 +85,7 @@ def generate_launch_description():
 
     declare_bt_xml_cmd = DeclareLaunchArgument(
         'default_nav_to_pose_bt_xml',
-        default_value=os.path.join(pkg_share, 'bt', 'main.xml'),
+        default_value=os.path.join(pkg_share, 'bt', 'nav_to_pose.xml'),
         description='Full path to the behavior tree xml file to use'
     )
 
@@ -165,6 +167,16 @@ def generate_launch_description():
                 output="screen",
                 prefix=prefix_cmd, 
                 emulate_tty=True,
+                respawn=use_respawn,
+            ),
+            
+            # --- Smoother ---
+            Node(
+                package="nav2_smoother",
+                executable="smoother_server",
+                name="smoother_server",
+                parameters=[smoother_params_path],
+                output="screen",
                 respawn=use_respawn,
             ),
             
