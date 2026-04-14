@@ -1,7 +1,8 @@
 import py_trees
 import operator
 
-from sancho_behavior.behaviors.sound import IsAngleFar, LockTarget, SpinBaseToSound, RotateHeadToSound, TurnToSound
+from sancho_behavior.behaviors.sound import IsAngleFar, LockTarget, RotateHeadToSound, TurnToSound
+from sancho_behavior.behaviors.interaction import GreetUser, IdentifyCentralTarget
 
 
 def create_reaction_subtree() -> py_trees.behaviour.Behaviour:
@@ -17,7 +18,13 @@ def create_reaction_subtree() -> py_trees.behaviour.Behaviour:
     turn_far_seq = py_trees.composites.Sequence(name="TurnFar", memory=True)
 
     # --- Build Tree ---
-    root.add_children([check_hotword, LockTarget(), turn_decision])
+    root.add_children([
+        check_hotword,
+        LockTarget(),
+        turn_decision,
+        IdentifyCentralTarget(),
+        GreetUser()
+    ])
     turn_decision.add_children([turn_far_seq, RotateHeadToSound()])
     turn_far_seq.add_children([IsAngleFar(), TurnToSound()])
 

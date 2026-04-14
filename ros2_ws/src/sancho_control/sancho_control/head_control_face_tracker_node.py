@@ -28,8 +28,8 @@ class FaceTrackerLifecycle(LifecycleNode):
         self.declare_parameter("base_frame", "base_link")
         self.declare_parameter("control_rate", 10.0)
         self.declare_parameter("ema_alpha", 0.6)
-        self.declare_parameter("p_gain_pan", 1.3)
-        self.declare_parameter("p_gain_tilt", 1.0)
+        self.declare_parameter("p_gain_pan", 0.5)
+        self.declare_parameter("p_gain_tilt", 0.3)
         self.declare_parameter("timeout_no_detection", 2.0)
         self.declare_parameter("pan_joint", "pan")
         self.declare_parameter("tilt_joint", "tilt")
@@ -145,6 +145,7 @@ class FaceTrackerLifecycle(LifecycleNode):
             for recog, det in zip(msg.recognitions, msg.detections):
                 if recog.classified_id == self.target_id:
                     target_detection = det
+                    self.get_logger().info(f"Trackeando a {recog.calssified_name}")
                     break
         
         # 2. Si no hay target_id (o perdimos al objetivo), seguimos a la cara más grande/centrada por defecto
