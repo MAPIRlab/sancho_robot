@@ -14,23 +14,21 @@ find_package(nav2_behavior_tree REQUIRED)
 find_package(behaviortree_cpp_v3 REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(pluginlib REQUIRED)
+find_package(nav_msgs REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
+find_package(topology_graph REQUIRED)
+find_package(tf2_ros REQUIRED)
 
 # =========================
-# Library
+# Library 1: Is Localized
 # =========================
-add_library(sancho_bt_plugins SHARED
-  src/is_localized_condition.cpp
-)
-
-target_include_directories(sancho_bt_plugins PUBLIC
+add_library(is_localized_condition SHARED src/is_localized_condition.cpp)
+target_include_directories(is_localized_condition PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
 )
-
-# Required for BT plugin symbol export
-target_compile_definitions(sancho_bt_plugins PRIVATE BT_PLUGIN_EXPORT)
-
-ament_target_dependencies(sancho_bt_plugins
+target_compile_definitions(is_localized_condition PRIVATE BT_PLUGIN_EXPORT)
+ament_target_dependencies(is_localized_condition
   rclcpp
   nav2_behavior_tree
   behaviortree_cpp_v3
@@ -39,9 +37,30 @@ ament_target_dependencies(sancho_bt_plugins
 )
 
 # =========================
+# Library 2: Inject Waypoints
+# =========================
+add_library(inject_waypoints_node SHARED src/inject_waypoints_node.cpp)
+target_include_directories(inject_waypoints_node PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+target_compile_definitions(inject_waypoints_node PRIVATE BT_PLUGIN_EXPORT)
+ament_target_dependencies(inject_waypoints_node
+  rclcpp
+  nav2_behavior_tree
+  behaviortree_cpp_v3
+  geometry_msgs
+  pluginlib
+  nav_msgs
+  tf2_geometry_msgs
+  topology_graph
+)
+
+
+# =========================
 # Installation
 # =========================
-install(TARGETS sancho_bt_plugins
+install(TARGETS is_localized_condition inject_waypoints_node
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin
@@ -51,7 +70,6 @@ install(DIRECTORY include/
   DESTINATION include
 )
 
-# IMPORTANT: install plugin.xml
 install(FILES plugin.xml
   DESTINATION share/${PROJECT_NAME}
 )
@@ -65,13 +83,16 @@ pluginlib_export_plugin_description_file(behaviortree_cpp_v3 plugin.xml)
 # Export for downstream packages
 # =========================
 ament_export_include_directories(include)
-ament_export_libraries(sancho_bt_plugins)
+ament_export_libraries(is_localized_condition inject_waypoints_node)
 ament_export_dependencies(
   rclcpp
   nav2_behavior_tree
   behaviortree_cpp_v3
   geometry_msgs
   pluginlib
+  nav_msgs
+  tf2_geometry_msgs
+  topology_graph
 )
 
 ament_package()

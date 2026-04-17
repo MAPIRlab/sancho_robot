@@ -12,9 +12,18 @@
 
         <RateController hz="1.0">
           <RecoveryNode name="ComputePathToPose" number_of_retries="1">
-            <ComputePathToPose goal="{goal}"
-                               planner_id="{selected_planner}"
-                               path="{path}"/>
+            <Sequence name="PlanAndInjectWaypoints">
+    
+                <!-- Standard global planner computes a path to the goal -->
+                <ComputePathToPose goal="{goal}" path="{raw_path}" planner_id="{selected_planner}"/>
+                
+                <!-- Post-process: inject ING waypoints if the path crosses a critical passage -->
+                <InjectWaypoints input_path="{raw_path}" output_path="{injected_path}"/>
+                
+                <!-- Soft smoother for heading, right after waypoint injection -->
+                <SmoothPath unsmoothed_path="{injected_path}" smoothed_path="{path}" smoother_id="SimpleSmoother"/>
+
+            </Sequence>
             <ClearEntireCostmap name="ClearGlobalCostmap-Context" 
                                 service_name="global_costmap/clear_entirely_global_costmap"/>
           </RecoveryNode>
@@ -31,14 +40,14 @@
           </PathLongerOnApproach>
 
           <RecoveryNode name="FollowPathRecovery" number_of_retries="6">
-            <ReactiveFallback name="ControlStrategyFallback">
-              <FollowPath controller_id="GeneralMPPI" path="{path}"/>
-              
-              <FollowPath controller_id="TightRPP" path="{path}"/>
-            </ReactiveFallback>
+            <FollowPath controller_id="GeneralMPPI" path="{path}"/>
             
-            <ClearEntireCostmap name="ClearLocalCostmap-Context" 
-                                service_name="local_costmap/clear_entirely_local_costmap"/>
+            <!-- Recovery actions executed specifically if FollowPath fails -->
+            <Sequence name="ControllerRecoveryActions">
+              <BackUp backup_dist="0.2" backup_speed="0.10"/>
+              <ClearEntireCostmap name="ClearLocalCostmap-Context" 
+                                  service_name="local_costmap/clear_entirely_local_costmap"/>
+            </Sequence>
           </RecoveryNode>
         </ReactiveSequence>
       </PipelineSequence>
@@ -52,7 +61,7 @@
             <ClearEntireCostmap name="ClearGlobalCostmap-Subtree"
                                 service_name="global_costmap/clear_entirely_global_costmap"/>
           </Sequence>
-          <Spin spin_dist="0.5"/>
+          <Spin spin_dist="0.2"/>
           <Wait wait_duration="3.0"/>
           <BackUp backup_dist="0.30" backup_speed="0.15"/>
         </RoundRobin>

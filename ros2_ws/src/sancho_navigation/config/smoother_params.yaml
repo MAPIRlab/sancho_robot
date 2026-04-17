@@ -8,7 +8,7 @@ smoother_server:
       max_its: 1000
       do_refinement: True
       # Add these parameters to control the behavior:
-      w_data: 0.5    # Increase (default 0.2) to stick closely to the yellow line
-      w_smooth: 0.2  # Decrease (default 0.3) to stop aggressive corner-cutting
+      w_data: 0.4    # Increase (default 0.2) to stick closely to the yellow line
+      w_smooth: 0.3  # Decrease (default 0.3) to stop aggressive corner-cutting
     SavitzkyGolaySmoother:
       plugin: "nav2_smoother::SavitzkyGolaySmoother"

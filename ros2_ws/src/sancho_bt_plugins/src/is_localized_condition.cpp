@@ -90,6 +90,7 @@ BT::NodeStatus IsLocalized::tick()
 // --- REGISTRO DEL PLUGIN ---
 BT_REGISTER_NODES(factory)
 {
-  std::cout << "[BT_PLUGIN] sancho_bt_plugins loaded and registered" << std::endl;
+  std::cout << "[BT_PLUGIN] is_localized_condition loaded and registered" << std::endl;
   factory.registerNodeType<sancho_bt_plugins::IsLocalized>("IsLocalized");
+
 }

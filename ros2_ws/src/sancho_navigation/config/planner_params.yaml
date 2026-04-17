@@ -16,14 +16,6 @@ planner_server:
       downsampling_factor: 2
       cost_travel_multiplier: 10.0 # High - More priority to obstacle avoidance than path length
       use_final_approach_orientation: false
-      smooth_path: false
-      smoother:
-        max_iterations: 1000
-        w_smooth: 0.35
-        w_data: 0.20
-        tolerance: 1.0e-10
-        do_refinement: true
-        refinement_num: 2
 
 
 global_costmap:

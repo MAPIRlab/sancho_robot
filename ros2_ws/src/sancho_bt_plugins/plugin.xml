@@ -1,8 +1,14 @@
-<library path="sancho_bt_plugins">
-  <class
-    name="sancho_bt_plugins::IsLocalizedCondition"
-    type="sancho_bt_plugins::IsLocalizedCondition"
-    base_class_type="BT::ConditionNode">
-    <description>Check if robot is localized</description>
-  </class>
-</library>
+<root>
+  <library path="is_localized_condition">
+    <class name="IsLocalized" type="IsLocalized">
+      <description>Condition node to check if robot is localized</description>
+    </class>
+  </library>
+
+  <library path="inject_waypoints_node">
+    <class name="InjectWaypoints" type="InjectWaypoints">
+      <description>Action node to inject topological waypoints</description>
+    </class>
+  </library>
+
+</root>
