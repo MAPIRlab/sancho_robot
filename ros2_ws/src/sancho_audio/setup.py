@@ -38,17 +38,9 @@ setup(
             'microphone=sancho_audio.microphone_node:main',
             'audio_doa_lifecycle=sancho_audio.audio_doa_lifecycle_node:main',
             'audio_doa_xvf3800_lifecycle=sancho_audio.audio_doa_xvf3800_lifecycle_node:main',
-<<<<<<< HEAD:sancho_ws/src/sancho_audio/setup.py
             'doa_active_speaker=sancho_audio.doa_active_speaker_node:main',
             'hotword_detector_node=sancho_audio.hotword_detector_node:main',
             'dialog_manager_node=sancho_audio.dialog_manager_node:main'
-=======
-            'audio_doa_overlay=sancho_audio.audio_doa_overlay_node:main',
-            'dialog_manager_node=sancho_audio.dialog_manager_node:main',
-            'hotword_detector_node=sancho_audio.hotword_detector_node:main',
-            'vad_transcriptor_node=sancho_audio.vad_transcriptor_node:main',
-            'doa_active_speaker=sancho_audio.doa_active_speaker_node:main'
->>>>>>> refactor:ros2_ws/src/sancho_audio/setup.py
         ],
     },
 )

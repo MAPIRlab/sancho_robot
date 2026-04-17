@@ -12,11 +12,7 @@ class AudioDOAXVF3800LifecycleNode(LifecycleNode):
 
     def __init__(self):
         super().__init__("audio_doa_xvf3800")
-<<<<<<< HEAD:sancho_ws/src/sancho_audio/sancho_audio/audio_doa_xvf3800_lifecycle_node.py
-
-=======
         
->>>>>>> refactor:ros2_ws/src/sancho_audio/sancho_audio/audio_doa_xvf3800_lifecycle_node.py
         self.declare_parameter("doa_topic", "sancho_audio/doa")
         self.declare_parameter("poll_hz", 10.0)
 
@@ -30,11 +26,7 @@ class AudioDOAXVF3800LifecycleNode(LifecycleNode):
         self.get_logger().info("Configurando nodo AudioDOAXVF3800LifecycleNode.")
 
         self.doa_topic = self.get_parameter("doa_topic").value
-<<<<<<< HEAD:sancho_ws/src/sancho_audio/sancho_audio/audio_doa_xvf3800_lifecycle_node.py
-        self.poll_hz = self.get_parameter("poll_hz").get_parameter_value().double_value
-=======
         self.poll_hz = float(self.get_parameter("poll_hz").value)
->>>>>>> refactor:ros2_ws/src/sancho_audio/sancho_audio/audio_doa_xvf3800_lifecycle_node.py
 
         if self.poll_hz <= 0.0:
             self.get_logger().warn("poll_hz <= 0. Ajustando a 1.0 Hz.")
@@ -66,16 +58,6 @@ class AudioDOAXVF3800LifecycleNode(LifecycleNode):
 
     def spin(self):
         angle = self._read_processed_deg()
-<<<<<<< HEAD:sancho_ws/src/sancho_audio/sancho_audio/audio_doa_xvf3800_lifecycle_node.py
-        if angle:
-            angle = 180 - angle
-            self.get_logger().info(f"DoA: {angle:6.2f}°")
-            if self.pub_angle:
-                self.pub_angle.publish(Float32(data=angle))
-        else:
-            self.get_logger().info("No angle")
-
-=======
 
         if angle:
             angle = ((float(angle) + 180) % 360) - 180
@@ -83,7 +65,6 @@ class AudioDOAXVF3800LifecycleNode(LifecycleNode):
             self.pub_angle.publish(Float32(data=angle))
         else:
             self.get_logger().info("No angle")
->>>>>>> refactor:ros2_ws/src/sancho_audio/sancho_audio/audio_doa_xvf3800_lifecycle_node.py
 
     def _read_processed_deg(self):
         cmd = ["xvf_host", "AUDIO_MGR_SELECTED_AZIMUTHS"]

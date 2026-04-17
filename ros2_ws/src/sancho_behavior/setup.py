@@ -24,13 +24,8 @@ setup(
     entry_points={
         'console_scripts': [
             'orchestrator_node = sancho_behavior.orchestrator.orchestrator_node:main',
-<<<<<<< HEAD:sancho_ws/src/sancho_behavior/setup.py
             'attention_manager_node = sancho_behavior.interaction.attention_manager_node:main',
             'interaction_manager_node = sancho_behavior.interaction.interaction_manager_node:main'
-=======
-            'interaction_manager_node = sancho_behavior.interaction.interaction_manager_node:main',
-            'attention_manager_node = sancho_behavior.interaction.attention_manager_node:main'
->>>>>>> refactor:ros2_ws/src/sancho_behavior/setup.py
         ],
     },
 )
