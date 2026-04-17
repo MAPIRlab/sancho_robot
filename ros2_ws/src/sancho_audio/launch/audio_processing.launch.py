@@ -4,6 +4,8 @@ from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node, LifecycleNode
 
+from sancho_hri.speech.models import TTS_MODELS, TTS_SPEAKERS
+
 def generate_launch_description():
     prefix_cmd = LaunchConfiguration('prefix')
 
@@ -53,6 +55,19 @@ def generate_launch_description():
         output='screen'
     )
 
+    tts_node = Node(
+        package='sancho_hri',
+        executable='tts',
+        name='tts',
+        output='screen',
+        emulate_tty=True,
+        parameters=[{
+            "load_models": f"[['{TTS_MODELS.PIPER}', '']]",
+            "active_model": f"{TTS_MODELS.PIPER}",
+            "active_speaker": f"{TTS_SPEAKERS.PIPER.DAVEFX}"
+        }]
+    )
+
     # Activador para el nodo de audio
     configurator_active = Node(
         package='sancho_lifecycle_utils',            
@@ -74,6 +89,7 @@ def generate_launch_description():
         doa_active_speaker,
         vad_transcriptor_node,
         audio_player_node,
+        tts_node,
         configurator_active,
         configurator_inactive
     ])
