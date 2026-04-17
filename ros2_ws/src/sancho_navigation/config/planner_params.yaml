@@ -1,7 +1,9 @@
 planner_server:
   ros__parameters:
     use_sim_time: False
+    expected_planner_frequency: 2.0
     planner_plugins: ["GridBased"]
+
     GridBased:
       plugin: "nav2_smac_planner/SmacPlanner2D"
       tolerance: 0.20
@@ -10,18 +12,11 @@ planner_server:
       max_on_approach_iterations: 1500
       terminal_checking_interval: 4000
       max_planning_time: 1.0
-      downsample_costmap: true
+      downsample_costmap: false
       downsampling_factor: 2
-      cost_travel_multiplier: 3.0 # Prioritize paths with lower cost
+      cost_travel_multiplier: 10.0 # High - More priority to obstacle avoidance than path length
       use_final_approach_orientation: false
-      smooth_path: true
-      smoother:
-        max_iterations: 1000
-        w_smooth: 0.35
-        w_data: 0.20
-        tolerance: 1.0e-10
-        do_refinement: true
-        refinement_num: 2
+
 
 global_costmap:
   global_costmap:
@@ -36,14 +31,15 @@ global_costmap:
       footprint_padding: 0.005
       transform_tolerance: 0.2
 
-      update_frequency: 1.0
-      publish_frequency: 1.0
+      update_frequency: 2.0
+      publish_frequency: 2.0
 
-      footprint: "[[-0.35, -0.25], [-0.35, 0.25], [0.35, 0.25], [0.35, -0.25]]"
-
+      footprint: "[[-0.30, -0.20], [-0.30, 0.20], [0.30, 0.20], [0.30, -0.20]]"
+      
       plugins:
         - "static_layer"
         - "obstacle_layer"
+        - "keepout_filter"
         - "inflation_layer"
 
       static_layer:
@@ -59,7 +55,7 @@ global_costmap:
         footprint_clearing_enabled: true
         max_obstacle_height: 2.0
         combination_method: 1
-        observation_sources: "laser_front laser_back semantic_scan_non_persistent"
+        observation_sources: "laser_front laser_back"
         allow_unknown: true
 
         laser_front:
@@ -76,26 +72,27 @@ global_costmap:
           marking: True
           observation_persistence: 0.5
 
-        semantic_scan_persistent:
-          topic: "/scan_persistent"
-          max_obstacle_height: 2.0
-          clearing: True
-          marking: True
-          observation_persistence: 30.0
 
-        semantic_scan_non_persistent:
-          topic: "/scan_non_persistent"
-          max_obstacle_height: 2.0
-          clearing: True
-          marking: True
-          observation_persistence: 0.5
+      keepout_filter:
+        plugin: "nav2_costmap_2d::KeepoutFilter"
+        enabled: true
+        filter_info_topic: "/costmap_filter_info"
         
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         enabled: true
-        inflation_radius: 0.75
-        cost_scaling_factor: 14.0
+        inflation_radius: 2.0
+        cost_scaling_factor: 7.0
         inflate_unknown: true
         inflate_around_unknown: true
       
       always_send_full_costmap: True
+
+costmap_filter_info_server:
+  ros__parameters:
+    use_sim_time: False
+    type: 0
+    filter_info_topic: "/costmap_filter_info"
+    mask_topic: "/keepout_filter_mask"
+    base: 0.0
+    multiplier: 1.0

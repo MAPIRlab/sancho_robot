@@ -1,0 +1,30 @@
+{
+    "spaces":[
+        {"category":"room", "label":"room_2.3.7", "location":{"x":-7.920871734619141, "y":3.4098434448242188}},
+        {"category":"room", "label":"room_2.3.6", "location":{"x":-3.2679226398468018, "y":4.1952972412109375}},
+        {"category":"corridor", "label":"corridor6", "location":{"x":-0.30841565132141113, "y":-0.04457879066467285}},
+        {"category":"corridor", "label":"corridor8", "location":{"x":-9.80168342590332, "y":-0.7723855972290039}},
+        {"category":"corridor", "label":"corridor4", "location":{"x":9.030773162841797, "y":1.0064384937286377}},
+        {"category":"corridor", "label":"corridor10", "location":{"x":-19.2179, "y":-1.7172}},
+        {"category":"corridor", "label":"corridor2", "location":{"x":18.4470, "y":1.8386}}
+    ],
+
+    "poses":[
+        {"space_label":"room_2.3.7", "location":{"x":-7.920871734619141, "y":3.4098434448242188}},
+        {"space_label":"room_2.3.6", "location":{"x":-3.2679226398468018, "y":4.1952972412109375}},
+        {"space_label":"corridor6", "location":{"x":-0.30841565132141113, "y":-0.04457879066467285}},
+        {"space_label":"corridor8", "location":{"x":-9.80168342590332, "y":-0.7723855972290039}},
+        {"space_label":"corridor4", "location":{"x":9.030773162841797, "y":1.0064384937286377}},
+        {"space_label":"corridor10", "location":{"x":-19.2179, "y":-1.7172}},
+        {"space_label":"corridor2", "location":{"x":18.4470, "y":1.8386}}
+    ],
+
+    "passages":[
+        {"location":{"x":-5.26924467086792, "y":1.872391700744629}, "label":"passage_236_237", "connecting":["room_2.3.7", "room_2.3.6"]},
+        {"location":{"x":-1.711610198020935, "y":1.6535216569900513}, "label":"passage_236_corridor6", "connecting":["room_2.3.6", "corridor6"], "type":"CP"}
+    ],
+
+    "objects":[
+        {"label":"docking_station", "type":"dockingstation", "location":{"x":-7.286144256591797, "y":1.4567469358444214}}
+    ]
+}

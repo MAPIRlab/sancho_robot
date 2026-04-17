@@ -3,62 +3,185 @@ import time
 
 import rclpy
 import pygame
+import sounddevice as sd
+import numpy as np
 from rclpy.action import ActionServer, CancelResponse, GoalResponse
 from rclpy.lifecycle import LifecycleNode, State, TransitionCallbackReturn
 from rclpy.executors import MultiThreadedExecutor
+from rclpy.callback_groups import ReentrantCallbackGroup, MutuallyExclusiveCallbackGroup
 
-from sancho_interfaces.action import PlayAudio
+from sancho_interfaces.action import PlayAudio, SayText
+from sancho_interfaces.srv import TTS
 
 from .utils.sound import load
 
 class AudioPlayer(LifecycleNode):
     """Audio Player Node for ROS 2 using lifecycle management.
 
-    This node provides an action server to play audio files using pygame.
+    This node provides action servers to play audio files using pygame 
+    and to synthesize/play text using a TTS service and sounddevice.
     It supports clean cancellation and non-blocking playback.
     """
 
     def __init__(self):
         super().__init__("audio_player_lifecycle")
 
-        # Action server will be created on activation
-        self._action_server = None
-        self._current_task = None
+        # Callback groups to prevent deadlocks when calling services from within actions
+        self.action_cb_group = ReentrantCallbackGroup()
+        self.service_cb_group = MutuallyExclusiveCallbackGroup()
 
-        self.get_logger().info("AudioPlayerLifecycle creado, esperando configuración.")
+        # Action servers and clients will be created on activation
+        self._play_action_server = None
+        self._say_action_server = None
+        self._tts_client = None
+
+        self.get_logger().info("AudioPlayerLifecycle created, waiting for configuration.")
 
     def on_configure(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info("AudioPlayer CONFIGURED")
         return super().on_configure(state)
 
     def on_activate(self, state: State) -> TransitionCallbackReturn:
-        # Create action server
-        self._action_server = ActionServer(
+        # Create action server for playing audio files
+        self._play_action_server = ActionServer(
             self,
             PlayAudio,
             "play_audio",
-            execute_callback=self.execute_callback,
-            goal_callback=self.goal_callback,
+            execute_callback=self.play_execute_callback,
+            goal_callback=self.play_goal_callback,
             cancel_callback=self.cancel_callback,
+            callback_group=self.action_cb_group
         )
 
-        self.get_logger().info("AudioPlayer ACTIVATED: starting action server")
+        # Create action server for TTS generation and playback
+        self._say_action_server = ActionServer(
+            self,
+            SayText,
+            "say_text",
+            execute_callback=self.say_execute_callback,
+            cancel_callback=self.cancel_callback,
+            callback_group=self.action_cb_group
+        )
+
+        # Create client for the TTS service
+        self._tts_client = self.create_client(
+            TTS, 
+            'sancho_hri/speech/tts', 
+            callback_group=self.service_cb_group
+        )
+
+        self.get_logger().info("AudioPlayer ACTIVATED: starting action servers and clients")
         return super().on_activate(state)
 
     def on_deactivate(self, state: State) -> TransitionCallbackReturn:
-        # Stop any audio playing
+        # Stop any audio playing via pygame
         if pygame.mixer.get_init() and pygame.mixer.get_busy():
             pygame.mixer.stop()
             
-        # Destroy action server
-        if self._action_server:
-            self._action_server.destroy()
-            self._action_server = None
+        # Stop any audio playing via sounddevice
+        sd.stop()
+            
+        # Destroy action servers and clients
+        if self._play_action_server:
+            self._play_action_server.destroy()
+            self._play_action_server = None
+            
+        if self._say_action_server:
+            self._say_action_server.destroy()
+            self._say_action_server = None
+            
+        if self._tts_client:
+            self.destroy_client(self._tts_client)
+            self._tts_client = None
 
         self.get_logger().info("AudioPlayer DEACTIVATED: shutting down")
         return super().on_deactivate(state)
 
-    def goal_callback(self, goal_request) -> GoalResponse:
+    # ==========================================
+    # GENERAL CALLBACKS
+    # ==========================================
+    
+    def cancel_callback(self, goal_handle) -> CancelResponse:
+        self.get_logger().info("Cancel requested")
+        return CancelResponse.ACCEPT
+
+
+    # ==========================================
+    # ACTION: SAY TEXT (TTS)
+    # ==========================================
+
+    def say_execute_callback(self, goal_handle):
+        text = goal_handle.request.text
+        result = SayText.Result()
+        
+        self.get_logger().info(f"Received request to speak: '{text}'")
+
+        # 1. Call TTS service asynchronously
+        if not self._tts_client.wait_for_service(timeout_sec=2.0):
+            self.get_logger().error("TTS Service is not available.")
+            goal_handle.abort()
+            result.success = False
+            return result
+
+        req = TTS.Request()
+        req.text = text
+
+        future = self._tts_client.call_async(req)
+        
+        # Wait for the response without blocking the executor
+        while not future.done():
+            if goal_handle.is_cancel_requested:
+                self.get_logger().info("Canceling TTS generation request.")
+                goal_handle.canceled()
+                result.success = False
+                return result
+            time.sleep(0.05)
+
+        response = future.result()
+
+        if not response or not response.success:
+            self.get_logger().error("Failed to generate TTS audio.")
+            goal_handle.abort()
+            result.success = False
+            return result
+
+        # 2. Play the audio array with sounddevice
+        try:
+            audio_array = np.array(response.audio, dtype=np.int16)
+            sample_rate = response.sample_rate
+            duration = len(audio_array) / sample_rate
+            
+            self.get_logger().info(f"Playing TTS audio ({duration:.2f} seconds)...")
+            sd.play(audio_array, samplerate=sample_rate)
+            start_time = time.time()
+            
+            # 3. Keep the Action RUNNING while playing
+            while (time.time() - start_time) < duration:
+                if goal_handle.is_cancel_requested:
+                    self.get_logger().info("Silencing audio playback due to cancel request.")
+                    sd.stop()
+                    goal_handle.canceled()
+                    result.success = False
+                    return result
+                time.sleep(0.05)
+                
+        except Exception as e:
+            self.get_logger().error(f"Error playing TTS audio: {e}")
+            goal_handle.abort()
+            result.success = False
+            return result
+
+        self.get_logger().info("TTS playback finished.")
+        goal_handle.succeed()
+        result.success = True
+        return result
+
+
+    # ==========================================
+    # ACTION: PLAY AUDIO (Files)
+    # ==========================================
+
+    def play_goal_callback(self, goal_request) -> GoalResponse:
         if not goal_request.filename:
             self.get_logger().warn("Received empty filename in goal")
             return GoalResponse.REJECT
@@ -72,16 +195,12 @@ class AudioPlayer(LifecycleNode):
         self.get_logger().info(f"Received request to play: {goal_request.filename}")
         return GoalResponse.ACCEPT
 
-    def cancel_callback(self, goal_handle) -> CancelResponse:
-        self.get_logger().info("Cancel requested")
-        return CancelResponse.ACCEPT
-
-    def execute_callback(self, goal_handle) -> PlayAudio.Result:
+    def play_execute_callback(self, goal_handle) -> PlayAudio.Result:
         filename = goal_handle.request.filename
         result = PlayAudio.Result()
         
         try:
-            self.get_logger().info(f"Reproduciendo con pygame: {filename}")
+            self.get_logger().info(f"Playing with pygame: {filename}")
             
             sound = load(filename)
             channel = sound.play()
@@ -89,25 +208,25 @@ class AudioPlayer(LifecycleNode):
             # Wait until it is finished, checking if action is cancelled
             while channel and channel.get_busy():
                 if goal_handle.is_cancel_requested:
-                    self.get_logger().info("Deteniendo el audio por petición de cancelación...")
+                    self.get_logger().info("Stopping audio due to cancel request...")
                     channel.stop()
                     goal_handle.canceled()
                     result.success = False
-                    result.message = "Reproducción cancelada"
+                    result.message = "Playback canceled"
                     return result
                 
                 time.sleep(0.05)
                 
         except Exception as e:
-            self.get_logger().error(f"Error al reproducir audio: {e}")
+            self.get_logger().error(f"Error playing audio file: {e}")
             result.success = False
             result.message = str(e)
             goal_handle.abort()
             return result
 
-        self.get_logger().info("Reproducción finalizada.")
+        self.get_logger().info("Playback finished.")
         result.success = True
-        result.message = "Reproducción completada correctamente"
+        result.message = "Playback completed successfully"
         goal_handle.succeed()
         return result
 

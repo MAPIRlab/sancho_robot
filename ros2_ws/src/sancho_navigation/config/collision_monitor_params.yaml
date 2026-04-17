@@ -9,7 +9,7 @@ collision_monitor:
     source_timeout: 2.0
     stop_pub_timeout: 0.5
     base_shift_correction: true
-    polygons: ["SlowdownApproach"]
+    polygons: ["SlowdownFair", "SlowdownNear"]
     observation_sources: ["laser_front", "laser_back", "camera_depth"]
 
     laser_front:
@@ -29,14 +29,21 @@ collision_monitor:
       min_obstacle_height: 0.1
       max_obstacle_height: 1.8
 
-    SlowdownApproach:
+    SlowdownFair:
       type: "polygon"
       action_type: "slowdown"
-      # En algunas versiones de Humble, el ratio debe ser un double explícito
+      slowdown_ratio: 0.5 
+      # Caja proyectada 1.2m hacia adelante y solo 0.5m de ancho.
+      # [1.2, 0.25, 1.2, -0.25, 0.2, -0.25, 0.2, 0.25]
+      points: [1.2, 0.25, 1.2, -0.25, 0.2, -0.25, 0.2, 0.25]
+      min_points: 6
+      visualize: true
+
+    SlowdownNear:
+      type: "polygon"
+      action_type: "slowdown"
       slowdown_ratio: 0.2 
-      # Formato de lista plana: [x1, y1, x2, y2, x3, y3, x4, y4]
-      # Definimos un área de aprox 1.0m x 0.55m (el robot mide 0.7x0.5)
-      points: [0.5, 0.275, 0.5, -0.275, -0.5, -0.275, -0.5, 0.275]
-      # min_points: Necesario para filtrar ruido
+      # Caja proyectada 0.6m hacia adelante, un poco más estrecha
+      points: [0.65, 0.25, 0.65, -0.25, 0.1, -0.25, 0.1, 0.25]
       min_points: 5
       visualize: true

@@ -26,6 +26,7 @@ def generate_launch_description():
     controller_params_path = os.path.join(pkg_share, "config", "controller_params.yaml")
     planner_params_path = os.path.join(pkg_share, "config", "planner_params.yaml")
     behavior_params_path = os.path.join(pkg_share, "config", "behavior_params.yaml")
+    smoother_params_path = os.path.join(pkg_share, "config", "smoother_params.yaml")
     collision_monitor_params_path = os.path.join(pkg_share, "config", "collision_monitor_params.yaml")
 
     nav2_params_path = os.path.join(pkg_share, "config", "old_nav2_params_ranger.yaml")
@@ -33,8 +34,11 @@ def generate_launch_description():
 
     lifecycle_nodes = [
         "map_server",
+        "filter_mask_server",
+        "costmap_filter_info_server",
         "amcl",
         "planner_server",
+        "smoother_server",
         "controller_server",
         "behavior_server",
         "bt_navigator",
@@ -81,7 +85,7 @@ def generate_launch_description():
 
     declare_bt_xml_cmd = DeclareLaunchArgument(
         'default_nav_to_pose_bt_xml',
-        default_value=os.path.join(pkg_share, 'bt', 'main.xml'),
+        default_value=os.path.join(pkg_share, 'bt', 'nav_to_pose.xml'),
         description='Full path to the behavior tree xml file to use'
     )
 
@@ -140,6 +144,41 @@ def generate_launch_description():
                 emulate_tty=True,
                 respawn=use_respawn,
             ),
+
+            # --- Keepout Mask Server (The Image) ---
+            Node(
+                package="nav2_map_server",
+                executable="map_server",
+                name="filter_mask_server",
+                parameters=[{'yaml_filename': os.path.join(pkg_share, 'maps', 'module2.3_keepout.yaml')}],
+                remappings=[('map', 'keepout_filter_mask')],
+                output="screen",
+                prefix=prefix_cmd,
+                emulate_tty=True,
+                respawn=use_respawn,
+            ),
+            
+            # --- Costmap Filter Info Server (The Rules) ---
+            Node(
+                package="nav2_map_server",
+                executable="costmap_filter_info_server",
+                name="costmap_filter_info_server",
+                parameters=[planner_params_path], 
+                output="screen",
+                prefix=prefix_cmd, 
+                emulate_tty=True,
+                respawn=use_respawn,
+            ),
+            
+            # --- Smoother ---
+            Node(
+                package="nav2_smoother",
+                executable="smoother_server",
+                name="smoother_server",
+                parameters=[smoother_params_path],
+                output="screen",
+                respawn=use_respawn,
+            ),
             
             # --- Controller ---
             Node(
@@ -189,18 +228,6 @@ def generate_launch_description():
         ]
     )
 
-    semantic_scan_node = Node(
-        package="sancho_navigation", 
-        executable="semantic_scan_filter",
-        name="semantic_scan_filter",
-        remappings=[
-            ("/scan_persistent", "/scan_persistent"),
-            ("/scan_non_persistent", "/scan_non_persistent"),
-        ],
-        output="screen",
-        respawn=use_respawn,
-    )
-
     depth_scan_node = Node(
         package="depthimage_to_laserscan",
         executable="depthimage_to_laserscan_node",
@@ -226,6 +253,5 @@ def generate_launch_description():
         declare_map_yaml_cmd,
         declare_bt_xml_cmd,
         nav2_nodes,
-        depth_scan_node,
-        semantic_scan_node
+        depth_scan_node
     ])
