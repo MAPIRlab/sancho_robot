@@ -156,6 +156,8 @@ class CentralFacesClusterNode(Node):
                 best_center = (mean_x, mean_y)
 
         chosen_indices = clusters[best_lbl]
+        chosen_indices.sort(key=lambda i: math.hypot(X[i, 0] - img_cx, X[i, 1] - img_cy))
+
         # La respuesta queda en PIXELES (z=0)
         response.cluster_center = Point(x=best_center[0], y=best_center[1], z=0.0)
         response.ids = [ids[i] for i in chosen_indices]
