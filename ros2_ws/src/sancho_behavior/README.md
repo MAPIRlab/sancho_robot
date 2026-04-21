@@ -110,3 +110,19 @@ Manages the robot's attentional focus based on multi-modal inputs (visual face d
 
 - **Internal:** `sancho_interfaces`, `sancho_lifecycle_utils`
 - **External:** `rclpy`
+
+---
+
+## L3/L4 Admission Contract
+
+To keep a clear boundary between high-level missions (L3) and idle behavior
+(L4), admission to L3 is handled in `main_tree.py` with explicit arbitration
+rules:
+
+1. L3 is admitted only if a formal objective exists (`group_waypoint_pose`).
+2. New L3 admissions are blocked when `battery_degraded=true`.
+3. After mission exit, a cooldown latch (`mission/cooldown_until`) blocks
+	immediate re-entry to L3 to avoid L3<->L4 oscillation.
+
+Mission execution details remain isolated in `mission_tree.py`, while policy
+decisions live in the arbitration layer.

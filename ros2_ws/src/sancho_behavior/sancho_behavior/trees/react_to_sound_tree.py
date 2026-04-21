@@ -1,17 +1,17 @@
 import py_trees
-import operator
 
 from sancho_behavior.behaviors.sound import IsAngleFar, LockTarget, RotateHeadToSound, TurnToSound
 from sancho_behavior.behaviors.interaction import GreetUser, IdentifyCentralTarget
 
 
 def create_reaction_subtree() -> py_trees.behaviour.Behaviour:
-    root = py_trees.composites.Sequence(name="ReactToSound", memory=True)
+    """
+    Pure reaction subtree for L2 once preemption has already been gated.
 
-    check_hotword = py_trees.behaviours.CheckBlackboardVariableValue(
-        name="Hotword?",
-        check=py_trees.common.ComparisonExpression("hotword_event", True, operator=operator.eq)
-    )
+    The hotword guard lives in preemption_tree.py (BTA-020), so this subtree
+    only handles orientation and short social acknowledgement.
+    """
+    root = py_trees.composites.Sequence(name="ReactToSound", memory=True)
 
     turn_decision = py_trees.composites.Selector(name="DecideMovement", memory=True)
 
@@ -19,7 +19,6 @@ def create_reaction_subtree() -> py_trees.behaviour.Behaviour:
 
     # --- Build Tree ---
     root.add_children([
-        check_hotword,
         LockTarget(),
         turn_decision,
         IdentifyCentralTarget(),

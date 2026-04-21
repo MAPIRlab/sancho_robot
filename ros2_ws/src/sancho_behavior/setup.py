@@ -23,7 +23,6 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'orchestrator_node = sancho_behavior.orchestrator.orchestrator_node:main',
             'interaction_manager_node = sancho_behavior.interaction.interaction_manager_node:main',
             'attention_manager_node = sancho_behavior.interaction.attention_manager_node:main',
             'sancho_behavior_tree = sancho_behavior.trees.main_tree:main'
