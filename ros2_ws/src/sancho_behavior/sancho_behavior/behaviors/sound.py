@@ -4,8 +4,6 @@ import py_trees
 import py_trees_ros
 from py_trees.blackboard import Client
 
-from nav2_msgs.action import Spin
-
 from sancho_interfaces.action import RotateHead, TurnToAngle
 
 class IsAngleFar(py_trees.behaviour.Behaviour):
@@ -57,64 +55,41 @@ class LockTarget(py_trees.behaviour.Behaviour):
             
         return py_trees.common.Status.SUCCESS
 
-class SpinBaseToSound(py_trees_ros.action_clients.FromBlackboard):
-    def __init__(self, name="SpinBaseToSound"):
-        super().__init__(
-            name=name,
-            action_type=Spin,
-            action_name="/spin",
-            key="spin_goal"
-        )
-        self.blackboard.register_key("target_angle", access=py_trees.common.Access.READ)
-        self.blackboard.register_key("spin_goal", access=py_trees.common.Access.WRITE)
-    
-    def initialise(self):
-        angle_deg = self.blackboard.target_angle if self.blackboard.exists("target_angle") else 0.0
-        
-        goal = Spin.Goal()
-        goal.target_yaw = math.radians(angle_deg)
-        
-        self.blackboard.spin_goal = goal
-        
-        super().initialise()
-
-class RotateHeadToSound(py_trees_ros.action_clients.FromBlackboard):
+class RotateHeadToSound(py_trees_ros.actions.ActionClient):
     def __init__(self, name="RotateHeadToSound"):
+        self.action_goal = RotateHead.Goal()
+
         super().__init__(
             name=name,
             action_type=RotateHead,
             action_name="/head_controller/rotate",
-            key="head_goal"
+            action_goal=self.action_goal
         )
+        
         self.blackboard.register_key("target_angle", access=py_trees.common.Access.READ)
-        self.blackboard.register_key("head_goal", access=py_trees.common.Access.WRITE)
     
     def initialise(self):
         angle_deg = self.blackboard.target_angle if self.blackboard.exists("target_angle") else 0.0
         
-        goal = RotateHead.Goal()
-        goal.target_angle_deg = angle_deg
-        goal.timeout_sec = 5.0
-        self.blackboard.head_goal = goal
+        self.action_goal.target_angle_deg = angle_deg
+        self.action_goal.timeout_sec = 5.0
         
         super().initialise()
 
-class TurnToSound(py_trees_ros.action_clients.FromBlackboard):
+class TurnToSound(py_trees_ros.actions.ActionClient):
     def __init__(self, name="TurnToSound"):
+        self.action_goal = TurnToAngle.Goal()
+
         super().__init__(
             name=name,
             action_type=TurnToAngle,
             action_name='/attention_controller/turn_to_angle',
-            key='turn_goal'
+            action_goal=self.action_goal
         )
         self.blackboard.register_key("absolute_target_angle", access=py_trees.common.Access.READ)
-        self.blackboard.register_key("turn_goal", access=py_trees.common.Access.WRITE)
     
     def initialise(self):
         angle_deg = self.blackboard.absolute_target_angle if self.blackboard.exists("absolute_target_angle") else 0.0
-        
-        goal = TurnToAngle.Goal()
-        goal.absolute_target_angle_deg = angle_deg
-        self.blackboard.turn_goal = goal
+        self.action_goal.absolute_target_angle_deg = angle_deg
 
         return super().initialise()

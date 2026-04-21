@@ -48,6 +48,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/VADSegment.msg"
   "srv/StartInteraction.srv"
   "srv/EndInteraction.srv"
+  "srv/ForceAttention.srv"
   "srv/AskUser.srv"
   "srv/Detection.srv"
   "srv/Embedding.srv"
@@ -80,9 +81,9 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/Training.srv"
   "srv/TriggerUserInteraction.srv"
   "action/PlayAudio.action"
+  "action/PlayTTS.action"
   "action/RotateHead.action"
   "action/TurnToAngle.action"
-  "action/SayText.action"
   DEPENDENCIES geometry_msgs sensor_msgs std_msgs action_msgs
 )
 

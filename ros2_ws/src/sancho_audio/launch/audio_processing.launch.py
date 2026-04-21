@@ -73,14 +73,14 @@ def generate_launch_description():
         package='sancho_lifecycle_utils',            
         executable='node_configurator',          
         name='node_configurator_active',
-        parameters=[{'activate': True, 'node_names': ['audio_player_lifecycle']}]
+        parameters=[{'activate': True, 'node_names': ['audio_player_lifecycle', 'hotword_detector']}]
     )
 
     configurator_inactive = Node(
         package='sancho_lifecycle_utils',            
         executable='node_configurator',          
         name='node_configurator_inactive',
-        parameters=[{'activate': False, 'node_names': ['hotword_detector', 'vad_transcriptor']}]
+        parameters=[{'activate': False, 'node_names': ['vad_transcriptor']}]
     )
 
     return LaunchDescription([

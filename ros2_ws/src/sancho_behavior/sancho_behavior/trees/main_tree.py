@@ -7,6 +7,7 @@ import py_trees_ros
 from std_msgs.msg import Float32, String
 
 from sancho_behavior.trees.react_to_sound_tree import create_reaction_subtree
+from sancho_behavior.trees.interaction_tree import create_interaction_subtree
 from sancho_behavior.behaviors.sensors import OdomYawToBlackboard
 
 def create_root() -> py_trees.behaviour.Behaviour:
@@ -47,20 +48,21 @@ def create_root() -> py_trees.behaviour.Behaviour:
         topic_name="/active_speaker_info",
         topic_type=String,
         qos_profile=QoSProfile(depth=10),
-        blackboard_variables={"speaker_info_json": "data"}, # Guardamos el raw string del JSON
-        initialise_variables={"speaker_info_json": '{"id": "0", "name": "amigo"}'}, # Valor por defecto
+        blackboard_variables={"speaker_info_json": "data"},
+        initialise_variables={"speaker_info_json": '{"id": "0", "name": "amigo"}'},
         clearing_policy=py_trees.common.ClearingPolicy.NEVER
     )
 
     # --- BRANCH 2: PRIORITIES ---
     priorities = py_trees.composites.Selector(name="Priorities", memory=False)
     reaction_to_sound = create_reaction_subtree()
+    interaction = create_interaction_subtree()
     idle = py_trees.behaviours.Running(name="Idle")
 
     # -- Build Tree ---
     root.add_children([topics2bb, priorities])
     topics2bb.add_children([doa2bb, hotword2bb, odom_yaw2bb, speaker2bb])
-    priorities.add_children([reaction_to_sound, idle])
+    priorities.add_children([reaction_to_sound, interaction, idle])
     
     return root
 

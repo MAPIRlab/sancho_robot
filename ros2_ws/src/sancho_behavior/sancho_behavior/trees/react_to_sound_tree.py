@@ -17,13 +17,24 @@ def create_reaction_subtree() -> py_trees.behaviour.Behaviour:
 
     turn_far_seq = py_trees.composites.Sequence(name="TurnFar", memory=True)
 
+    stabilize_camera = py_trees.timers.Timer(name="StabilizeCamera", duration=1.0) # 1 second delay
+
+    set_engaged = py_trees.behaviours.SetBlackboardVariable(
+        name="SetEngaged",
+        variable_name="is_engaged",
+        variable_value=True,
+        overwrite=True
+    )
+
     # --- Build Tree ---
     root.add_children([
         check_hotword,
         LockTarget(),
         turn_decision,
+        stabilize_camera,
         IdentifyCentralTarget(),
-        GreetUser()
+        GreetUser(),
+        set_engaged
     ])
     turn_decision.add_children([turn_far_seq, RotateHeadToSound()])
     turn_far_seq.add_children([IsAngleFar(), TurnToSound()])

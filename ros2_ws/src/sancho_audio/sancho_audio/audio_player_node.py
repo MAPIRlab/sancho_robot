@@ -10,7 +10,7 @@ from rclpy.lifecycle import LifecycleNode, State, TransitionCallbackReturn
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.callback_groups import ReentrantCallbackGroup, MutuallyExclusiveCallbackGroup
 
-from sancho_interfaces.action import PlayAudio, SayText
+from sancho_interfaces.action import PlayAudio, PlayTTS
 from sancho_interfaces.srv import TTS
 
 from .utils.sound import load
@@ -26,11 +26,14 @@ class AudioPlayer(LifecycleNode):
     def __init__(self):
         super().__init__("audio_player_lifecycle")
 
+        # Track active state for Python lifecycle nodes
+        self._is_active = False 
+
         # Callback groups to prevent deadlocks when calling services from within actions
         self.action_cb_group = ReentrantCallbackGroup()
         self.service_cb_group = MutuallyExclusiveCallbackGroup()
 
-        # Action servers and clients will be created on activation
+        # Action servers and clients will be created on configuration
         self._play_action_server = None
         self._say_action_server = None
         self._tts_client = None
@@ -38,10 +41,6 @@ class AudioPlayer(LifecycleNode):
         self.get_logger().info("AudioPlayerLifecycle created, waiting for configuration.")
 
     def on_configure(self, state: State) -> TransitionCallbackReturn:
-        self.get_logger().info("AudioPlayer CONFIGURED")
-        return super().on_configure(state)
-
-    def on_activate(self, state: State) -> TransitionCallbackReturn:
         # Create action server for playing audio files
         self._play_action_server = ActionServer(
             self,
@@ -56,8 +55,8 @@ class AudioPlayer(LifecycleNode):
         # Create action server for TTS generation and playback
         self._say_action_server = ActionServer(
             self,
-            SayText,
-            "say_text",
+            PlayTTS,
+            "play_tts",
             execute_callback=self.say_execute_callback,
             cancel_callback=self.cancel_callback,
             callback_group=self.action_cb_group
@@ -70,17 +69,28 @@ class AudioPlayer(LifecycleNode):
             callback_group=self.service_cb_group
         )
 
-        self.get_logger().info("AudioPlayer ACTIVATED: starting action servers and clients")
+        self.get_logger().info("AudioPlayer CONFIGURED: Action servers and clients created.")
+        return super().on_configure(state)
+
+    def on_activate(self, state: State) -> TransitionCallbackReturn:
+        self._is_active = True
+        self.get_logger().info("AudioPlayer ACTIVATED: Ready to process goals.")
         return super().on_activate(state)
 
     def on_deactivate(self, state: State) -> TransitionCallbackReturn:
+        self._is_active = False
+        
         # Stop any audio playing via pygame
         if pygame.mixer.get_init() and pygame.mixer.get_busy():
             pygame.mixer.stop()
             
         # Stop any audio playing via sounddevice
         sd.stop()
-            
+
+        self.get_logger().info("AudioPlayer DEACTIVATED: Hardware playback halted.")
+        return super().on_deactivate(state)
+
+    def on_cleanup(self, state: State) -> TransitionCallbackReturn:
         # Destroy action servers and clients
         if self._play_action_server:
             self._play_action_server.destroy()
@@ -94,8 +104,8 @@ class AudioPlayer(LifecycleNode):
             self.destroy_client(self._tts_client)
             self._tts_client = None
 
-        self.get_logger().info("AudioPlayer DEACTIVATED: shutting down")
-        return super().on_deactivate(state)
+        self.get_logger().info("AudioPlayer CLEANED UP: Entities destroyed.")
+        return super().on_cleanup(state)
 
     # ==========================================
     # GENERAL CALLBACKS
@@ -107,12 +117,18 @@ class AudioPlayer(LifecycleNode):
 
 
     # ==========================================
-    # ACTION: SAY TEXT (TTS)
+    # ACTION: PLAY TTS
     # ==========================================
 
     def say_execute_callback(self, goal_handle):
+        # Prevent execution if node is not Active
+        if not self._is_active:
+            self.get_logger().warn("Rejecting TTS goal: Node is not ACTIVE.")
+            goal_handle.abort()
+            return PlayTTS.Result()
+
         text = goal_handle.request.text
-        result = SayText.Result()
+        result = PlayTTS.Result()
         
         self.get_logger().info(f"Received request to speak: '{text}'")
 
@@ -182,6 +198,11 @@ class AudioPlayer(LifecycleNode):
     # ==========================================
 
     def play_goal_callback(self, goal_request) -> GoalResponse:
+        # Prevent accepting goals if node is not Active
+        if not self._is_active: 
+            self.get_logger().warn("Rejecting audio goal: Node is not ACTIVE.")
+            return GoalResponse.REJECT
+
         if not goal_request.filename:
             self.get_logger().warn("Received empty filename in goal")
             return GoalResponse.REJECT

@@ -1,0 +1,10 @@
+# Goal
+string text
+string model
+string speaker
+---
+# Result 
+bool success
+string message
+---
+# Feedback
