@@ -30,21 +30,21 @@ def generate_launch_description():
     llm_node = Node(
         package='sancho_hri',
         executable='llm',
-        name='mapirbot',
+        name='llm_node',
         output='screen',
         prefix=prefix_cmd,
         emulate_tty=True,
         parameters=[{
-            "llm_load_models": f"[['{PROVIDER.MAPIRBOT}', ['{MODELS.LLM.MAPIRBOT.MAPIRBOT}'], '{OPENAI_API_KEY}']]",
-            "llm_active_provider": f"{PROVIDER.MAPIRBOT}",
-            "llm_active_model": f"{MODELS.LLM.MAPIRBOT.MAPIRBOT}",
+            "llm_load_models": f"[['{PROVIDER.OPENAI}', ['{MODELS.LLM.OPENAI.GPT_3_5_TURBO}'], '{OPENAI_API_KEY}']]",
+            "llm_active_provider": f"{PROVIDER.OPENAI}",
+            "llm_active_model": f"{MODELS.LLM.OPENAI.GPT_3_5_TURBO}",
         }]
     )
 
     tts_node = Node(
         package='sancho_hri',
         executable='tts',
-        name='tts',
+        name='tts_node',
         output='screen',
         emulate_tty=True,
         parameters=[{
@@ -54,23 +54,9 @@ def generate_launch_description():
         }]
     )
 
-    dialog_manager_node = Node(
-        package='sancho_audio',
-        executable='dialog_manager_node',
-        name='dialog_manager',
-        output='screen',
-        prefix=prefix_cmd,
-        emulate_tty=True,
-        parameters=[
-            {'transcriptor_node': 'vad_transcriptor'},
-            {"mapirbot_url": "ws://warrant-cure-hostel-railway.trycloudflare.com/ws/robot"}
-        ]
-    )
-
     return LaunchDescription([
         DeclareLaunchArgument('prefix', default_value='xterm -hold -e' if os.environ.get('DISPLAY') else ''),
         stt_node,
         llm_node,
-        tts_node,
-        dialog_manager_node
+        tts_node
     ])

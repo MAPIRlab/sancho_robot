@@ -4,8 +4,6 @@ from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node, LifecycleNode
 
-from sancho_hri.speech.models import TTS_MODELS, TTS_SPEAKERS
-
 def generate_launch_description():
     prefix_cmd = LaunchConfiguration('prefix')
 
@@ -15,12 +13,12 @@ def generate_launch_description():
         executable='hotword_detector_node',
         name='hotword_detector',
         output='screen',
+        prefix=prefix_cmd,
         emulate_tty=True,
         parameters=[
             {'mic_topic': '/sancho_audio/microphone/mono'},
             {'hotword_event_topic': '/voice_events/hotword_detected'}
-        ],
-        arguments=['--ros-args', '--log-level', 'WARN']
+        ]
     )
 
     doa_active_speaker = Node(
@@ -55,32 +53,12 @@ def generate_launch_description():
         output='screen'
     )
 
-    tts_node = Node(
-        package='sancho_hri',
-        executable='tts',
-        name='tts',
-        output='screen',
-        emulate_tty=True,
-        parameters=[{
-            "load_models": f"[['{TTS_MODELS.PIPER}', '']]",
-            "active_model": f"{TTS_MODELS.PIPER}",
-            "active_speaker": f"{TTS_SPEAKERS.PIPER.DAVEFX}"
-        }]
-    )
-
     # Activador para el nodo de audio
     configurator_active = Node(
         package='sancho_lifecycle_utils',            
         executable='node_configurator',          
         name='node_configurator_active',
-        parameters=[{'activate': True, 'node_names': ['audio_player_lifecycle']}]
-    )
-
-    configurator_inactive = Node(
-        package='sancho_lifecycle_utils',            
-        executable='node_configurator',          
-        name='node_configurator_inactive',
-        parameters=[{'activate': False, 'node_names': ['hotword_detector', 'vad_transcriptor']}]
+        parameters=[{'activate': True, 'node_names': ['audio_player_lifecycle', 'hotword_detector']}]
     )
 
     return LaunchDescription([
@@ -89,7 +67,5 @@ def generate_launch_description():
         doa_active_speaker,
         vad_transcriptor_node,
         audio_player_node,
-        tts_node,
-        configurator_active,
-        configurator_inactive
+        configurator_active
     ])
