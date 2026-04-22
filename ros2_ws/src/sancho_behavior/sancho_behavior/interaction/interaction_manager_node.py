@@ -16,7 +16,7 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy
 from sancho_interfaces.msg import FaceDetectionArray, FaceRecognitionArray
 from sancho_interfaces.srv import GetCentralFaceCluster, SocialState, GreetPeople
 from std_msgs.msg import Float32, Int16
-from std_srvs.srv import Trigger
+from std_srvs.srv import SetBool, Trigger
 from tf_transformations import quaternion_from_euler
 
 def clip(value: float, min_value: float, max_value: float) -> float:
@@ -99,6 +99,10 @@ class InteractionManager(LifecycleNode):
         self.declare_parameter("assistant_helper_question_id", 1)
         self.declare_parameter("assistant_helper_timeout", 60.0)
         self.declare_parameter("assistant_helper_service_timeout", 10.0)
+        self.declare_parameter(
+            "attention_tracking_enable_service",
+            "/attention_manager/capability/tracking/enable",
+        )
         self.declare_parameter("scan_angles", [0.0, 45.0, -45.0, 0.0])  # Scan pattern
         self.declare_parameter("min_faces_for_direct_interaction", 1)  # Min faces needed to skip TDOA
         self.declare_parameter("max_fallback_search_cycles", 3)  # Max fallback->search cycles before giving up
@@ -129,6 +133,8 @@ class InteractionManager(LifecycleNode):
         self.assistant_helper_target_names: list[str] = []
         self.assistant_helper_cluster_center = None
         self.assistant_helper_service_timeout = None
+        self.attention_tracking_enable_service = None
+        self.attention_tracking_enable_client = None
 
         # QoS
         self.sensor_qos = QoSProfile(depth=1, reliability=ReliabilityPolicy.BEST_EFFORT)
@@ -162,9 +168,20 @@ class InteractionManager(LifecycleNode):
         """Callback for the service that assistant_helper calls when it's done."""
         self.get_logger().info("Assistant helper ha notificado su finalización.")
         self.assistant_helper_interaction_finished = True
+        self.request_attention_tracking_enable()
         response.success = True
         response.message = "Notificación de finalización recibida."
         return response
+
+    def request_attention_tracking_enable(self) -> None:
+        """Best-effort ping to keep post-interaction tracking capability alive."""
+        if self.attention_tracking_enable_client is None:
+            return
+        if not self.attention_tracking_enable_client.wait_for_service(timeout_sec=0.05):
+            return
+        req = SetBool.Request()
+        req.data = True
+        self.attention_tracking_enable_client.call_async(req)
 
     def transition_to(self, state_cls: type[IMState]) -> None:
         """Change current state."""
@@ -202,6 +219,7 @@ class InteractionManager(LifecycleNode):
         self.assistant_helper_question_id = int(self.get_parameter("assistant_helper_question_id").value)
         self.assistant_helper_timeout = float(self.get_parameter("assistant_helper_timeout").value)
         self.assistant_helper_service_timeout = float(self.get_parameter("assistant_helper_service_timeout").value)
+        self.attention_tracking_enable_service = self.get_parameter("attention_tracking_enable_service").value
         self.scan_angles = self.get_parameter("scan_angles").value
         self.min_faces_for_direct_interaction = int(self.get_parameter("min_faces_for_direct_interaction").value)
         self.max_fallback_search_cycles = int(self.get_parameter("max_fallback_search_cycles").value)
@@ -303,6 +321,12 @@ class InteractionManager(LifecycleNode):
         )
         self.get_logger().info(f"Servicio {self.assistant_finished_service_name} listo.")
 
+        self.attention_tracking_enable_client = self.create_client(
+            SetBool,
+            self.attention_tracking_enable_service,
+            callback_group=self.io_cb,
+        )
+
         self.get_logger().info("InteractionManager configurado")
         return super().on_configure(state)
 
@@ -381,6 +405,9 @@ class InteractionManager(LifecycleNode):
         if self.assistant_helper_client:
             self.destroy_client(self.assistant_helper_client)
             self.assistant_helper_client = None
+        if self.attention_tracking_enable_client:
+            self.destroy_client(self.attention_tracking_enable_client)
+            self.attention_tracking_enable_client = None
         if self.assistant_finished_service:
             self.destroy_service(self.assistant_finished_service)
             self.assistant_finished_service = None
@@ -662,6 +689,7 @@ class InteractionManager(LifecycleNode):
         self.assistant_helper_interaction_started = True
         self.assistant_helper_start_time = now_sec
         self.assistant_helper_deadline = now_sec + self.assistant_helper_timeout
+        self.request_attention_tracking_enable()
         self.get_logger().info(
             f"Assistant helper aceptó la interacción para: {self.assistant_helper_target_names}"
         )

@@ -1,9 +1,11 @@
 import py_trees
 from py_trees.composites import Sequence
 from sancho_behavior.behaviors.navigation import NavigateToGroupPose
+from sancho_behavior.behaviors.capability_control import CapabilityEnable, CapabilitySetMode
 from sancho_behavior.behaviors.lifecycle_actions import ActivateNode, DeactivateNode
 from sancho_behavior.behaviors.interaction import WaitForSocialInteraction
 from sancho_behavior.behaviors.layer_reporter import LayerReporter
+from sancho_behavior.behaviors.preemption_contract import WithPreemptionContract
 
 def create_mission_subtree() -> py_trees.behaviour.Behaviour:
     """
@@ -44,12 +46,26 @@ def create_mission_subtree() -> py_trees.behaviour.Behaviour:
     navigate = NavigateToGroupPose(name="NavigateToGroupPose")
 
     # Socialize
+    tracking_mode_mission = CapabilitySetMode(
+        name="TrackingModeMission",
+        topic="/attention_manager/capability/tracking/set_mode",
+        mode="active",
+    )
+    tracking_enable_mission = CapabilityEnable(
+        name="EnableTrackingMission",
+        service_name="/attention_manager/capability/tracking/enable",
+    )
     activate_social = ActivateNode(name="ActivateInteractionManager", node_name="interaction_manager")
     
     # Wait for social interaction to finish
     wait_for_social = WaitForSocialInteraction(name="WaitForSocialInteraction")
     
     # After social is done, deactivate social and activate group detection
+    tracking_mode_standby = CapabilitySetMode(
+        name="TrackingModeMissionStandby",
+        topic="/attention_manager/capability/tracking/set_mode",
+        mode="standby",
+    )
     deactivate_social = DeactivateNode(name="DeactivateInteractionManager", node_name="interaction_manager")
     activate_waypoint_node = ActivateNode(name="ActivateGroupWaypoint", node_name="group_waypoint_generator_node")
 
@@ -61,11 +77,18 @@ def create_mission_subtree() -> py_trees.behaviour.Behaviour:
         has_waypoint_check,
         deactivate_waypoint_node,
         navigate,
+        tracking_mode_mission,
+        tracking_enable_mission,
         activate_social,
         wait_for_social,
+        tracking_mode_standby,
         deactivate_social,
         activate_waypoint_node,
         clear_waypoint
     ])
 
-    return mission_root
+    return WithPreemptionContract(
+        child=mission_root,
+        name="L3_Mission_Preemptable",
+        resumable=True
+    )

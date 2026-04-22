@@ -126,3 +126,55 @@ rules:
 
 Mission execution details remain isolated in `mission_tree.py`, while policy
 decisions live in the arbitration layer.
+
+---
+
+## Blackboard Namespace Conventions (BTA-075)
+
+To avoid collisions and maintain clear data ownership, all Blackboard keys must follow these namespace prefixes:
+
+- `layer/<name>/...`: Internal variables private to a specific layer (e.g., `layer/L1/...`).
+- `mission/...`: Global arbitration state regarding the current L3 mission (e.g., `mission/active`, `mission/id`).
+- `capability/<name>/...`: Variables shared by a reusable capability/proxy (e.g., `capability/tracking/active_until`).
+- `config/...`: Global static or slowly changing configuration parameters (e.g., `config/dock_pose`).
+- Global unstructured keys (like `hotword_event` or `battery_critical`) are legacy and will be gradually migrated to structured namespaces.
+
+---
+
+## Capability Tracking API (BTA-094)
+
+The attention stack now exposes a minimal, reusable capability contract for tracking:
+
+- Enable tracking:
+	- Service: `/attention_manager/capability/tracking/enable`
+	- Type: `std_srvs/srv/SetBool`
+	- Request: `data=true`
+- Disable tracking:
+	- Service: `/attention_manager/capability/tracking/disable`
+	- Type: `std_srvs/srv/Trigger`
+- Set tracking mode:
+	- Topic: `/attention_manager/capability/tracking/set_mode`
+	- Type: `std_msgs/msg/String`
+	- Typical values: `active`, `standby`, `post_interaction`
+- Tracking TTL observability:
+	- Topic: `/attention_manager/capability/tracking/active_until`
+	- Type: `std_msgs/msg/Float32`
+
+L2 (`preemption_tree`) and L3 (`mission_tree`) use this same contract to avoid
+direct coupling to attention internals.
+
+---
+
+## How To Visualize Trees
+
+From `ros2_ws/`:
+
+1. Render static graph files (`.dot`, `.png`, `.svg`):
+	 - `python3 scripts/render_tree.py src/sancho_behavior/sancho_behavior/trees/main_tree.py`
+2. Open generated files:
+	 - `render_main_tree.dot`
+	 - `render_main_tree.png`
+	 - `render_main_tree.svg`
+
+Runtime snapshots are also printed in logs because `DisplaySnapshotVisitor`
+is enabled in `main_tree.py`.

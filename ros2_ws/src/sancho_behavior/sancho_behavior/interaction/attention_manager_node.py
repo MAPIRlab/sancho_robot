@@ -8,6 +8,7 @@ from rclpy.action import ActionClient
 from ament_index_python import get_package_share_directory
 
 from std_msgs.msg import Empty, Float32, String
+from std_srvs.srv import SetBool, Trigger
 from geometry_msgs.msg import PoseStamped
 from tf_transformations import quaternion_from_euler
 
@@ -259,13 +260,22 @@ class EngagedState(AttentionState):
         self.request_sent = True
     
     def exit(self):
-        self.manager.tracker_lc.set_state(False)
+        # Keep tracking for a short post-interaction window (BTA-093).
+        self.manager._set_tracking_capability(
+            enabled=True,
+            ttl_sec=self.manager.capability_tracking_ttl_sec,
+            mode="post_interaction",
+        )
 
     def _on_interaction_started(self, future):
         response = future.result()
         if response.success:
             self.manager.get_logger().info("¡Dialog Manager tomó el control! Manteniendo contacto visual y rearmando oídos...")
-            self.manager.tracker_lc.set_state(True)
+            self.manager._set_tracking_capability(
+                enabled=True,
+                ttl_sec=self.manager.capability_tracking_ttl_sec,
+                mode="active",
+            )
             
             # NUEVO: Rearmamos el hotword para que el robot sea interrumpible
             self.manager.hotword_lc.set_state(True)
@@ -291,6 +301,7 @@ class AttentionManagerNode(Node):
         # Parameters
         self.declare_parameter("activation_sound_path", default_sound_path)
         self.declare_parameter("cooldown_seconds", 60.0)
+        self.declare_parameter("capability_tracking_ttl_sec", 20.0)
 
         self.cb_group = ReentrantCallbackGroup()
 
@@ -312,12 +323,24 @@ class AttentionManagerNode(Node):
         self.user_cooldowns = {}
         self.hotword_triggered = False
 
+        self.capability_tracking_ttl_sec = float(
+            self.get_parameter("capability_tracking_ttl_sec").value
+        )
+        self.capability_tracking_enabled = False
+        self.capability_tracking_mode = "standby"
+        self.capability_tracking_active_until = 0.0
+
         # Publishers / Subscribers
         self.face_sub = self.create_subscription(FaceRecognitionArray, "/face_recognitions", self._face_cb, 10, callback_group=self.cb_group)
         self.hotword_sub = self.create_subscription(Empty, "/voice_events/hotword_detected", self._hotword_cb, 10, callback_group=self.cb_group)
         self.doa_sub = self.create_subscription(Float32, "/sancho_audio/doa", self._doa_cb, 10, callback_group=self.cb_group)
         self.head_pub = self.create_publisher(PoseStamped, "/head_goal", 10)
         self.tracker_target_pub = self.create_publisher(String, "/face_tracker/set_target", 10)
+        self.tracking_active_until_pub = self.create_publisher(
+            Float32,
+            "/attention_manager/capability/tracking/active_until",
+            10,
+        )
 
         # Clients
         self.central_cluster_client = self.create_client(GetCentralFaceCluster, "/central_faces_cluster_node/get_central_cluster", callback_group=self.cb_group)
@@ -330,6 +353,26 @@ class AttentionManagerNode(Node):
 
         # Services
         self.end_interaction_srv = self.create_service(EndInteraction, "~/interaction_finished", self._interaction_finished_cb, callback_group=self.cb_group)
+        self.enable_tracking_srv = self.create_service(
+            SetBool,
+            "/attention_manager/capability/tracking/enable",
+            self._enable_tracking_cb,
+            callback_group=self.cb_group,
+        )
+        self.disable_tracking_srv = self.create_service(
+            Trigger,
+            "/attention_manager/capability/tracking/disable",
+            self._disable_tracking_cb,
+            callback_group=self.cb_group,
+        )
+
+        self.tracking_mode_sub = self.create_subscription(
+            String,
+            "/attention_manager/capability/tracking/set_mode",
+            self._tracking_mode_cb,
+            10,
+            callback_group=self.cb_group,
+        )
 
         # State Machine main loop (10 Hz)
         self.transition_to(IdleState)
@@ -397,6 +440,79 @@ class AttentionManagerNode(Node):
 
         self.head_pub.publish(msg)
 
+    def _now_sec(self) -> float:
+        return self.get_clock().now().nanoseconds / 1e9
+
+    def _tracking_lifecycle_set(self, enabled: bool):
+        # Best effort: this capability must not block the attention state machine.
+        try:
+            self.tracker_lc.set_state(enabled)
+        except Exception as exc:
+            self.get_logger().warn(f"No se pudo cambiar lifecycle de tracker: {exc}")
+
+    def _set_tracking_capability(self, enabled: bool, ttl_sec: float | None = None, mode: str | None = None):
+        now = self._now_sec()
+        if enabled:
+            ttl = float(ttl_sec) if ttl_sec is not None else float(self.capability_tracking_ttl_sec)
+            self.capability_tracking_active_until = max(
+                self.capability_tracking_active_until,
+                now + max(0.0, ttl),
+            )
+            self.capability_tracking_enabled = True
+            if mode:
+                self.capability_tracking_mode = mode
+            self._tracking_lifecycle_set(True)
+        else:
+            self.capability_tracking_enabled = False
+            self.capability_tracking_active_until = 0.0
+            if mode:
+                self.capability_tracking_mode = mode
+            self._tracking_lifecycle_set(False)
+
+    def _update_tracking_capability(self):
+        now = self._now_sec()
+        if self.capability_tracking_enabled and now >= self.capability_tracking_active_until:
+            self.capability_tracking_enabled = False
+            self.capability_tracking_mode = "standby"
+            self.capability_tracking_active_until = 0.0
+            self._tracking_lifecycle_set(False)
+
+        msg = Float32()
+        msg.data = float(self.capability_tracking_active_until)
+        self.tracking_active_until_pub.publish(msg)
+
+    def _enable_tracking_cb(self, request: SetBool.Request, response: SetBool.Response):
+        if request.data:
+            self._set_tracking_capability(
+                enabled=True,
+                ttl_sec=self.capability_tracking_ttl_sec,
+                mode=self.capability_tracking_mode,
+            )
+            response.success = True
+            response.message = "tracking capability enabled"
+        else:
+            self._set_tracking_capability(enabled=False, mode="standby")
+            response.success = True
+            response.message = "tracking capability disabled"
+        return response
+
+    def _disable_tracking_cb(self, request, response):
+        self._set_tracking_capability(enabled=False, mode="standby")
+        response.success = True
+        response.message = "tracking capability disabled"
+        return response
+
+    def _tracking_mode_cb(self, msg: String):
+        mode = msg.data.strip()
+        if not mode:
+            return
+        self.capability_tracking_mode = mode
+        if mode == "active" and self.capability_tracking_enabled:
+            self._set_tracking_capability(enabled=True, ttl_sec=self.capability_tracking_ttl_sec, mode=mode)
+        elif mode == "standby":
+            # Keep enabled flag as-is; runtime TTL manager decides disable.
+            pass
+
     # --- Communication Callback with Dialog Manager ---
     def _interaction_finished_cb(self, request, response):
         """Called when conversation is over"""
@@ -405,6 +521,12 @@ class AttentionManagerNode(Node):
         now = self.get_clock().now().nanoseconds / 1e9
         for uid in self.target_ids:
             self.user_cooldowns[uid] = now
+
+        self._set_tracking_capability(
+            enabled=True,
+            ttl_sec=self.capability_tracking_ttl_sec,
+            mode="post_interaction",
+        )
 
         if isinstance(self.current_state, EngagedState):
             self.transition_to(IdleState)
@@ -422,6 +544,7 @@ class AttentionManagerNode(Node):
         self.current_state = new_state
 
     def _run_state(self):
+        self._update_tracking_capability()
         if self.current_state:
             self.current_state.execute()
 

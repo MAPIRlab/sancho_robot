@@ -13,6 +13,7 @@ from sancho_behavior.trees.survival_tree import create_survival_subtree
 from sancho_behavior.trees.preemption_tree import create_preemption_subtree
 from sancho_behavior.trees.mission_tree import create_mission_subtree
 from sancho_behavior.trees.idle_tree import create_idle_subtree
+from sancho_behavior.trees.capabilities_tree import create_capabilities_runtime_subtree
 from sancho_behavior.behaviors.battery_monitor import BatteryMonitor
 from sancho_behavior.behaviors.mission_arbitration import MissionAdmissionGate, MissionStatusTracker
 
@@ -79,7 +80,10 @@ def create_root() -> py_trees.behaviour.Behaviour:
 
     battery_monitor = BatteryMonitor()
 
-    # --- BRANCH 2: 4-LEVEL PRIORITIES ---
+    # --- BRANCH 2: CAPABILITIES RUNTIME (BTA-091/BTA-092/BTA-093) ---
+    capabilities_runtime = create_capabilities_runtime_subtree()
+
+    # --- BRANCH 3: 4-LEVEL PRIORITIES ---
     # Memory must be false so higher priority branches can preempt lower priority ones continuously
     priorities = py_trees.composites.Selector(name="Priorities", memory=False)
     
@@ -104,7 +108,7 @@ def create_root() -> py_trees.behaviour.Behaviour:
     idle_l4 = create_idle_subtree()
 
     # -- Build Tree ---
-    root.add_children([topics2bb, priorities])
+    root.add_children([topics2bb, capabilities_runtime, priorities])
     topics2bb.add_children([doa2bb, hotword2bb, odom_yaw2bb, speaker2bb, waypoint2bb, battery2bb, battery_monitor])
     priorities.add_children([survival_l1, preemption_l2, mission_l3, idle_l4])
     
@@ -113,12 +117,22 @@ def create_root() -> py_trees.behaviour.Behaviour:
 def main():
     rclpy.init()
 
+    # =========================================================================
+    # BLACKBOARD NAMESPACE CONVENTIONS (BTA-075)
+    # -------------------------------------------------------------------------
+    # layer/<name>/...      : Private variables for a layer (e.g. layer/L1/..)
+    # mission/...           : Global arbitration for L3 missions
+    # capability/<name>/... : Shared variables for reusable proxies
+    # config/...            : Global static or slowly changing parameters
+    # =========================================================================
+
     # -- Global Configuration ---
     config_bb = py_trees.blackboard.Client(name="GlobalConfig")
 
     # Register BB variables
     config_bb.register_key(key="config/max_head_angle", access=py_trees.common.Access.WRITE)
     config_bb.register_key(key="config/far_angle_limit", access=py_trees.common.Access.WRITE)
+    config_bb.register_key(key="config/capability_tracking_ttl_sec", access=py_trees.common.Access.WRITE)
     # BTA-010: dock_pose — default is the map origin facing forward (+X direction).
     # Override this key at runtime (e.g. from a parameter server node) to point
     # the robot at the actual docking station.
@@ -127,6 +141,7 @@ def main():
     # Set config values
     config_bb.set("config/max_head_angle", 90.0)
     config_bb.set("config/far_angle_limit", 60.0)
+    config_bb.set("config/capability_tracking_ttl_sec", 20.0)
 
     # Default dock pose: map origin (0, 0) facing forward (quaternion w=1)
     _dock_pose = PoseStamped()
@@ -163,6 +178,30 @@ def main():
     observability_bb.set("active_layer",  "none")
     observability_bb.set("active_reason", "initialising")
 
+    # BTA-091/BTA-092/BTA-093: shared capability/resource state.
+    capability_bb = py_trees.blackboard.Client(name="CapabilityRuntime")
+    capability_bb.register_key(key="capability/tracking/enabled", access=py_trees.common.Access.WRITE)
+    capability_bb.register_key(key="capability/tracking/mode", access=py_trees.common.Access.WRITE)
+    capability_bb.register_key(key="capability/tracking/active_until", access=py_trees.common.Access.WRITE)
+    capability_bb.set("capability/tracking/enabled", False)
+    capability_bb.set("capability/tracking/mode", "standby")
+    capability_bb.set("capability/tracking/active_until", 0.0)
+
+    for resource in ("head", "base", "face"):
+        capability_bb.register_key(
+            key=f"resource/{resource}/owner", access=py_trees.common.Access.WRITE
+        )
+        capability_bb.register_key(
+            key=f"resource/{resource}/locked", access=py_trees.common.Access.WRITE
+        )
+        capability_bb.register_key(
+            key=f"resource/{resource}/requester/capability_tracking",
+            access=py_trees.common.Access.WRITE,
+        )
+        capability_bb.set(f"resource/{resource}/owner", "")
+        capability_bb.set(f"resource/{resource}/locked", False)
+        capability_bb.set(f"resource/{resource}/requester/capability_tracking", False)
+
     # --- Tree Creation ---
     root = create_root()
     tree = py_trees_ros.trees.BehaviourTree(
@@ -184,6 +223,8 @@ def main():
         tree.setup(timeout=15.0)
         print("\\n--- Main Behavior Tree Initialized Successfully ---")
         tree.tick_tock(period_ms=100)
+        if tree.node is None:
+            raise RuntimeError("BehaviourTree node no inicializado")
         rclpy.spin(tree.node)
     except (KeyboardInterrupt, py_trees_ros.exceptions.NotReadyError):
         print("\\nStopping behavior tree execution...")

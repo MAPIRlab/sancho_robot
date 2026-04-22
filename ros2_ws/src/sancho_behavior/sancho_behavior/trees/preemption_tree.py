@@ -2,10 +2,20 @@ import py_trees
 import operator
 from py_trees.composites import Sequence
 from py_trees.behaviours import CheckBlackboardVariableValue
-from sancho_behavior.trees.react_to_sound_tree import create_reaction_subtree
+
+# Ensure registry side-effect for ProxySubtreeBehavior factories.
+from sancho_behavior.trees import react_to_sound_tree as _react_to_sound_registry  # noqa: F401
+
+from sancho_behavior.behaviors.proxy_subtree import ProxySubtreeBehavior
+from sancho_behavior.behaviors.capability_control import (
+    CapabilityDisable,
+    CapabilityEnable,
+    CapabilitySetMode,
+)
 from sancho_behavior.behaviors.navigation import PauseNavigation, ResumeNavigation
 from sancho_behavior.behaviors.layer_reporter import LayerReporter
 from sancho_behavior.behaviors.preemption_checks import EnsureAttentionManagerReady
+from sancho_behavior.behaviors.preemption_contract import WithPreemptionContract
 
 def create_preemption_subtree() -> py_trees.behaviour.Behaviour:
     """
@@ -47,7 +57,11 @@ def create_preemption_subtree() -> py_trees.behaviour.Behaviour:
 
     # The pure reaction to sound logic is encapsulated in its own subtree
     # to maintain a clear hierarchical structure.
-    reaction_subtree = create_reaction_subtree()
+    # BTA-073: Use proxy subtree to encapsulate the reaction flow.
+    reaction_subtree = ProxySubtreeBehavior(
+        name="ReactToSoundProxy",
+        subtree_id="react_to_sound"
+    )
 
     # BTA-022: Real readiness handshake with attention manager endpoint.
     attention_manager_ready = EnsureAttentionManagerReady(
@@ -65,9 +79,23 @@ def create_preemption_subtree() -> py_trees.behaviour.Behaviour:
 
     success_flow = Sequence(name="PreemptionSuccessFlow", memory=True)
     success_flow.add_children([
+        CapabilitySetMode(
+            name="TrackingModePreemption",
+            topic="/attention_manager/capability/tracking/set_mode",
+            mode="active",
+        ),
+        CapabilityEnable(
+            name="EnableTrackingPreemption",
+            service_name="/attention_manager/capability/tracking/enable",
+        ),
         reaction_subtree,
         attention_manager_ready,
         resume_nav_success,
+        CapabilitySetMode(
+            name="TrackingModeStandby",
+            topic="/attention_manager/capability/tracking/set_mode",
+            mode="standby",
+        ),
         clear_hotword_success,
     ])
 
@@ -82,6 +110,10 @@ def create_preemption_subtree() -> py_trees.behaviour.Behaviour:
     failure_cleanup = Sequence(name="PreemptionFailureCleanup", memory=False)
     failure_cleanup.add_children([
         resume_nav_failure,
+        CapabilityDisable(
+            name="DisableTrackingOnFailure",
+            service_name="/attention_manager/capability/tracking/disable",
+        ),
         clear_hotword_failure,
         mark_failure,
     ])
@@ -99,4 +131,8 @@ def create_preemption_subtree() -> py_trees.behaviour.Behaviour:
         preemption_flow,
     ])
 
-    return preemption_root
+    return WithPreemptionContract(
+        child=preemption_root,
+        name="L2_HumanPreemption_Preemptable",
+        resumable=True
+    )
