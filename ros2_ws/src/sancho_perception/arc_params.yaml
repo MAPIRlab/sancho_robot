@@ -1,0 +1,31 @@
+action_recognition_node:
+  ros__parameters:
+    frames_route: "/home/cayecaji/image_frames"
+    n_predicciones_lvlm: 3
+    n_predicciones_llm: 5
+    idle_timeout: 5.0
+
+    #Model selection
+    lvlm_model: "qwen2.5vl:7b"
+    llm_model: "llama3.2:3b"
+    format: "json"
+
+    #LVLM Config
+    lvlm_temperature: 0.1
+    lvlm_top_p: 0.75
+    lvlm_num_predict: 175
+
+    #LLM Action predict config
+    llm_action_temperature: 0.6
+    llm_action_top_p: 0.5
+    llm_action_num_predict: 175
+
+    #LLM Voting config
+    llm_voting_temperature: 0.1
+    llm_voting_top_p: 0.5
+    llm_voting_num_predict: 175
+
+    #Diverse control variables
+    debugging: False
+    local_testing: True
+     

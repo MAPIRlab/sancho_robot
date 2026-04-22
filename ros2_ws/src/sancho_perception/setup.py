@@ -34,6 +34,7 @@ setup(
             'single_person_waypoint_generator_node = sancho_perception.single_person_waypoint_generator_node:main',
             'relay_metrics_node = sancho_perception.metrics_node:main',
             'perception_test = sancho_perception.tracking_node:main',
+            'action_recognition_node = sancho_perception.action_recognition_node:main',
         ],
     },
 )
