@@ -55,41 +55,31 @@ class LockTarget(py_trees.behaviour.Behaviour):
             
         return py_trees.common.Status.SUCCESS
 
-class RotateHeadToSound(py_trees_ros.actions.ActionClient):
+class RotateHeadToSound(py_trees_ros.action_clients.FromCallback):
     def __init__(self, name="RotateHeadToSound"):
-        self.action_goal = RotateHead.Goal()
-
         super().__init__(
             name=name,
             action_type=RotateHead,
             action_name="/head_controller/rotate",
-            action_goal=self.action_goal
         )
         
         self.blackboard.register_key("target_angle", access=py_trees.common.Access.READ)
     
-    def initialise(self):
+    def get_goal(self):
         angle_deg = self.blackboard.target_angle if self.blackboard.exists("target_angle") else 0.0
         
-        self.action_goal.target_angle_deg = angle_deg
-        self.action_goal.timeout_sec = 5.0
+        goal = RotateHead.Goal()
+        goal.target_angle_deg = angle_deg
+        goal.timeout_sec = 5.0
         
-        super().initialise()
+        return goal
 
-class TurnToSound(py_trees_ros.actions.ActionClient):
+class TurnToSound(py_trees_ros.action_clients.AttributesFromBlackboard):
     def __init__(self, name="TurnToSound"):
-        self.action_goal = TurnToAngle.Goal()
-
         super().__init__(
             name=name,
             action_type=TurnToAngle,
             action_name='/attention_controller/turn_to_angle',
-            action_goal=self.action_goal
+            goal_fields={'absolute_target_angle_deg': 'absolute_target_angle'}, # {Goal Field: BB Key}
+            wait_for_server_timeout_sec=0.0
         )
-        self.blackboard.register_key("absolute_target_angle", access=py_trees.common.Access.READ)
-    
-    def initialise(self):
-        angle_deg = self.blackboard.absolute_target_angle if self.blackboard.exists("absolute_target_angle") else 0.0
-        self.action_goal.absolute_target_angle_deg = angle_deg
-
-        return super().initialise()

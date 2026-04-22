@@ -1,0 +1,9 @@
+# Request
+float32 timeout_sec 5.0
+---
+# Result
+string text
+bool success
+---
+# Feedback
+float32 audio_duration

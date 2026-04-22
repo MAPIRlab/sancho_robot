@@ -18,6 +18,10 @@ def generate_launch_description():
         PythonLaunchDescriptionSource(os.path.join(audio_pkg_dir, 'launch', 'audio_processing.launch.py'))
     )
 
+    dialog_core_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(os.path.join(audio_pkg_dir, 'launch', 'dialog_core.launch.py'))
+    )
+
     head_action_server = Node(
         package='sancho_control',
         executable='head_action_server',
@@ -47,7 +51,8 @@ def generate_launch_description():
         executable='central_faces_cluster_node',
         name='central_faces_cluster_node',
         output='screen',
-        emulate_tty=True
+        emulate_tty=True,
+        arguments=['--ros-args', '--log-level', 'WARN']
     )
 
     behavior_tree = Node(
@@ -70,6 +75,7 @@ def generate_launch_description():
         DeclareLaunchArgument('prefix', default_value='xterm -hold -e' if os.environ.get('DISPLAY') else ''),
         hardware_launch,
         processing_launch,
+        dialog_core_launch,
         head_action_server,
         turn_action_server,
         tracking_node,

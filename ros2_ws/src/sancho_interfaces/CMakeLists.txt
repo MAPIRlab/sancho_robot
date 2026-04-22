@@ -82,6 +82,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/TriggerUserInteraction.srv"
   "action/PlayAudio.action"
   "action/PlayTTS.action"
+  "action/ListenVoice.action"
   "action/RotateHead.action"
   "action/TurnToAngle.action"
   DEPENDENCIES geometry_msgs sensor_msgs std_msgs action_msgs

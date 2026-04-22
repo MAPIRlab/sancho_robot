@@ -1,197 +1,172 @@
 import time
-from enum import Enum
 import numpy as np
+from enum import Enum
 
 import rclpy
-from rclpy.lifecycle import LifecycleNode, State, TransitionCallbackReturn
+from rclpy.node import Node
+from rclpy.action import ActionServer, CancelResponse, GoalResponse
 
-from std_msgs.msg import String
 from sancho_interfaces.msg import ChunkMono
 from sancho_interfaces.srv import STT
+from sancho_interfaces.action import ListenVoice
 
-IMPORTS_SUCCESSFUL = True
-IMPORT_ERROR_MSG = ""
-
+# (Keep your existing IMPORTS_SUCCESSFUL / try-except block here)
 try:
     from .utils.silero_vad_attach_criterion import SileroVADAttachCriterion
     from .utils.intensity_attach_criterion import IntensityAttachCriterion
 except ImportError as e:
-    IMPORTS_SUCCESSFUL = False
-    IMPORT_ERROR_MSG = str(e)
-
+    pass
 
 class AudioState(int, Enum):
     NO_AUDIO = -1
     SOME_AUDIO = 0
     END_AUDIO = 1
 
-
-class VADTranscriptorNode(LifecycleNode):
-    """
-    Listens to the microphone when active, groups audio using VAD,
-    and sends it to the STT service once the user finishes speaking.
-    """
+class VADTranscriptorActionServer(Node):
     def __init__(self):
-        super().__init__("vad_transcriptor")
+        super().__init__("vad_transcriptor_action_server")
 
         self.declare_parameter("mic_topic", "/sancho_audio/microphone/mono")
-        self.declare_parameter("transcription_topic", "/voice_events/user_transcription")
         self.declare_parameter("vad_criterion", "intensity")
         self.declare_parameter("intensity_threshold", 900)
-        self.declare_parameter("timeout_seconds", 5.0)
         self.declare_parameter("chunk_size", 0.5)
         self.declare_parameter("silence_patience_seconds", 1.5)
 
-        self.audio_state = AudioState.NO_AUDIO
-        self.audio_buffer = []
-        self.check_audio_buffer = []
-        self.previous_chunk = []
-        self.start_listening_time = 0.0
-        self.silence_timer = 0.0
+        self._action_server = ActionServer(
+            self, ListenVoice, 'listen_voice',
+            execute_callback=self.execute_callback,
+            goal_callback=self.goal_callback,
+            cancel_callback=self.cancel_callback
+        )
+
+        self.stt_client = self.create_client(STT, 'sancho_hri/speech/stt')
         
-        # Bandera para ignorar audio mientras esperamos respuesta del STT
-        self._processing = False
-
-        self.chunk_attach_criterion = None
-        self.transcription_pub = None
-        self.mic_sub = None
-        self.stt_client = None
-
-    def on_configure(self, state: State) -> TransitionCallbackReturn:
-        self.get_logger().info("Configuring VAD Transcriptor...")
-        if not IMPORTS_SUCCESSFUL:
-            self.get_logger().fatal(f"Could not import VAD models: {IMPORT_ERROR_MSG}")
-            return TransitionCallbackReturn.FAILURE
-
+        # Setup VAD Criterion
         criterion = self.get_parameter("vad_criterion").get_parameter_value().string_value
         threshold = self.get_parameter("intensity_threshold").get_parameter_value().integer_value
-
         if criterion == "intensity":
             self.chunk_attach_criterion = IntensityAttachCriterion(threshold)
-        elif criterion == "silero":
-            self.chunk_attach_criterion = SileroVADAttachCriterion()
         else:
-            self.get_logger().error(f"Unrecognized criterion: {criterion}")
-            return TransitionCallbackReturn.FAILURE
+            self.chunk_attach_criterion = SileroVADAttachCriterion()
 
-        transcription_topic = self.get_parameter("transcription_topic").get_parameter_value().string_value
-        self.transcription_pub = self.create_lifecycle_publisher(String, transcription_topic, 10)
-        self.stt_client = self.create_client(STT, 'sancho_hri/speech/stt')
+        self.get_logger().info("VAD Transcriptor Action Server is ready.")
 
-        return TransitionCallbackReturn.SUCCESS
+    def goal_callback(self, goal_request):
+        self.get_logger().info("Received request to listen to voice.")
+        return GoalResponse.ACCEPT
 
-    def on_activate(self, state: State) -> TransitionCallbackReturn:
-        self.get_logger().info(">>> LISTENING FOR VOICE COMMAND <<<")
-        self._processing = False
-        self.start_listening_time = time.time()
-        self.audio_state = AudioState.NO_AUDIO
-        self.audio_buffer = []
-        self.check_audio_buffer = []
-        self.previous_chunk = []
-        self.silence_timer = 0.0
+    def cancel_callback(self, goal_handle):
+        self.get_logger().info("Voice listening canceled.")
+        return CancelResponse.ACCEPT
 
-        mic_topic = self.get_parameter("mic_topic").get_parameter_value().string_value
-        self.mic_sub = self.create_subscription(ChunkMono, mic_topic, self.on_audio_chunk, 10)
-
-        return super().on_activate(state)
-
-    def on_deactivate(self, state: State) -> TransitionCallbackReturn:
-        self.get_logger().info(">>> VAD TRANSCRIPTOR DEACTIVATED <<<")
-        if self.mic_sub:
-            self.destroy_subscription(self.mic_sub)
-            self.mic_sub = None
-        return super().on_deactivate(state)
-
-    def on_cleanup(self, state: State) -> TransitionCallbackReturn:
-        if self.transcription_pub:
-            self.destroy_publisher(self.transcription_pub)
-        self.chunk_attach_criterion = None
-        return TransitionCallbackReturn.SUCCESS
-
-    def on_audio_chunk(self, msg: ChunkMono):
-        if self._processing:
-            return
-
-        new_audio = list([np.int16(x) for x in msg.chunk_mono])
-        sample_rate = msg.sample_rate
-        self.check_audio_buffer.extend(new_audio)
-
-        timeout = self.get_parameter("timeout_seconds").get_parameter_value().double_value
+    async def execute_callback(self, goal_handle):
+        self.get_logger().info(">>> START LISTENING <<<")
+        
+        # Initialize state for this action run
+        audio_state = AudioState.NO_AUDIO
+        audio_buffer = []
+        check_audio_buffer = []
+        previous_chunk = []
+        start_listening_time = time.time()
+        silence_timer = 0.0
+        
+        timeout = goal_handle.request.timeout_sec
         chunk_size = self.get_parameter("chunk_size").get_parameter_value().double_value
+        patience = self.get_parameter("silence_patience_seconds").get_parameter_value().double_value
+        mic_topic = self.get_parameter("mic_topic").get_parameter_value().string_value
 
-        # Timeout check
-        if len(self.audio_buffer) == 0 and (time.time() - self.start_listening_time) > timeout:
-            self.get_logger().warn("Timeout: No voice detected.")
-            self._publish_transcription("")
-            self._processing = True
-            return
+        # Queue to pass audio from subscriber callback to this execution thread
+        audio_queue = []
+        
+        def mic_callback(msg):
+            new_audio = list([np.int16(x) for x in msg.chunk_mono])
+            audio_queue.append((new_audio, msg.sample_rate))
 
-        # VAD grouping logic
-        if len(self.check_audio_buffer) >= (chunk_size * sample_rate):
-            # Someone talked
-            if self.chunk_attach_criterion.should_attach_chunk(self.check_audio_buffer, sample_rate):
-                self.silence_timer = 0.0
-                
-                if self.audio_state == AudioState.NO_AUDIO:
-                    self.audio_state = AudioState.SOME_AUDIO
-                    self.audio_buffer.extend(self.previous_chunk)
+        mic_sub = self.create_subscription(ChunkMono, mic_topic, mic_callback, 10)
 
-                self.audio_buffer.extend(self.check_audio_buffer)
-                self.get_logger().debug(f"Voice detected. Buffer: {len(self.audio_buffer) / sample_rate:.1f}s")
-            
-            # Silence
-            elif self.audio_state != AudioState.NO_AUDIO:
-                self.audio_buffer.extend(self.check_audio_buffer)
-                self.silence_timer += chunk_size
-                
-                patience = self.get_parameter("silence_patience_seconds").get_parameter_value().double_value
-                
-                # Silence patience exceeded
-                if self.silence_timer >= patience:
-                    self.audio_state = AudioState.END_AUDIO
-                    self.get_logger().info("End of speech detected (Silence patience reached).")
+        final_transcription = ""
+        success = False
 
-            self.previous_chunk = self.check_audio_buffer
-            self.check_audio_buffer = []
-
-        if self.audio_state == AudioState.END_AUDIO:
-            self._processing = True
-            self._process_stt(self.audio_buffer, sample_rate)
-
-    def _process_stt(self, audio_data, sample_rate):
-        if not self.stt_client.wait_for_service(timeout_sec=1.0):
-            self.get_logger().error("STT service not available.")
-            self._publish_transcription("")
-            return
-
-        req = STT.Request()
-        req.audio = list(map(int, audio_data))
-        req.sample_rate = sample_rate
-
-        self.get_logger().info(f"Sending {len(audio_data)/sample_rate:.1f}s of audio to STT...")
-        future = self.stt_client.call_async(req)
-        future.add_done_callback(self._stt_callback)
-
-    def _stt_callback(self, future):
         try:
-            response = future.result()
-            transcribed_text = response.text
-            self.get_logger().info(f"[SUCCESS] Transcription: '{transcribed_text}'")
-            self._publish_transcription(transcribed_text)
-        except Exception as e:
-            self.get_logger().error(f"STT request failed: {e}")
-            self._publish_transcription("")
+            while rclpy.ok() and not goal_handle.is_cancel_requested:
+                # 1. Check Timeout (no one spoke)
+                if audio_state == AudioState.NO_AUDIO and (time.time() - start_listening_time) > timeout:
+                    self.get_logger().warn("Timeout: No voice detected.")
+                    break
 
-    def _publish_transcription(self, text):
-        msg = String()
-        msg.data = text
-        self.transcription_pub.publish(msg)
+                # 2. Process audio queue
+                while len(audio_queue) > 0:
+                    new_audio, sample_rate = audio_queue.pop(0)
+                    check_audio_buffer.extend(new_audio)
 
+                    if len(check_audio_buffer) >= (chunk_size * sample_rate):
+                        # VAD Logic
+                        if self.chunk_attach_criterion.should_attach_chunk(check_audio_buffer, sample_rate):
+                            silence_timer = 0.0
+                            if audio_state == AudioState.NO_AUDIO:
+                                audio_state = AudioState.SOME_AUDIO
+                                audio_buffer.extend(previous_chunk)
+                            audio_buffer.extend(check_audio_buffer)
+                            
+                        elif audio_state != AudioState.NO_AUDIO:
+                            audio_buffer.extend(check_audio_buffer)
+                            silence_timer += chunk_size
+                            if silence_timer >= patience:
+                                audio_state = AudioState.END_AUDIO
+                                break # Stop processing audio, user is done
+
+                        previous_chunk = check_audio_buffer
+                        check_audio_buffer = []
+
+                if audio_state == AudioState.END_AUDIO:
+                    break
+                
+                # Sleep briefly to yield thread
+                time.sleep(0.05)
+
+            # 3. Handle STT if audio was captured
+            if audio_state == AudioState.END_AUDIO and len(audio_buffer) > 0:
+                self.get_logger().info("User finished speaking. Sending to STT...")
+                if self.stt_client.wait_for_service(timeout_sec=1.0):
+                    req = STT.Request()
+                    req.audio = list(map(int, audio_buffer))
+                    req.sample_rate = sample_rate
+                    
+                    # Async call to service, waiting for result
+                    future = self.stt_client.call_async(req)
+                    while rclpy.ok() and not future.done():
+                        time.sleep(0.05)
+                        
+                    if future.result() is not None:
+                        final_transcription = future.result().text
+                        success = True
+                        self.get_logger().info(f"Transcription: {final_transcription}")
+                else:
+                    self.get_logger().error("STT Service unavailable.")
+
+        finally:
+            # Clean up subscription
+            self.destroy_subscription(mic_sub)
+
+        # 4. Return Result to Behavior Tree
+        if goal_handle.is_cancel_requested:
+            goal_handle.canceled()
+            self.get_logger().info("Action Canceled")
+            return ListenVoice.Result()
+
+        goal_handle.succeed()
+        result = ListenVoice.Result()
+        result.text = final_transcription
+        result.success = success
+        return result
 
 def main(args=None):
     rclpy.init(args=args)
-    node = VADTranscriptorNode()
-    rclpy.spin(node)
+    node = VADTranscriptorActionServer()
+    # Use MultiThreadedExecutor so the ActionServer and Subscriptions don't block each other
+    executor = rclpy.executors.MultiThreadedExecutor()
+    executor.add_node(node)
+    executor.spin()
     rclpy.shutdown()
 
 if __name__ == '__main__':
