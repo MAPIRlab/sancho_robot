@@ -1,8 +1,10 @@
 import py_trees
 import py_trees.decorators
-from py_trees.composites import Sequence
-from py_trees.behaviours import CheckBlackboardVariableValue
+from py_trees.composites import Sequence, Selector
+from py_trees.behaviours import CheckBlackboardVariableValue, SetBlackboardVariable
 import operator
+import py_trees_ros
+from sancho_interfaces.action import PlayTTS
 
 from sancho_behavior.behaviors.layer_reporter import LayerReporter
 from sancho_behavior.behaviors.navigation import NavigateToDock
@@ -43,32 +45,88 @@ def create_survival_subtree() -> py_trees.behaviour.Behaviour:
         reason_label="battery_critical",
     )
 
-    # Gate: only allow the rest of the sequence to execute if battery is
-    # critically low. When False, the Sequence returns FAILURE and the
-    # parent Selector moves to the next layer (L2).
+    # ================= GATES =================
+
     battery_critical_check = CheckBlackboardVariableValue(
         name="IsBatteryCritical?",
-        check=py_trees.common.ComparisonExpression(
-            variable="battery_critical",
-            value=True,
-            operator=operator.eq
-        )
+        check=py_trees.common.ComparisonExpression(variable="battery_critical", value=True, operator=operator.eq)
     )
 
-    # BTA-010: Real docking action with a 120-second hard timeout.
-    # NavigateToDock reads config/dock_pose and sends a NavigateToPose goal.
+    is_charging_check = CheckBlackboardVariableValue(
+        name="IsCharging?",
+        check=py_trees.common.ComparisonExpression(variable="is_charging", value=True, operator=operator.eq)
+    )
+
+    has_greeted_check = CheckBlackboardVariableValue(
+        name="HasGreeted?",
+        check=py_trees.common.ComparisonExpression(variable="has_greeted_charging", value=True, operator=operator.eq)
+    )
+
+    # ================= CHARGING BRANCH =================
+    
+    greeting_goal = PlayTTS.Goal()
+    greeting_goal.text = "Gracias por ponerme a cargar."
+    greeting_tts = py_trees_ros.action_clients.FromConstant(
+        name="GreetingTTS", action_type=PlayTTS, action_name="/play_tts", action_goal=greeting_goal, wait_for_server_timeout_sec=1.0 
+    )
+
+    set_greeted_flag = SetBlackboardVariable(
+        name="SetGreetedFlag", variable_name="has_greeted_charging", variable_value=True, overwrite=True
+    )
+
+    # 1. Speak, then set the flag
+    greeting_sequence = Sequence(name="Greeting_Sequence", memory=True)
+    greeting_sequence.add_children([greeting_tts, set_greeted_flag])
+
+    # 2. Skip speaking if the flag is already True
+    check_greeted_selector = Selector(name="Check_Greeted", memory=False)
+    check_greeted_selector.add_children([
+        has_greeted_check,  
+        greeting_sequence   
+    ])
+
+    # 3. Only run this whole logic if we are charging
+    handle_charging_sequence = Sequence(name="Handle_Charging", memory=False)
+    handle_charging_sequence.add_children([
+        is_charging_check,
+        check_greeted_selector
+    ])
+
+    # ================= DOCKING BRANCH =================
+
     navigate_to_dock = NavigateToDock(name="NavigateToDock")
     dock_with_timeout = py_trees.decorators.Timeout(
-        child=navigate_to_dock,
-        name="DockTimeout",
-        duration=120.0,
+        child=navigate_to_dock, name="DockTimeout", duration=120.0,
     )
 
-    survival_root = Sequence(name="L1_Survival", memory=True)
+    sos_goal = PlayTTS.Goal()
+    sos_goal.text = "Ayuda, ponme a cargar."
+    request_charge_sos = py_trees_ros.action_clients.FromConstant(
+        name="RequestChargeTTS", action_type=PlayTTS, action_name="/play_tts", action_goal=sos_goal, wait_for_server_timeout_sec=1.0 
+    )
+
+    # 4. Dock, then yell for help
+    docking_sequence = Sequence(name="Docking_Sequence", memory=True)
+    docking_sequence.add_children([
+        dock_with_timeout,
+        request_charge_sos,
+    ])
+
+    # ================= ROOT ROUTER =================
+
+    # 5. Choose: Are we charging, or do we need to dock?
+    charge_or_dock = Selector(name="Charge_Or_Dock", memory=False)
+    charge_or_dock.add_children([
+        handle_charging_sequence, 
+        docking_sequence   
+    ])
+
+    # 6. Main entry point
+    survival_root = Sequence(name="L1_Survival", memory=False)
     survival_root.add_children([
         reporter,
         battery_critical_check,
-        dock_with_timeout,
+        charge_or_dock,
     ])
 
     return survival_root

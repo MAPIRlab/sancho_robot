@@ -146,8 +146,8 @@ def main():
     # Default dock pose: map origin (0, 0) facing forward (quaternion w=1)
     _dock_pose = PoseStamped()
     _dock_pose.header.frame_id = "map"
-    _dock_pose.pose.position.x = -7.275995254516602
-    _dock_pose.pose.position.y = 1.7265782356262207
+    _dock_pose.pose.position.x = -7.10
+    _dock_pose.pose.position.y = 1.55
     _dock_pose.pose.position.z = 0.0
     _dock_pose.pose.orientation = Quaternion(x=0.0, y=0.0, z=0.0, w=1.0)
     config_bb.set("config/dock_pose", _dock_pose)
