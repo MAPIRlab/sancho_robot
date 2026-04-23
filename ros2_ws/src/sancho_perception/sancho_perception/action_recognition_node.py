@@ -32,7 +32,7 @@ class ActionRecognitionNode(Node):
        # --- Params read from .yaml ---
         
         # Routes and predictions for models
-        self.frames_route = self.declare_parameter('frames_route', '/home/cayecaji/image_frames').value #CHECK AT LAB
+        self.frames_route = self.declare_parameter('frames_route', '/home/mapir/ar_images').value #CHECK AT LAB
         self.nPrediccionesLVLM = self.declare_parameter('n_predicciones_lvlm', 3).value
         self.nPrediccionesLLM = self.declare_parameter('n_predicciones_llm', 5).value
 
@@ -70,7 +70,7 @@ class ActionRecognitionNode(Node):
 
         # --- Utils ---
         self.idle_timeout = self.declare_parameter('idle_timeout', 3.0).value
-        self.LOCAL_TESTING = self.declare_parameter('local_testing', True).value
+        self.LOCAL_TESTING = self.declare_parameter('local_testing', False).value
         self.predict_frames_list = []
         self.id_match_list = []
         self.image_route_list = []
@@ -82,7 +82,7 @@ class ActionRecognitionNode(Node):
         self.timeout_timer = None
         self.current_id = "No ID"
         self.frame_counter = 0
-        self.process_frame_every_n = 7 #CHECK AT LAB / CHANGE SO NOT HARDCODED
+        self.process_frame_every_n = 15 #CHECK AT LAB / CHANGE SO NOT HARDCODED
         
 
         # --- Subcriptions and publishers ---
@@ -142,7 +142,7 @@ class ActionRecognitionNode(Node):
             try:
                     frame = self.bridge.imgmsg_to_cv2(img_msg, "bgr8")
                     self.predict_frames_list.append(frame)
-                    self.id_match_list.append("Frame " + str(self.id_count) + ": " + id_msg)
+                    self.id_match_list.append("Frame " + str(self.id_count) + ": " + str(id_msg))
                     self.get_logger().info("    Image recieved...")
                     self.reset_idle_timer()
                     self.id_count +=1
@@ -419,7 +419,7 @@ def get_frame_id_info(id_info):
     frame_info_index = 1
     result = ""
     for frame_info in id_info:
-        result += str(frame_info_index) + ". " + frame_info + "\n"
+        result += str(frame_info_index) + ". " + str(frame_info) + "\n"
         frame_info_index +=1
 
     return result
