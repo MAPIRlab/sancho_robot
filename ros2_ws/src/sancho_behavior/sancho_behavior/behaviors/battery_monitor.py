@@ -15,11 +15,6 @@ class BatteryMonitor(py_trees.behaviour.Behaviour):
         /battery_level     (float): Battery percentage 0.0-1.0
         /battery_degraded  (bool):  True below 15%, cleared above 90%
         /battery_critical  (bool):  True below 10%, cleared above 90%
-
-    Thresholds:
-        DEGRADED  < 15%  → stop accepting new tasks
-        CRITICAL  < 10%  → dock immediately
-        RECOVERY  > 90%  → clear both flags (hysteresis)
     """
 
     THRESHOLD_CRITICAL = 0.10
@@ -29,30 +24,16 @@ class BatteryMonitor(py_trees.behaviour.Behaviour):
     def __init__(self, name: str = "BatteryMonitor"):
         super().__init__(name)
 
-        # Internal hysteresis state — this is NOT an FSM, just memory
-        # inside the node to avoid flag chattering around thresholds
         self._was_critical = False
         self._was_degraded = False
 
         # Blackboard client
         self.bb = self.attach_blackboard_client(name=self.name)
 
-        self.bb.register_key(
-            key="battery_msg",
-            access=py_trees.common.Access.READ
-        )
-        self.bb.register_key(
-            key="battery_level",
-            access=py_trees.common.Access.WRITE
-        )
-        self.bb.register_key(
-            key="battery_degraded",
-            access=py_trees.common.Access.WRITE
-        )
-        self.bb.register_key(
-            key="battery_critical",
-            access=py_trees.common.Access.WRITE
-        )
+        self.bb.register_key(key="battery_msg", access=py_trees.common.Access.READ)
+        self.bb.register_key(key="battery_level", access=py_trees.common.Access.WRITE)
+        self.bb.register_key(key="battery_degraded", access=py_trees.common.Access.WRITE)
+        self.bb.register_key(key="battery_critical", access=py_trees.common.Access.WRITE)
     
     def initialize(self):
         self.bb.battery_critical = False
@@ -61,25 +42,27 @@ class BatteryMonitor(py_trees.behaviour.Behaviour):
 
     def update(self) -> py_trees.common.Status:
 
-        # --- Read raw message from blackboard ---
         battery_msg = self.bb.battery_msg
 
         if battery_msg is None:
             self.logger.warning("No battery message on blackboard yet")
             return py_trees.common.Status.FAILURE
 
-        percentage = battery_msg.percentage  # ROS standard: 0.0 - 1.0
-        is_charging = (
-            battery_msg.power_supply_status
-            == BatteryState.POWER_SUPPLY_STATUS_CHARGING
-        )
+        # --- Hardware Patch 1: Percentage Scaling ---
+        # Hardware outputs 0-100 (e.g., 81.0), convert to ROS standard 0.0-1.0
+        percentage = battery_msg.percentage / 100.0
+        percentage = 0.05 # --- TEMP OVERRIDE FOR TESTING ---
+
+        # --- Hardware Patch 2: Charging Status ---
+        # Hardware outputs status: 0 (UNKNOWN). Use current instead.
+        # Negative current (-1.8A) means discharging, positive means charging.
+        is_charging = battery_msg.current > 0.0
 
         # --- Write level ---
         self.bb.battery_level = percentage
 
         # --- Hysteresis logic ---
         # Once a flag is set, it only clears when charging AND above recovery threshold.
-        # This prevents chattering if percentage hovers around a threshold.
         if is_charging and percentage >= self.THRESHOLD_RECOVERY:
             self._was_critical = False
             self._was_degraded = False
