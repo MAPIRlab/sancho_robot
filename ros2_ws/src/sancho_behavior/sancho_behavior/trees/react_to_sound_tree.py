@@ -1,5 +1,7 @@
 import py_trees
-
+from sancho_behavior.behaviors.proxy_subtree import ProxySubtreeBehavior
+#from sancho_behavior.trees import interaction_tree as _interaction_registry  # noqa: F401
+from sancho_behavior.trees import interaction_tree
 from sancho_behavior.behaviors.sound import IsAngleFar, LockTarget, RotateHeadToSound, TurnToSound
 from sancho_behavior.behaviors.interaction import GreetUser, IdentifyCentralTarget
 from sancho_behavior.behaviors.factories import SubtreeRegistry
@@ -28,6 +30,12 @@ def create_reaction_subtree(name: str = "ReactToSound", config: dict = None) -> 
         overwrite=True
     )
 
+    interaction_subtree = ProxySubtreeBehavior(
+        name="InteractionProxy",
+        subtree_id="interaction"
+    )
+    interaction_subtree = interaction_tree.create_interaction_subtree(name="InteractionProxy", config=None)
+
     # --- Build Tree ---
     root.add_children([
         LockTarget(),
@@ -35,7 +43,7 @@ def create_reaction_subtree(name: str = "ReactToSound", config: dict = None) -> 
         stabilize_camera,
         IdentifyCentralTarget(),
         GreetUser(),
-        set_engaged
+        interaction_subtree
     ])
     turn_decision.add_children([turn_far_seq, RotateHeadToSound()])
     turn_far_seq.add_children([IsAngleFar(), TurnToSound()])

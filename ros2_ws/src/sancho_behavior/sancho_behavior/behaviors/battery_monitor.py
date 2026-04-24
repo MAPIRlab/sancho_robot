@@ -17,9 +17,9 @@ class BatteryMonitor(py_trees.behaviour.Behaviour):
         /battery_critical  (bool):  True below 10%, cleared above 90%
     """
 
-    THRESHOLD_CRITICAL = 0.99
-    THRESHOLD_DEGRADED = 0.99
-    THRESHOLD_RECOVERY = 0.100
+    THRESHOLD_CRITICAL = 0.10
+    THRESHOLD_DEGRADED = 0.15
+    THRESHOLD_RECOVERY = 0.9
 
     def __init__(self, name: str = "BatteryMonitor"):
         super().__init__(name)

@@ -4,7 +4,12 @@ from py_trees.composites import Sequence
 
 from sancho_behavior.behaviors.tracking import ManageFaceTracker, UpdateTrackingTarget
 from sancho_behavior.behaviors.factories import SubtreeRegistry
-
+from sancho_behavior.behaviors.interaction import (
+    SetFaceMode,
+    ListenToUser,
+    GenerateLLMResponse,
+    RespondUser,
+)
 # ==============================================================================
 # MOCKS (As requested by user for standalone proxy migration)
 # ==============================================================================
@@ -55,14 +60,16 @@ def create_interaction_subtree(name: str = "Interaction", config: dict = None) -
     conversation = py_trees.composites.Sequence(name="Conversation", memory=True)
 
     conversation.add_children([
-        MockSetFaceMode("listening"),
-        MockListenToUser(),             # Fails if timeout/silence -> drops out of conversation
-        MockSetFaceMode("thinking"),
-        MockGenerateLLMResponse(),
-        MockSetFaceMode("speaking"),
-        # Optionally add another SetFaceMode(blackboard.ai_emotion) here if you want color!
-        MockRespondUser(),
-        MockSetFaceMode("idle")
+        SetFaceMode("listening"),
+        ListenToUser(
+            name="ListenToUser",
+            timeout_sec=0.0,
+        ),
+        SetFaceMode("thinking"),
+        GenerateLLMResponse(),
+        SetFaceMode("speaking"),
+        RespondUser(),
+        SetFaceMode("idle")
     ])
 
     reset_engaged = py_trees.behaviours.SetBlackboardVariable(
@@ -73,7 +80,7 @@ def create_interaction_subtree(name: str = "Interaction", config: dict = None) -
     )
     
     # Build Tree
-    interaction_seq.add_children([is_engaged, handle_interaction_end])
+    interaction_seq.add_children([ handle_interaction_end]) # is_engaged removed
     handle_interaction_end.add_children([interaction_tasks, MockSetFaceMode("idle"), reset_engaged])
     interaction_tasks.add_children([tracking_parallel, conversation])
     tracking_parallel.add_children([

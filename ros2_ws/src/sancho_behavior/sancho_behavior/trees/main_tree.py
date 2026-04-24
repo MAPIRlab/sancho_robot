@@ -217,8 +217,6 @@ def main():
     except Exception as e:
         print(f"\\n--- Could not render static tree: {e} ---")
 
-    tree.visitors.append(py_trees.visitors.DisplaySnapshotVisitor(display_blackboard=True))
-
     try:
         tree.setup(timeout=15.0)
         print("\\n--- Main Behavior Tree Initialized Successfully ---")
