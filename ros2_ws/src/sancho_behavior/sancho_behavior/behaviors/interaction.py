@@ -209,6 +209,7 @@ class GenerateLLMResponse(py_trees_ros.service_clients.FromCallback):
         
         self.blackboard.register_key("ai_response_text", access=py_trees.common.Access.WRITE)
         self.blackboard.register_key("ai_emotion", access=py_trees.common.Access.WRITE)
+        self.blackboard.register_key("interaction_finished", access=py_trees.common.Access.WRITE)
 
     def get_request(self):
         """Called automatically by the parent's initialise() method"""
@@ -242,9 +243,15 @@ class GenerateLLMResponse(py_trees_ros.service_clients.FromCallback):
                 # Use .get("text") with a fallback to .get("response") just in case
                 response_text = value.get("text", value.get("response", "Ha habido un fallo al pensar."))
                 
+                is_finished = value.get("finished", False)
                 self.blackboard.ai_response_text = response_text
                 self.blackboard.ai_emotion = value.get("emotion", "neutral")
-                self.logger.info(f"LLM Response: {self.blackboard.ai_response_text}")
+                self.blackboard.interaction_finished = is_finished
+                
+                if is_finished:
+                    self.logger.info("LLM signaled end of conversation.")
+                
+                self.logger.info(f"LLM Response: {self.blackboard.ai_response_text} (Finished: {is_finished})")
                 
             except Exception as e:
                 self.logger.error(f"Error parsing SanchoPrompt response: {e}")
@@ -256,8 +263,8 @@ class GenerateLLMResponse(py_trees_ros.service_clients.FromCallback):
             self.blackboard.ai_response_text = "Perdona, no he podido conectar con mi cerebro."
             self.blackboard.ai_emotion = "sad"
             
-        # Always return SUCCESS so that the sequence doesn't get aborted
-        return py_trees.common.Status.SUCCESS
+        # Return the actual status (RUNNING, SUCCESS, or FAILURE)
+        return status
     
 class RespondUser(py_trees_ros.action_clients.AttributesFromBlackboard):
     """Reads AI text from blackboard and sends to PlayTTS Action Server"""

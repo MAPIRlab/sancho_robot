@@ -23,18 +23,7 @@ def create_reaction_subtree(name: str = "ReactToSound", config: dict = None) -> 
 
     stabilize_camera = py_trees.timers.Timer(name="StabilizeCamera", duration=1.0) # 1 second delay
 
-    set_engaged = py_trees.behaviours.SetBlackboardVariable(
-        name="SetEngaged",
-        variable_name="is_engaged",
-        variable_value=True,
-        overwrite=True
-    )
-
-    interaction_subtree = ProxySubtreeBehavior(
-        name="InteractionProxy",
-        subtree_id="interaction"
-    )
-    interaction_subtree = interaction_tree.create_interaction_subtree(name="InteractionProxy", config=None)
+    interaction_subtree = interaction_tree.create_interaction_tree()
 
     # --- Build Tree ---
     root.add_children([

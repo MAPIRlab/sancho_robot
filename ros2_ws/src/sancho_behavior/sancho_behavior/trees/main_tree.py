@@ -202,6 +202,32 @@ def main():
         capability_bb.set(f"resource/{resource}/locked", False)
         capability_bb.set(f"resource/{resource}/requester/capability_tracking", False)
 
+    # BTA-Interactions: interaction state defaults
+    interaction_bb = py_trees.blackboard.Client(name="InteractionState")
+    interaction_bb.register_key(key="user_transcription", access=py_trees.common.Access.WRITE)
+    interaction_bb.register_key(key="ai_response_text", access=py_trees.common.Access.WRITE)
+    interaction_bb.register_key(key="ai_emotion", access=py_trees.common.Access.WRITE)
+    interaction_bb.register_key(key="is_engaged", access=py_trees.common.Access.WRITE)
+    interaction_bb.register_key(key="interaction_finished", access=py_trees.common.Access.WRITE)
+    interaction_bb.set("user_transcription", "")
+    interaction_bb.set("ai_response_text", "")
+    interaction_bb.set("ai_emotion", "neutral")
+    interaction_bb.set("is_engaged", False)
+    interaction_bb.set("interaction_finished", False)
+
+    # BTA-Battery: battery state defaults
+    battery_bb = py_trees.blackboard.Client(name="BatteryState")
+    battery_bb.register_key(key="battery_critical", access=py_trees.common.Access.WRITE)
+    battery_bb.register_key(key="battery_degraded", access=py_trees.common.Access.WRITE)
+    battery_bb.register_key(key="has_greeted_charging", access=py_trees.common.Access.WRITE)
+    battery_bb.register_key(key="has_requested_charge", access=py_trees.common.Access.WRITE)
+    battery_bb.register_key(key="has_greeted_full", access=py_trees.common.Access.WRITE)
+    battery_bb.set("battery_critical", False)
+    battery_bb.set("battery_degraded", False)
+    battery_bb.set("has_greeted_charging", False)
+    battery_bb.set("has_requested_charge", False)
+    battery_bb.set("has_greeted_full", False)
+
     # --- Tree Creation ---
     root = create_root()
     tree = py_trees_ros.trees.BehaviourTree(

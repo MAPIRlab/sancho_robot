@@ -1,91 +1,109 @@
-import operator
 import py_trees
-from py_trees.composites import Sequence
+import py_trees_ros
+import operator
+from ..behaviors.interaction import ListenToUser, GenerateLLMResponse, RespondUser
+from ..behaviors.tracking import ManageFaceTracker, UpdateTrackingTarget
 
-from sancho_behavior.behaviors.tracking import ManageFaceTracker, UpdateTrackingTarget
-from sancho_behavior.behaviors.factories import SubtreeRegistry
-from sancho_behavior.behaviors.interaction import (
-    SetFaceMode,
-    ListenToUser,
-    GenerateLLMResponse,
-    RespondUser,
-)
-# ==============================================================================
-# MOCKS (As requested by user for standalone proxy migration)
-# ==============================================================================
-class MockSetFaceMode(py_trees.behaviours.Success):
-    def __init__(self, mode: str):
-        super().__init__(name=f"MockSetFaceMode({mode})")
-
-class MockListenToUser(py_trees.behaviours.Success):
-    def __init__(self):
-        super().__init__(name="MockListenToUser")
-
-class MockGenerateLLMResponse(py_trees.behaviours.Success):
-    def __init__(self):
-        super().__init__(name="MockGenerateLLMResponse")
-
-class MockRespondUser(py_trees.behaviours.Success):
-    def __init__(self):
-        super().__init__(name="MockRespondUser")
-# ==============================================================================
-
-@SubtreeRegistry.register("interaction")
-def create_interaction_subtree(name: str = "Interaction", config: dict = None) -> py_trees.behaviour.Behaviour:
-    """
-    Creates the branch that manages active face tracking.
-    BTA-070: This subtree is now integrated via ProxySubtreeBehavior.
-    """
-    interaction_seq = py_trees.composites.Sequence(name=name, memory=False)
-    
-    # Condition to enter this branch
-    is_engaged = py_trees.behaviours.CheckBlackboardVariableValue(
-        name="IsEngaged?",
-        check=py_trees.common.ComparisonExpression("is_engaged", True, operator=operator.eq)
-    )
-
-    handle_interaction_end = py_trees.composites.Selector(name="HandleInteractionEnd", memory=False)
-    
-    interaction_tasks = py_trees.composites.Parallel(
-        name="InteractionTasks",
-        policy=py_trees.common.ParallelPolicy.SuccessOnAll(synchronise=False)
-    )
-
-    # Parallel node to handle lifecycle and target updates simultaneously
-    tracking_parallel = py_trees.composites.Parallel(
-        name="ActiveTracking",
-        policy=py_trees.common.ParallelPolicy.SuccessOnAll(synchronise=False),
-    )
-
-    conversation = py_trees.composites.Sequence(name="Conversation", memory=True)
-
-    conversation.add_children([
-        SetFaceMode("listening"),
-        ListenToUser(
-            name="ListenToUser",
-            timeout_sec=0.0,
-        ),
-        SetFaceMode("thinking"),
-        GenerateLLMResponse(),
-        SetFaceMode("speaking"),
-        RespondUser(),
-        SetFaceMode("idle")
-    ])
-
-    reset_engaged = py_trees.behaviours.SetBlackboardVariable(
-        name="ResetEngaged",
-        variable_name="is_engaged",
-        variable_value=False,
+def SetFaceMode(mode):
+    """Helper to set face mode via blackboard"""
+    return py_trees.behaviours.SetBlackboardVariable(
+        name=f"SetFace:{mode}",
+        variable_name="face_mode",
+        variable_value=mode,
         overwrite=True
     )
+
+def create_interaction_tree():
+    """
+    Creates a self-contained subtree for human interaction.
+    Manages its own lifecycle and provides a public 'is_engaged' flag.
+    """
     
-    # Build Tree
-    interaction_seq.add_children([ handle_interaction_end]) # is_engaged removed
-    handle_interaction_end.add_children([interaction_tasks, MockSetFaceMode("idle"), reset_engaged])
-    interaction_tasks.add_children([tracking_parallel, conversation])
+    # Root: A sequence that ensures we reset before looping and cleanup after
+    interaction_root = py_trees.composites.Sequence(name="InteractionRoot", memory=True)
+
+    # 1. State Initialisation
+    init_state = py_trees.composites.Sequence(name="InitState", memory=True)
+    init_state.add_children([
+        # Internal flag for the loop
+        py_trees.behaviours.SetBlackboardVariable(
+            name="ResetFinished",
+            variable_name="interaction_finished",
+            variable_value=False,
+            overwrite=True
+        ),
+        # Public flag for other branches to know we are busy
+        py_trees.behaviours.SetBlackboardVariable(
+            name="SetEngaged",
+            variable_name="is_engaged",
+            variable_value=True,
+            overwrite=True
+        )
+    ])
+
+    # 2. Tracking Subtree (Parallel to the conversation)
+    tracking_parallel = py_trees.composites.Parallel(
+        name="ActiveTracking",
+        policy=py_trees.common.ParallelPolicy.SuccessOnAll()
+    )
     tracking_parallel.add_children([
         ManageFaceTracker(),
         UpdateTrackingTarget()
     ])
 
-    return interaction_seq
+    # 3. One Conversation Turn (Sequence)
+    conversation_turn = py_trees.composites.Sequence(name="ConversationTurn", memory=True)
+    conversation_turn.add_children([
+        SetFaceMode("listening"),
+        ListenToUser(name="ListenToUser", timeout_sec=10.0),
+        SetFaceMode("thinking"),
+        GenerateLLMResponse(),
+        SetFaceMode("speaking"),
+        RespondUser(),
+    ])
+
+    # 4. The Conversation Loop
+    is_finished_check = py_trees.behaviours.CheckBlackboardVariableValue(
+        name="IsFinished?",
+        check=py_trees.common.ComparisonExpression("interaction_finished", True, operator=operator.eq)
+    )
+
+    conversation_loop = py_trees.composites.Selector(name="ConversationLoop", memory=False)
+    conversation_loop.add_children([
+        is_finished_check,
+        py_trees.decorators.Repeat(
+            name="RepeatTurn",
+            child=conversation_turn,
+            num_success=-1
+        )
+    ])
+
+    # 5. Parallel interaction (Tracking + Conversation)
+    interaction_tasks = py_trees.composites.Parallel(
+        name="InteractionTasks",
+        policy=py_trees.common.ParallelPolicy.SuccessOnOne(), 
+        children=[
+            tracking_parallel,
+            conversation_loop
+        ]
+    )
+
+    # 6. Cleanup
+    cleanup = py_trees.composites.Sequence(name="Cleanup", memory=True)
+    cleanup.add_children([
+        SetFaceMode("idle"),
+        py_trees.behaviours.SetBlackboardVariable(
+            name="ClearEngaged",
+            variable_name="is_engaged",
+            variable_value=False,
+            overwrite=True
+        )
+    ])
+
+    interaction_root.add_children([
+        init_state,
+        interaction_tasks,
+        cleanup
+    ])
+
+    return interaction_root
