@@ -61,6 +61,7 @@ class RotateHeadToSound(py_trees_ros.action_clients.FromCallback):
             name=name,
             action_type=RotateHead,
             action_name="/head_controller/rotate",
+            wait_for_server_timeout_sec=0.0
         )
         
         self.blackboard.register_key("target_angle", access=py_trees.common.Access.READ)

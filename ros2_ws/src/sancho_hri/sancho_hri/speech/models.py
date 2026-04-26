@@ -20,6 +20,7 @@ class TTS_MODELS(SmartStrEnum):
     TACOTRON2 = "tacotron2"
     XTTS = "xtts"
     YOUR_TTS = "your_tts"
+    PYTTSX3 = "pyttsx3"
 
 class TTS_SPEAKERS:
     class BARK(SmartStrEnum):
@@ -52,6 +53,9 @@ class TTS_SPEAKERS:
     class YOUR_TTS(SmartStrEnum):
         FEMALE_EN_5 = "female-en-5"
         MALE_EN_2 = "male-en-2"
+
+    class PYTTSX3(SmartStrEnum):
+        DEFAULT = "default"
 
 STT_NEEDS_API_KEY = {
     STT_MODELS.GOOGLE

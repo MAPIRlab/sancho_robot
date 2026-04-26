@@ -30,16 +30,13 @@ class SanchoMockEnvironment(Node):
 
         # --- ACTIONS ---
         self._as_nav = ActionServer(self, NavigateToPose, '/navigate_to_pose', self.execute_nav)
-        self._as_tts = ActionServer(self, PlayTTS, '/play_tts', self.execute_tts)
         self._as_rotate = ActionServer(self, RotateHead, '/head_controller/rotate', self.execute_rotate)
         self._as_turn = ActionServer(self, TurnToAngle, '/attention_controller/turn_to_angle', self.execute_turn)
         self._as_turn_head = ActionServer(self, TurnToAngle, '/head_controller/turn_to_angle', self.execute_turn)
-        self._as_listen = ActionServer(self, ListenVoice, 'listen_voice', self.execute_listen)
 
         # --- SERVICES ---
         self._srv_cluster = self.create_service(GetCentralFaceCluster, '/central_faces_cluster_node/get_central_cluster', self.srv_cluster_cb)
         self._srv_greet = self.create_service(GreetPeople, 'assistant/greet_people', self.srv_greet_cb)
-        self._srv_prompt = self.create_service(SanchoPrompt, 'sancho_hri/llm/prompt', self.srv_prompt_cb)
         self._srv_social = self.create_service(SocialState, '/social_state', self.srv_social_cb)
 
         # --- TOPIC PUBLISHERS ---
@@ -86,18 +83,6 @@ class SanchoMockEnvironment(Node):
         goal_handle.succeed()
         return NavigateToPose.Result()
 
-    def execute_tts(self, goal_handle):
-        text = goal_handle.request.text
-        self.get_logger().info(f'Speaking: "{text}"')
-        
-        # Publish to the mock speech topic
-        msg = String()
-        msg.data = text
-        self._pub_mock_speech.publish(msg)
-
-        goal_handle.succeed()
-        return PlayTTS.Result()
-
     def execute_rotate(self, goal_handle):
         self.get_logger().info(f'Rotating head: {goal_handle.request.target_angle_deg} degrees')
         goal_handle.succeed()
@@ -108,14 +93,6 @@ class SanchoMockEnvironment(Node):
         goal_handle.succeed()
         return TurnToAngle.Result()
 
-    def execute_listen(self, goal_handle):
-        self.get_logger().info('Listening to user...')
-        goal_handle.succeed()
-        result = ListenVoice.Result()
-        result.success = True
-        result.text = "Hola Sancho, ¿cómo estás?"
-        return result
-
     # --- Service Callbacks ---
     def srv_cluster_cb(self, request, response):
         self.get_logger().info('Cluster request received')
@@ -125,25 +102,6 @@ class SanchoMockEnvironment(Node):
 
     def srv_greet_cb(self, request, response):
         self.get_logger().info('Greet people request received')
-        return response
-
-    def srv_prompt_cb(self, request, response):
-        self.conv_turns += 1
-        self.get_logger().info(f'LLM Prompt received: {request.text} (Turn {self.conv_turns})')
-        
-        finished = False
-        text = "Estoy muy bien, ¡gracias por preguntar!"
-        
-        if self.conv_turns >= 3:
-            text = "Bueno, me tengo que ir. ¡Hasta luego!"
-            finished = True
-            self.conv_turns = 0 # Reset for next conversation
-            
-        response.value_json = json.dumps({
-            "text": text,
-            "emotion": "happy",
-            "finished": finished
-        })
         return response
 
     def srv_social_cb(self, request, response):

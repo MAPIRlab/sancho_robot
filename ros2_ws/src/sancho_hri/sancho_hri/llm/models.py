@@ -57,7 +57,11 @@ class MODELS:
             DEEPSEEK_R1_DISTILL_QWEN_32B = "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B"
 
         class GEMINI(SmartStrEnum):
+            GEMINI_FLASH_LATEST = "gemini-flash-latest"
+            GEMINI_PRO_LATEST = "gemini-pro-latest"
+            GEMINI_1_5_FLASH = "gemini-1.5-flash"
             GEMINI_2_5_FLASH = "gemini-2.5-flash"
+            GEMINI_2_5_PRO = "gemini-2.5-pro"
 
         class GEMMA(SmartStrEnum):
             GEMMA_3_27B_IT = "google/gemma-3-27b-it"

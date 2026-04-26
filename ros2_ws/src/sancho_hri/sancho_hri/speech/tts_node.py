@@ -21,6 +21,7 @@ class TTSNode(Node):
         TTS_MODELS.TACOTRON2: ("sancho_hri.speech.tts.tacotron2_tts", "Tacotron2TTS"),
         TTS_MODELS.XTTS: ("sancho_hri.speech.tts.xtts", "XTTS"),
         TTS_MODELS.YOUR_TTS: ("sancho_hri.speech.tts.your_tts", "YourTTS"),
+        TTS_MODELS.PYTTSX3: ("sancho_hri.speech.tts.pyttsx3_tts", "Pyttsx3TTS"),
     }
 
     def __init__(self):

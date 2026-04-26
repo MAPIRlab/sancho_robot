@@ -7,7 +7,7 @@ from ..behaviors.tracking import ManageFaceTracker, UpdateTrackingTarget
 def SetFaceMode(mode):
     """Helper to set face mode via blackboard"""
     return py_trees.behaviours.SetBlackboardVariable(
-        name=f"SetFace:{mode}",
+        name=f"SetFace-{mode}",
         variable_name="face_mode",
         variable_value=mode,
         overwrite=True

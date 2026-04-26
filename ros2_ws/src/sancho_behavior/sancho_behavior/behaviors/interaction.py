@@ -66,7 +66,7 @@ class IdentifyCentralTarget(py_trees_ros.service_clients.FromConstant):
             service_type=GetCentralFaceCluster,
             service_name='/central_faces_cluster_node/get_central_cluster',
             service_request=request,
-            wait_for_server_timeout_sec=2.0
+            wait_for_server_timeout_sec=0.0
         )
 
         self.blackboard.register_key("speaker_info_json", access=py_trees.common.Access.WRITE)
@@ -164,7 +164,7 @@ class ListenToUser(py_trees_ros.action_clients.FromConstant):
         super().__init__(
             name=name,
             action_type=ListenVoice,
-            action_name="listen_voice",
+            action_name="/listen_voice",
             action_goal=goal,
             wait_for_server_timeout_sec=0.0
         )
@@ -178,17 +178,25 @@ class ListenToUser(py_trees_ros.action_clients.FromConstant):
         
         # 2. Intercept the SUCCESS state to read the result
         if status == py_trees.common.Status.SUCCESS:
+            self.logger.info("ListenVoice Action SUCCESS. Extracting result...")
             
-            # Extract the actual result payload from the ROS 2 wrapper
-            action_result = self.result_message.result if hasattr(self, 'result_message') else None
+            # Debug: What do we actually have here?
+            if hasattr(self, 'result_message'):
+                self.logger.info(f"Result message type: {type(self.result_message)}")
+                # In ROS2, the result is usually in .result
+                action_result = self.result_message.result
+                self.logger.info(f"Action result: {action_result}")
+            else:
+                self.logger.error("No result_message found in node!")
+                return py_trees.common.Status.FAILURE
             
-            if action_result and action_result.success:
-                self.blackboard.user_transcription = action_result.text
-                self.logger.info(f"User said: '{action_result.text}'")
+            if action_result:
+                # Store it and move on
+                self.blackboard.user_transcription = getattr(action_result, 'text', "")
+                self.logger.info(f"Blackboard updated with text: '{self.blackboard.user_transcription}'")
                 return py_trees.common.Status.SUCCESS
             else:
-                self.logger.info("Listening failed or timed out with no audio.")
-                # Return FAILURE so the Conversation Sequence aborts and the robot goes to Idle
+                self.logger.info("Listening failed or timed out (action_result is None).")
                 return py_trees.common.Status.FAILURE
                 
         return status
@@ -230,6 +238,7 @@ class GenerateLLMResponse(py_trees_ros.service_clients.FromCallback):
         req.args_json = json.dumps({"user_id": user_id, "user_name": user_name})
         req.mode = "normal"
         
+        self.logger.info(f"Generating LLM response for: '{text}'")
         return req
 
     def update(self):

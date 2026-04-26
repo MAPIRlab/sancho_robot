@@ -77,7 +77,7 @@ def create_survival_subtree() -> py_trees.behaviour.Behaviour:
     greeting_goal = PlayTTS.Goal()
     greeting_goal.text = "Gracias por ponerme a cargar."
     greeting_tts = py_trees_ros.action_clients.FromConstant(
-        name="GreetingTTS", action_type=PlayTTS, action_name="/play_tts", action_goal=greeting_goal, wait_for_server_timeout_sec=1.0 
+        name="GreetingTTS", action_type=PlayTTS, action_name="/play_tts", action_goal=greeting_goal, wait_for_server_timeout_sec=0.0 
     )
 
     set_greeted_flag = SetBlackboardVariable(
@@ -99,7 +99,7 @@ def create_survival_subtree() -> py_trees.behaviour.Behaviour:
     full_tts_goal = PlayTTS.Goal()
     full_tts_goal.text = "Estoy lleno, puedes desconectarme"
     full_tts = py_trees_ros.action_clients.FromConstant(
-        name="FullTTS", action_type=PlayTTS, action_name="/play_tts", action_goal=full_tts_goal, wait_for_server_timeout_sec=1.0 
+        name="FullTTS", action_type=PlayTTS, action_name="/play_tts", action_goal=full_tts_goal, wait_for_server_timeout_sec=0.0 
     )
 
     set_full_flag = SetBlackboardVariable(
@@ -147,7 +147,7 @@ def create_survival_subtree() -> py_trees.behaviour.Behaviour:
     sos_goal = PlayTTS.Goal()
     sos_goal.text = "Ayuda, ponme a cargar."
     request_charge_sos = py_trees_ros.action_clients.FromConstant(
-        name="RequestChargeTTS", action_type=PlayTTS, action_name="/play_tts", action_goal=sos_goal, wait_for_server_timeout_sec=1.0 
+        name="RequestChargeTTS", action_type=PlayTTS, action_name="/play_tts", action_goal=sos_goal, wait_for_server_timeout_sec=0.0 
     )
 
     set_requested_flag = SetBlackboardVariable(
@@ -185,7 +185,7 @@ def create_survival_subtree() -> py_trees.behaviour.Behaviour:
     goodbye_goal = PlayTTS.Goal()
     goodbye_goal.text = "Perdona, me queda muy poca batería y tengo que ir a cargar. ¡Hablamos luego!"
     emergency_goodbye_tts = py_trees_ros.action_clients.FromConstant(
-        name="EmergencyGoodbyeTTS", action_type=PlayTTS, action_name="/play_tts", action_goal=goodbye_goal, wait_for_server_timeout_sec=1.0 
+        name="EmergencyGoodbyeTTS", action_type=PlayTTS, action_name="/play_tts", action_goal=goodbye_goal, wait_for_server_timeout_sec=0.0 
     )
 
     clear_engaged = SetBlackboardVariable(

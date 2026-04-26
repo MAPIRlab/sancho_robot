@@ -165,9 +165,10 @@ class AudioPlayer(LifecycleNode):
         try:
             audio_array = np.array(response.audio, dtype=np.int16)
             sample_rate = response.sample_rate
-            duration = len(audio_array) / sample_rate
+            duration = (len(audio_array) / sample_rate) + 0.5 # Add 0.5s grace period
             
-            self.get_logger().info(f"Playing TTS audio ({duration:.2f} seconds)...")
+            self.get_logger().info(f"Received audio array of length {len(audio_array)} at {sample_rate}Hz")
+            self.get_logger().info(f"Playing TTS audio (calculated duration: {duration:.2f} seconds)...")
             sd.play(audio_array, samplerate=sample_rate)
             start_time = time.time()
             

@@ -1,4 +1,9 @@
 import rclpy
+import numpy as np
+# Monkey-patch for compatibility with newer numpy versions and older ROS libraries
+if not hasattr(np, "float"):
+    np.float = float
+
 from rclpy.qos import QoSProfile
 
 import py_trees

@@ -14,7 +14,8 @@ class NavigateToGroupPose(py_trees_ros.action_clients.FromBlackboard):
             name=name,
             action_type=NavigateToPose,
             action_name=action_name,
-            key="navigate_goal"
+            key="navigate_goal",
+            wait_for_server_timeout_sec=0.0
         )
         self.blackboard = Client(name=self.name)
         self.blackboard.register_key("group_waypoint_pose", access=py_trees.common.Access.READ)
@@ -106,6 +107,7 @@ class NavigateToDock(py_trees_ros.action_clients.FromBlackboard):
             action_type=NavigateToPose,
             action_name=action_name,
             key="dock_nav_goal",          # internal BB key for the goal msg
+            wait_for_server_timeout_sec=0.0
         )
         self.bb = self.attach_blackboard_client(name=self.name)
         self.bb.register_key("config/dock_pose",  access=py_trees.common.Access.READ)
