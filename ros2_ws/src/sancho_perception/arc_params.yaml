@@ -1,6 +1,6 @@
 action_recognition_node:
   ros__parameters:
-    frames_route: "/home/cayecaji/image_frames"
+    frames_route: "/home/mapir/ar_images"
     n_predicciones_lvlm: 3
     n_predicciones_llm: 5
     idle_timeout: 5.0
@@ -24,6 +24,12 @@ action_recognition_node:
     llm_voting_temperature: 0.1
     llm_voting_top_p: 0.5
     llm_voting_num_predict: 175
+
+    #Wait time between frames
+    process_frame_every_n: 15
+
+    #Bounding box margin
+    bbox_margin: 0.2
 
     #Diverse control variables
     debugging: False

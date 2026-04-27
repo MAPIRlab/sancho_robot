@@ -5,6 +5,7 @@ import json
 import time
 import re
 import os
+import base64
 import rclpy
 import numpy as np
 
@@ -32,7 +33,7 @@ class ActionRecognitionNode(Node):
        # --- Params read from .yaml ---
         
         # Routes and predictions for models
-        self.frames_route = self.declare_parameter('frames_route', '/home/mapir/ar_images').value #CHECK AT LAB
+        self.frames_route = self.declare_parameter('frames_route', '/home/mapir/ar_images').value
         self.nPrediccionesLVLM = self.declare_parameter('n_predicciones_lvlm', 3).value
         self.nPrediccionesLLM = self.declare_parameter('n_predicciones_llm', 5).value
 
@@ -47,7 +48,7 @@ class ActionRecognitionNode(Node):
         self.LVLM_NUM_PREDICT = self.declare_parameter('lvlm_num_predict', 175).value
 
         #LLM configuration (Action prediction)
-        self.LLM_ACTION_TEMP        = self.declare_parameter('llm_action_temperature', 0.4).value
+        self.LLM_ACTION_TEMP        = self.declare_parameter('llm_action_temperature', 0.6).value
         self.LLM_ACTION_TOP_P       = self.declare_parameter('llm_action_top_p', 0.5).value
         self.LLM_ACTION_NUM_PREDICT = self.declare_parameter('llm_action_num_predict', 175).value
 
@@ -63,10 +64,18 @@ class ActionRecognitionNode(Node):
         # --- Debug mode ---
         self.DEBUG_MODE = self.declare_parameter('debugging', False).value
 
+        # --- Wait time between frames --- 
+        self.process_frame_every_n = self.declare_parameter('process_frame_every_n', 15).value
+
+        # -- Bounding box margin ---
+        self.bbox_margin = self.declare_parameter('bbox_margin', 20).value
+
         # --- Prompts for models ---
         self.promptLVLM = PROMPT_SCENE_DESCRIPTION
         self.promptLLM_SD = PROMPT_ACTION_PREDICTION
         self.promptLLM_Voting = PROMPT_VOTING
+
+        
 
         # --- Utils ---
         self.idle_timeout = self.declare_parameter('idle_timeout', 3.0).value
@@ -82,7 +91,6 @@ class ActionRecognitionNode(Node):
         self.timeout_timer = None
         self.current_id = "No ID"
         self.frame_counter = 0
-        self.process_frame_every_n = 15 #CHECK AT LAB / CHANGE SO NOT HARDCODED
         
 
         # --- Subcriptions and publishers ---
@@ -124,14 +132,15 @@ class ActionRecognitionNode(Node):
             if not msg.detections:
                 return
 
-            #Extract image and first person id 
+            #Extract image, first person id and bounding box coordinates to cropp image 
             image = msg.image 
+            bounding_box = msg.detections[0]
             person_id = msg.detections[0].tid
             
-            self.recognition_core(image, person_id)
+            self.recognition_core(image, person_id,bounding_box)
 
 
-    def recognition_core(self,img_msg, id_msg):
+    def recognition_core(self,img_msg, id_msg, bbox_msg):
         
         #We want to predict the action of the first person captured by camera.
         if len(self.predict_frames_list) == 0:
@@ -141,7 +150,16 @@ class ActionRecognitionNode(Node):
         if(len(self.predict_frames_list) < 5 and id_msg == self.target_id ):
             try:
                     frame = self.bridge.imgmsg_to_cv2(img_msg, "bgr8")
-                    self.predict_frames_list.append(frame)
+
+                    #Cropp image to reduce latency in prediction
+                    try:
+                        cropped_frame = self.cropp_image(frame,bbox_msg)
+
+                    except Exception as e:
+                        self.get_logger().error("Error occured during image cropp process, ABORTING.")
+                        return
+
+                    self.predict_frames_list.append(cropped_frame)
                     self.id_match_list.append("Frame " + str(self.id_count) + ": " + str(id_msg))
                     self.get_logger().info("    Image recieved...")
                     self.reset_idle_timer()
@@ -189,7 +207,14 @@ class ActionRecognitionNode(Node):
             frame_id_info = get_frame_id_info(self.id_match_list)
             updatedLVLMprompt = self.promptLVLM.replace("INPUT_LVLM", frame_id_info)
 
+            #Store images in variables instead of reading from drive
+            frame_list = [self.frame_to_base64(f) for f in self.predict_frames_list]
+
+            #Check to store b64 images in drive and to read the full prompt
+            if(self.DEBUG_MODE): self.debug_base64_image(frame_list)
             if(self.DEBUG_MODE): print(updatedLVLMprompt)
+
+
             print("------------------------------------------")
 
 
@@ -202,7 +227,7 @@ class ActionRecognitionNode(Node):
                     messages=[{
                         'role': 'user',
                         'content': updatedLVLMprompt,
-                        'images': [self.image_route_list[0], self.image_route_list[1], self.image_route_list[2], self.image_route_list[3], self.image_route_list[4]]
+                        'images': [frame_list]
                     }],
                     format = self.FORMAT,
                     options={
@@ -397,6 +422,62 @@ class ActionRecognitionNode(Node):
         self.get_logger.info("The model " + model + " returned an empty message, aborting prediction...")
         self.reset_utils()
         return
+
+    def cropp_image(self, frame, bbox):
+
+        h, w, _ = frame.shape
+
+        if bbox.width <= 0 or bbox.height <= 0:
+            self.get_logger().warn("Even bounding box width or height was not valid.")
+            return frame
+
+        xmin = bbox.corner.x
+        ymin = bbox.corner.y
+        bw = bbox.width
+        bh = bbox.height
+        xmax = xmin + bw
+        ymax = ymin + bh
+
+        #Apply selected margin to bounding box
+        x1_m = max(0, int(xmin - bw * self.bbox_margin))
+        y1_m = max(0, int(ymin - bh * self.bbox_margin))
+        x2_m = min(w, int(xmax + bw * self.bbox_margin))
+        y2_m = min(h, int(ymax + bh * self.bbox_margin))
+        cropped_frame = frame[y1_m:y2_m, x1_m:x2_m]
+
+        if cropped_frame.size == 0:
+            self.get_logger().warn("Cropped frame size was invalid")
+            return frame
+
+        return cropped_frame
+    
+
+    def frame_to_base64(self, frame):
+
+        _, buffer = cv2.imencode('.jpg', frame)
+        return base64.b64encode(buffer).decode('utf-8')
+    
+
+    def debug_base64_image(self, b64_list):
+
+
+        self.get_logger().info(f"Saving {len(b64_list)} images in Base64 in hardrive...")
+        
+        for i, b64_string in enumerate(b64_list):
+            try:
+                img_data = base64.b64decode(b64_string)
+                nparr = np.frombuffer(img_data, np.uint8)
+                img_check = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+                
+                if img_check is not None:
+                    debug_path = os.path.join(self.frames_route, f"debug_b64_frame_{i}.jpg")
+                    cv2.imwrite(debug_path, img_check)
+                else:
+                    self.get_logger().error(f"Couldn't save image in base64 with index: {i}")
+                    
+            except Exception as e:
+                self.get_logger().error(f"Error processing frame in base64 {i}: {e}")
+
 
         
     def reset_utils(self):
