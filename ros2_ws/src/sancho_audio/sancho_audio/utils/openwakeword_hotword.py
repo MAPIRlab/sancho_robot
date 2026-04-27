@@ -31,7 +31,7 @@ class OpenWakeWordHotword(ModelHotword):
         self.target_rate = 16000
         self.frame_ms = 80
         self.samples_per_frame = self.target_rate * self.frame_ms // 1000
-        self.threshold = 0.250
+        self.threshold = 0.100
         self.frames_needed = 1
 
         self.model = Model(

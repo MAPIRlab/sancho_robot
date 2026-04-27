@@ -25,33 +25,7 @@ def generate_launch_description():
         prefix=prefix_cmd,
         emulate_tty=True,
     )
-    microphone_publisher_node = Node(
-        namespace='',
-        package='sancho_audio',
-        executable='microphone_capturer',
-        name='microphone_publisher',
-        output='screen',
-        prefix=prefix_cmd,
-        emulate_tty=True,
-    )
-    vad_node = Node(
-        namespace='',
-        package='sancho_audio',
-        executable='voice_activity_detector',
-        name='vad_node',
-        output='screen',
-        prefix=prefix_cmd,
-        emulate_tty=True,
-    )
-    sound_direction_node = Node(
-        namespace='',
-        package='sancho_audio',
-        executable='audio_direction',
-        name='sound_direction_node',
-        output='screen',
-        prefix=prefix_cmd,
-        emulate_tty=True,
-    )
+
 
     configurator_node = Node(
         package='sancho_lifecycle_utils',
@@ -77,9 +51,7 @@ def generate_launch_description():
             GroupAction(
                 [
                     audio_player_node,
-                    microphone_publisher_node,
-                    vad_node,
-                    sound_direction_node,
+
                     configurator_node,
                 ]
             ),
