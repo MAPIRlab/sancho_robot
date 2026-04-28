@@ -33,5 +33,5 @@ action_recognition_node:
 
     #Diverse control variables
     debugging: False
-    local_testing: True
+    execution_enviroment: "LOCAL"
      

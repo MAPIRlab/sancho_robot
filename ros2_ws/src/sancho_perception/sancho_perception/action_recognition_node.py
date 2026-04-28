@@ -79,7 +79,7 @@ class ActionRecognitionNode(Node):
 
         # --- Utils ---
         self.idle_timeout = self.declare_parameter('idle_timeout', 3.0).value
-        self.LOCAL_TESTING = self.declare_parameter('local_testing', False).value
+        self.EXECUTION_ENVIROMENT = self.declare_parameter('execution_enviroment', "LOCAL").value
         self.predict_frames_list = []
         self.id_match_list = []
         self.image_route_list = []
@@ -99,13 +99,15 @@ class ActionRecognitionNode(Node):
 
 
         # --- Create route depending on the test we doing --- 
-        if self.LOCAL_TESTING: 
-            self.EDGE_ROUTE = 'http://localhost:11434' 
-        else:
-            self.EDGE_ROUTE = 'http://10.1.26.67:11434'
+        if self.EXECUTION_ENVIROMENT == "LOCAL": 
+            self.WS_ROUTE = 'http://localhost:11434' 
+        elif self.EXECUTION_ENVIROMENT == "EDGE":
+            self.WS_ROUTE = 'http://10.1.26.67:11434'
+        else: 
+            self.WS_ROUTE = 'http://10.2.26.241:11434'
 
         # --- Create Ollama client to connect with edge ---
-        self.client = Client(host = self.EDGE_ROUTE)
+        self.client = Client(host = self.WS_ROUTE)
 
         # --- Check if Ollama is available ---
         if not self.check_ollama_connection():
@@ -156,7 +158,7 @@ class ActionRecognitionNode(Node):
                         cropped_frame = self.cropp_image(frame,bbox_msg)
 
                     except Exception as e:
-                        self.get_logger().error("Error occured during image cropp process, ABORTING.")
+                        self.get_logger().error("Error occured during image cropp process, ABORTING EXECUTION...")
                         return
 
                     self.predict_frames_list.append(cropped_frame)
@@ -368,7 +370,7 @@ class ActionRecognitionNode(Node):
             return json.dumps({"accion_final": "unknown", "error": "fallo_en_parseo"})
         
     def check_ollama_connection(self):
-        self.get_logger().info(f"Connecting to Ollama in URL: {self.EDGE_ROUTE}...")
+        self.get_logger().info(f"Connecting to Ollama in URL: {self.WS_ROUTE}...")
         
         try:
             response = self.client.list()
