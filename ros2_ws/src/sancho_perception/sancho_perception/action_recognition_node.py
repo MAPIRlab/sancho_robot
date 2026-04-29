@@ -67,8 +67,15 @@ class ActionRecognitionNode(Node):
         # --- Wait time between frames --- 
         self.process_frame_every_n = self.declare_parameter('process_frame_every_n', 15).value
 
-        # -- Bounding box margin ---
+        # --- Bounding box margin ---
         self.bbox_margin = self.declare_parameter('bbox_margin', 20).value
+
+        # --- Cropp image flag ---
+        self.cropp_image_flag = self.declare_parameter('cropp_image_flag', True).value
+
+        # --- Read images from hard drive flag ---
+
+        self.read_from_hard_drive = self.declare_parameter('read_from_hard_drive', True).value
 
         # --- Prompts for models ---
         self.promptLVLM = PROMPT_SCENE_DESCRIPTION
@@ -154,14 +161,16 @@ class ActionRecognitionNode(Node):
                     frame = self.bridge.imgmsg_to_cv2(img_msg, "bgr8")
 
                     #Cropp image to reduce latency in prediction
-                    try:
-                        cropped_frame = self.cropp_image(frame,bbox_msg)
 
-                    except Exception as e:
-                        self.get_logger().error("Error occured during image cropp process, ABORTING EXECUTION...")
-                        return
+                    if self.cropp_image_flag:
+                        try:
+                            frame = self.cropp_image(frame,bbox_msg)
 
-                    self.predict_frames_list.append(cropped_frame)
+                        except Exception as e:
+                            self.get_logger().error("Error occured during image cropp process, ABORTING EXECUTION...")
+                            return
+
+                    self.predict_frames_list.append(frame)
                     self.id_match_list.append("Frame " + str(self.id_count) + ": " + str(id_msg))
                     self.get_logger().info("    Image recieved...")
                     self.reset_idle_timer()
@@ -210,7 +219,10 @@ class ActionRecognitionNode(Node):
             updatedLVLMprompt = self.promptLVLM.replace("INPUT_LVLM", frame_id_info)
 
             #Store images in variables instead of reading from drive
-            frame_list = [self.frame_to_base64(f) for f in self.predict_frames_list]
+            if self.read_from_hard_drive:
+                frame_list = self.image_route_list
+            else:
+                frame_list = [self.frame_to_base64(f) for f in self.predict_frames_list]
 
             #Check to store b64 images in drive and to read the full prompt
             if(self.DEBUG_MODE): self.debug_base64_image(frame_list)

@@ -34,4 +34,6 @@ action_recognition_node:
     #Diverse control variables
     debugging: False
     execution_enviroment: "LOCAL"
+    cropp_image_flag: True
+    read_from_hard_drive: True
      
