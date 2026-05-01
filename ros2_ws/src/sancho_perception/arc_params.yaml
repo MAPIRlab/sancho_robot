@@ -36,4 +36,5 @@ action_recognition_node:
     execution_enviroment: "LOCAL"
     cropp_image_flag: True
     read_from_hard_drive: True
+    node_as_service: True
      

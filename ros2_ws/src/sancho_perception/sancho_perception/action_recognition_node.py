@@ -21,6 +21,7 @@ from rclpy.executors import MultiThreadedExecutor
 from collections import Counter
 from rclpy.callback_groups import ReentrantCallbackGroup, MutuallyExclusiveCallbackGroup
 from .prompts import PROMPT_SCENE_DESCRIPTION, PROMPT_ACTION_PREDICTION, PROMPT_VOTING
+from sancho_interfaces.srv import GetActionPrediction
 
 
 
@@ -29,7 +30,7 @@ class ActionRecognitionNode(Node):
     def __init__(self):
         super().__init__("action_recognition_node") 
         self.bridge = CvBridge()
-
+        
        # --- Params read from .yaml ---
         
         # Routes and predictions for models
@@ -61,6 +62,14 @@ class ActionRecognitionNode(Node):
         self.sensor_cb_group = ReentrantCallbackGroup()
         self.ai_cb_group = MutuallyExclusiveCallbackGroup()
 
+        # --- Create service for BH ---
+        self.srv = self.create_service(
+        GetActionPrediction, 
+        'recognize_human_action', 
+        self.handle_recognition_request,
+        callback_group=self.ai_cb_group
+        )
+
         # --- Debug mode ---
         self.DEBUG_MODE = self.declare_parameter('debugging', False).value
 
@@ -74,8 +83,10 @@ class ActionRecognitionNode(Node):
         self.cropp_image_flag = self.declare_parameter('cropp_image_flag', True).value
 
         # --- Read images from hard drive flag ---
-
         self.read_from_hard_drive = self.declare_parameter('read_from_hard_drive', True).value
+
+        # --- Node as a service flag ---
+        self.node_as_service = self.declare_parameter('node_as_service', True).value
 
         # --- Prompts for models ---
         self.promptLVLM = PROMPT_SCENE_DESCRIPTION
@@ -98,6 +109,9 @@ class ActionRecognitionNode(Node):
         self.timeout_timer = None
         self.current_id = "No ID"
         self.frame_counter = 0
+        self.active_interface = False
+        self.last_action = ""
+        self.service_promised = False
         
 
         # --- Subcriptions and publishers ---
@@ -129,6 +143,10 @@ class ActionRecognitionNode(Node):
 
 
     def tracking_callback(self, msg):
+
+        if self.node_as_service:
+            if not self.active_interface:
+                return
 
         if self.ai_busy:
             return
@@ -356,7 +374,11 @@ class ActionRecognitionNode(Node):
             #Publish final prediction
             msg = String()
             msg.data = final_prediction
+            self.last_action = msg
             self.action_publisher.publish(msg)
+
+            #Notice service that prediction has finished
+            if self.node_as_service :self.service_promised = True 
 
             #Clear the lists and reset vars for other predictions
             self.reset_utils()
@@ -491,6 +513,36 @@ class ActionRecognitionNode(Node):
                     
             except Exception as e:
                 self.get_logger().error(f"Error processing frame in base64 {i}: {e}")
+
+
+    # --- All service request come here (empty request) ---
+    def handle_recognition_request(self, request, response):
+
+        self.get_logger().info("Petition from Sancho recieved. Waiting for frames and prediction...")
+        self.reset_utils() 
+        self.service_promised = False
+        self.active_interface = True
+
+
+        #Start a 60s timer to avoid blocking status
+        start_time = self.get_clock().now()
+        timeout_duration = 60.0
+
+        while not self.service_promised:
+            
+            elapsed_time = (self.get_clock().now() - start_time).nanoseconds / 1e9
+
+            if elapsed_time > timeout_duration:
+                self.get_logger().error("TIMEOUT: 60s has passed since the service was launched.")
+                response.action = "timeout_error"
+                self.active_interface = False
+                return response
+            
+            time.sleep(0.1)
+        
+        response.action = self.last_action.data if hasattr(self.last_action, 'data') else "unknown"
+        self.active_interface = False
+        return response
 
 
         
