@@ -80,6 +80,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/TTSSetActiveModel.srv"
   "srv/Training.srv"
   "srv/TriggerUserInteraction.srv"
+  "srv/GetActionPrediction.srv"
   "action/PlayAudio.action"
   DEPENDENCIES geometry_msgs sensor_msgs std_msgs action_msgs
 )
