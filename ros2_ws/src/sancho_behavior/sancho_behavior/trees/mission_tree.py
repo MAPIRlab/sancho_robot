@@ -6,6 +6,7 @@ from sancho_behavior.behaviors.lifecycle_actions import ActivateNode, Deactivate
 from sancho_behavior.behaviors.interaction import WaitForSocialInteraction
 from sancho_behavior.behaviors.layer_reporter import LayerReporter
 from sancho_behavior.behaviors.preemption_contract import WithPreemptionContract
+from sancho_behavior.behaviors.action_recognition import PredictHumanAction
 
 def create_mission_subtree() -> py_trees.behaviour.Behaviour:
     """
@@ -55,6 +56,11 @@ def create_mission_subtree() -> py_trees.behaviour.Behaviour:
         name="EnableTrackingMission",
         service_name="/attention_manager/capability/tracking/enable",
     )
+
+
+    predict_action = PredictHumanAction(name="IdentifyHumanAction")
+
+
     activate_social = ActivateNode(name="ActivateInteractionManager", node_name="interaction_manager")
     
     # Wait for social interaction to finish
@@ -79,6 +85,7 @@ def create_mission_subtree() -> py_trees.behaviour.Behaviour:
         navigate,
         tracking_mode_mission,
         tracking_enable_mission,
+        predict_action,
         activate_social,
         wait_for_social,
         tracking_mode_standby,
