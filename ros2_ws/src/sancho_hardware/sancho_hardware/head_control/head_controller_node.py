@@ -20,58 +20,7 @@ class State(Enum):
 
 
 class HRIHeadNode(Node):
-    """ROS 2 node to control the robot's head for Human-Robot Interaction.
-
-    This node provides functionality to move the robot head in pan and tilt
-    motions. It operates in two main states:
-    - IDLE: performs random movements within specified limits
-    - TRACKING: moves the head to track a specific target
-
-    The node accepts PoseStamped messages with orientation (as quaternion)
-    that get converted to pan and tilt angles. It also provides timeout
-    functionality to return to idle state when tracking is no longer active.
-
-    Parameters
-    ----------
-    idle_move_min_interval : float
-        Minimum interval (seconds) between random movements in idle state
-    idle_move_max_interval : float
-        Maximum interval (seconds) between random movements in idle state
-    pan_limit : list
-        Min and max values for pan motion [min, max]
-    tilt_limit : list
-        Min and max values for tilt motion [min, max]
-    tolerance : float
-        Angular tolerance to consider a target reached
-    tracking_timeout : float
-        Seconds to wait before returning to idle when no new targets received
-    joint_group_name : str
-        Name of the joint group for control commands
-    pan_joint : str
-        Name of the pan joint in the robot
-    tilt_joint : str
-        Name of the tilt joint in the robot
-    tracking_topic : str
-        Topic name for receiving target poses to track
-
-    Published Topics:
-    ---------------
-    /wxxms/commands/joint_group (JointGroupCommand)
-        Commands to control joint positions
-
-    Subscribed Topics:
-    ---------------
-    /wxxms/joint_states (JointState)
-        Current state of the robot joints
-    [tracking_topic] (PoseStamped)
-        Target pose for the robot head to track
-
-    Services:
-    --------
-    /wxxms/set_operating_modes (OperatingModes)
-        Service to set joint operating modes
-
-    """
+    """ROS 2 node to control the robot's head for Human-Robot Interaction."""
 
     def __init__(self):
         super().__init__("hri_head_node")
@@ -129,7 +78,6 @@ class HRIHeadNode(Node):
         self.op_srv = self.create_client(OperatingModes, "/wxxms/set_operating_modes")
         while not self.op_srv.wait_for_service(timeout_sec=1.0):
             self.get_logger().warning("Waiting for OperatingModes service...")
-        #self.set_position_control_mode()
 
         # Timer principal
         self.timer = self.create_timer(0.1, self.update)
@@ -137,27 +85,6 @@ class HRIHeadNode(Node):
         self.get_logger().info(
             "HRI Head node initialized with PoseStamped goal interface."
         )
-
-    def set_position_control_mode(self):
-        req = OperatingModes.Request()
-        req.cmd_type = "group"
-        req.name = self.joint_group
-        req.mode = "position"
-        req.profile_type = "velocity"
-        req.profile_velocity = self.profile_velocity
-        req.profile_acceleration = self.profile_acceleration
-        
-        # Send the request asynchronously and attach a callback for the result
-        future = self.op_srv.call_async(req)
-        future.add_done_callback(self._op_mode_response_cb)
-
-    def _op_mode_response_cb(self, future):
-        try:
-            # If the service call was successful, future.result() will return the response
-            response = future.result()
-            self.get_logger().info("Operating mode successfully set to POSITION.")
-        except Exception as e:
-            self.get_logger().error(f"Failed to set operating mode: {e}")
 
     def joint_state_cb(self, msg: JointState):
         try:
@@ -174,8 +101,8 @@ class HRIHeadNode(Node):
         roll, pitch, yaw = tf_transformations.euler_from_quaternion(
             [q.x, q.y, q.z, q.w]
         )
-        target_pan = yaw  # ← invertir si gira al revés
-        target_tilt = pitch  # ← invertir si se inclina al revés
+        target_pan = yaw
+        target_tilt = pitch
 
         # Si aún no hemos recibido nunca joint_states, movemos de todas formas
         if hasattr(self, "current_pan") and hasattr(self, "current_tilt"):
@@ -188,7 +115,7 @@ class HRIHeadNode(Node):
                 return
 
         self.get_logger().info(
-            f"Received PoseStamped goal ▶ pan={target_pan:.2f}, tilt={target_tilt:.2f}"
+            f"Received PoseStamped goal ▶ pan={target_pan:.2f}, tilt={target_tilt:.2f} (from topic)"
         )
         self.move_head(target_pan, target_tilt)
         self.state = State.TRACKING
