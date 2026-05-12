@@ -163,12 +163,22 @@ class AudioPlayer(LifecycleNode):
 
         # 2. Play the audio array with sounddevice
         try:
+            # Debug hardware devices
+            self.get_logger().info(f"Available audio devices:\n{sd.query_devices()}")
+            self.get_logger().info(f"Using default output device: {sd.default.device}")
+
             audio_array = np.array(response.audio, dtype=np.int16)
             sample_rate = response.sample_rate
+            
+            if len(audio_array) == 0:
+                self.get_logger().error("Received empty audio array from TTS.")
+                goal_handle.abort()
+                result.success = False
+                return result
+
             duration = (len(audio_array) / sample_rate) + 0.5 # Add 0.5s grace period
             
-            self.get_logger().info(f"Received audio array of length {len(audio_array)} at {sample_rate}Hz")
-            self.get_logger().info(f"Playing TTS audio (calculated duration: {duration:.2f} seconds)...")
+            self.get_logger().info(f"🔊 Playing {len(audio_array)} samples at {sample_rate}Hz (duration: {duration:.2f}s)")
             sd.play(audio_array, samplerate=sample_rate)
             start_time = time.time()
             

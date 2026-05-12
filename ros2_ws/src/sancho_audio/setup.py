@@ -30,7 +30,8 @@ setup(
             'audio_gateway=sancho_audio.audio_gateway_node:main',
             'audio_doa_xvf3800_lifecycle=sancho_audio.audio_doa_xvf3800_lifecycle_node:main',
             'vad_transcriptor_node=sancho_audio.vad_transcriptor_node:main',
-            'doa_active_speaker=sancho_audio.doa_active_speaker_node:main'
+            'doa_active_speaker=sancho_audio.doa_active_speaker_node:main',
+            'microphone=sancho_audio.legacy.microphone_node:main'
         ],
     },
 )

@@ -103,7 +103,7 @@ class AudioGatewayNode(LifecycleNode):
             namespace="",
             parameters=[
                 ("device_name", "xvf3800"),
-                ("chunk_size", 1280),
+                ("chunk_size", 1024),
                 # Index of the channel to extract as mono (0 = left/first).
                 # Change this if the XVF3800 DSP output is on a different channel.
                 ("mic_channel", 0),
@@ -254,9 +254,6 @@ class AudioGatewayNode(LifecycleNode):
                 msg.chunk_mono = mono_list
                 self._mono_pub.publish(msg)
 
-    # ------------------------------------------------------------------
-    # Service handler — called by the BT
-    # ------------------------------------------------------------------
 
     def _on_set_audio_session(
         self, request: SetAudioSession.Request, response: SetAudioSession.Response

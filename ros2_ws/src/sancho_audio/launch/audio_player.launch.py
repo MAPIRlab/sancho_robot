@@ -34,9 +34,8 @@ def generate_launch_description():
         output='screen',
         parameters=[
             {
-                'node_names': [
-                    audio_node_name,
-                ]
+                'activate': True,
+                'node_names': [audio_node_name]
             }
         ],
     )
@@ -51,7 +50,6 @@ def generate_launch_description():
             GroupAction(
                 [
                     audio_player_node,
-
                     configurator_node,
                 ]
             ),

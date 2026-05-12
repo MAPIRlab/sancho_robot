@@ -58,8 +58,7 @@ class AudioDOAXVF3800LifecycleNode(LifecycleNode):
 
     def spin(self):
         angle = self._read_processed_deg()
-
-        if angle:
+        if angle is not None:
             angle = ((float(angle) + 180) % 360) - 180
             self.get_logger().info(f"DoA (processed): {angle:6.2f}°")
             self.pub_angle.publish(Float32(data=angle))

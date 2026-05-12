@@ -14,11 +14,11 @@ from sancho_interfaces.msg import QuestionTTS, FaceRecognitionArray, UserTranscr
 from sancho_interfaces.srv import AskUser
 from sancho_interfaces.srv import STT
 
-from .utils.sound import play
-from .utils.sounds import ACTIVATION_SOUND, TIME_OUT_SOUND
+from sancho_audio.utils.sound import play
+from sancho_audio.utils.sounds import ACTIVATION_SOUND, TIME_OUT_SOUND
 
-from .utils.silero_vad_attach_criterion import SileroVADAttachCriterion
-from .utils.intensity_attach_criterion import IntensityAttachCriterion
+from sancho_audio.utils.silero_vad_attach_criterion import SileroVADAttachCriterion
+from sancho_audio.utils.intensity_attach_criterion import IntensityAttachCriterion
 
 class AUDIO_STATE(int, Enum):
     NO_AUDIO = -1

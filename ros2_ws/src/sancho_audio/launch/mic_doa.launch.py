@@ -38,16 +38,6 @@ def generate_launch_description():
         emulate_tty=True,
     )
 
-    # audio_doa_node = LifecycleNode(
-    #     namespace='',
-    #     package='sancho_audio',
-    #     executable='audio_doa_lifecycle',
-    #     name='audio_doa_lifecycle',
-    #     output='screen',
-    #     prefix=prefix_cmd,
-    #     emulate_tty=True,
-    # )
-
 
     doa_active_speaker_node = Node(
         namespace='',
