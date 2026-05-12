@@ -5,7 +5,7 @@ import importlib
 
 from rclpy.node import Node
 from sancho_interfaces.msg import LLMLoadUnloadResult, ProviderItem
-from sancho_interfaces.srv import GetModels, SanchoPrompt, Embedding, LLMLoadModel, LLMUnloadModel, GetActiveModels, SetActiveModel
+from sancho_interfaces.srv import GetModels, SanchoPrompt, Prompt, Embedding, LLMLoadModel, LLMUnloadModel, GetActiveModels, SetActiveModel
 
 from .providers.base_provider import BaseProvider
 from .models import PROVIDER, MODELS, NEEDS_API_KEY, EXECUTED_LOCALLY
@@ -42,6 +42,7 @@ class LLMNode(Node):
         self.get_active_srv = self.create_service(GetActiveModels, 'sancho_hri/llm/get_active_models', self.handle_get_active_models)
         self.get_available_srv = self.create_service(GetModels, 'sancho_hri/llm/get_available_models', self.handle_get_available_models)
         self.prompt_srv = self.create_service(SanchoPrompt, 'sancho_hri/llm/prompt', self.handle_prompt)
+        self.raw_prompt_srv = self.create_service(Prompt, 'sancho_hri/llm/raw_prompt', self.handle_raw_prompt)
         self.embedding_srv = self.create_service(Embedding, 'sancho_hri/llm/embedding', self.handle_embedding)
         self.load_model_srv = self.create_service(LLMLoadModel, 'sancho_hri/llm/load_model', self.handle_load_model)
         self.unload_model_srv = self.create_service(LLMUnloadModel, 'sancho_hri/llm/unload_model', self.handle_unload_model)
@@ -163,6 +164,37 @@ class LLMNode(Node):
             self.get_logger().info(f"❌ Prompt service failed: {str(e)}")
 
         return response
+    def handle_raw_prompt(self, request, response):
+        """Technical prompt interface used by LLMEngine.
+
+        Unlike handle_prompt (SanchoPrompt), this handler exposes the full
+        provider/model/prompt_system/messages_json API so internal components
+        (classifiers, generators, memory manager) can control all LLM parameters.
+        """
+        self.get_logger().info(
+            f"📖 Raw prompt for provider='{request.provider}', model='{request.model}'"
+        )
+        try:
+            provider_name, model_name = self._get_or_active("llm", request.provider, request.model)
+            provider = self._get_provider(provider_name)
+
+            result, model_used = provider.prompt(
+                model=model_name,
+                prompt_system=request.prompt_system,
+                messages_json=request.messages_json,
+                user_input=request.user_input,
+                parameters_json=request.parameters_json,
+            )
+
+            self._fill_response(response, True, "OK", provider_name, model_used)
+            response.response = result
+            self.get_logger().info(f"✅ Raw prompt done using provider='{provider_name}', model='{model_used}'")
+        except Exception as e:
+            self._fill_response(response, False, str(e))
+            self.get_logger().error(f"❌ Raw prompt failed: {str(e)}")
+
+        return response
+
 
     def handle_embedding(self, request, response):
         self.get_logger().info(f"📖 Embedding service for provider='{request.provider}', model='{request.model}'")
