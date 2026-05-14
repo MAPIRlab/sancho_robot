@@ -25,16 +25,44 @@ def create_reaction_subtree(name: str = "ReactToSound", config: dict = None) -> 
 
     interaction_subtree = interaction_tree.create_interaction_tree()
 
+    # BTA-088: Wrap movement in a selector to make it non-fatal
+    movement_gate = py_trees.composites.Selector(name="OptionalMovement", memory=True)
+    movement_gate.add_children([
+        turn_decision,
+        py_trees.behaviours.Success(name="IgnoreMovementFailure")
+    ])
+
+    # BTA-089: Wrap identification in a selector to make it non-fatal
+    identification_gate = py_trees.composites.Selector(name="OptionalIdentification", memory=True)
+    identification_gate.add_children([
+        IdentifyCentralTarget(),
+        py_trees.behaviours.Success(name="IgnoreIdentificationFailure")
+    ])
+
     # --- Build Tree ---
     root.add_children([
         LockTarget(),
-        turn_decision,
+        movement_gate,
         stabilize_camera,
-        IdentifyCentralTarget(),
+        identification_gate,
         GreetUser(),
         interaction_subtree
     ])
-    turn_decision.add_children([turn_far_seq, RotateHeadToSound()])
-    turn_far_seq.add_children([IsAngleFar(), TurnToSound()])
+    turn_decision.add_children([
+        turn_far_seq, 
+        py_trees.decorators.Timeout(
+            name="RotateHeadTimeout",
+            child=RotateHeadToSound(),
+            duration=5.0
+        )
+    ])
+    turn_far_seq.add_children([
+        IsAngleFar(), 
+        py_trees.decorators.Timeout(
+            name="TurnTimeout",
+            child=TurnToSound(),
+            duration=5.0
+        )
+    ])
 
     return root

@@ -5,7 +5,7 @@ import random
 
 from std_msgs.msg import String
 
-from sancho_interfaces.srv import GetCentralFaceCluster, SanchoPrompt, SocialState
+from sancho_interfaces.srv import GetCentralFaceCluster, SanchoPrompt, SocialState, SetAudioSession
 from sancho_interfaces.action import PlayTTS, ListenVoice
 
 class GreetUser(py_trees_ros.action_clients.FromCallback):
@@ -207,7 +207,7 @@ class GenerateLLMResponse(py_trees_ros.service_clients.FromCallback):
         super().__init__(
             name=name,
             service_type=SanchoPrompt,
-            service_name="sancho_hri/llm/prompt",
+            service_name="sancho_hri/ai/prompt",
             wait_for_server_timeout_sec=0.0
         )
         
@@ -283,5 +283,21 @@ class RespondUser(py_trees_ros.action_clients.AttributesFromBlackboard):
             action_type=PlayTTS,
             action_name="/play_tts",
             goal_fields={'text': 'ai_response_text'}, # {Goal Field: BB Key}
+            wait_for_server_timeout_sec=0.0
+        )
+
+class SetAudioSessionBehavior(py_trees_ros.service_clients.FromConstant):
+    """
+    Enables or disables the audio gateway stream (OWW and ROS publishing).
+    """
+    def __init__(self, active: bool, name="SetAudioSession"):
+        request = SetAudioSession.Request()
+        request.active = active
+
+        super().__init__(
+            name=f"{name}_{'Active' if active else 'Inactive'}",
+            service_type=SetAudioSession,
+            service_name='/sancho_audio/set_audio_session',
+            service_request=request,
             wait_for_server_timeout_sec=0.0
         )

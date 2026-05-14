@@ -1,7 +1,7 @@
 import py_trees
 import py_trees_ros
 import operator
-from ..behaviors.interaction import ListenToUser, GenerateLLMResponse, RespondUser
+from ..behaviors.interaction import ListenToUser, GenerateLLMResponse, RespondUser, SetAudioSessionBehavior
 from ..behaviors.tracking import ManageFaceTracker, UpdateTrackingTarget
 
 def SetFaceMode(mode):
@@ -54,8 +54,10 @@ def create_interaction_tree():
     # 3. One Conversation Turn (Sequence)
     conversation_turn = py_trees.composites.Sequence(name="ConversationTurn", memory=True)
     conversation_turn.add_children([
+        SetAudioSessionBehavior(active=True),
         SetFaceMode("listening"),
         ListenToUser(name="ListenToUser", timeout_sec=10.0),
+        SetAudioSessionBehavior(active=False),
         SetFaceMode("thinking"),
         GenerateLLMResponse(),
         SetFaceMode("speaking"),

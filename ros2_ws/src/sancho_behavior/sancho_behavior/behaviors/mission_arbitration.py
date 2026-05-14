@@ -22,7 +22,7 @@ class MissionAdmissionGate(py_trees.behaviour.Behaviour):
         self.bb.register_key(key="mission/active", access=py_trees.common.Access.READ)
         self.bb.register_key(key="mission/cooldown_until", access=py_trees.common.Access.READ)
         self.bb.register_key(key="battery_degraded", access=py_trees.common.Access.READ)
-        self.bb.register_key(key="group_waypoint_pose", access=py_trees.common.Access.READ)
+        self.bb.register_key(key="mission/request", access=py_trees.common.Access.READ)
 
     def setup(self, **kwargs):
         self.node = kwargs["node"]
@@ -37,8 +37,8 @@ class MissionAdmissionGate(py_trees.behaviour.Behaviour):
         if mission_active:
             return py_trees.common.Status.SUCCESS
 
-        has_objective = self.bb.exists("group_waypoint_pose")
-        if not has_objective:
+        mission_request = self.bb.get("mission/request") if self.bb.exists("mission/request") else None
+        if not mission_request:
             return py_trees.common.Status.FAILURE
 
         battery_degraded = self.bb.get("battery_degraded") if self.bb.exists("battery_degraded") else False
@@ -64,15 +64,14 @@ class MissionStatusTracker(py_trees.decorators.Decorator):
         self,
         child: py_trees.behaviour.Behaviour,
         name: str = "MissionStatusTracker",
-        default_mission_type: str = "social_approach",
     ):
         super().__init__(name=name, child=child)
-        self.default_mission_type = default_mission_type
         self.node = None
         self.bb = self.attach_blackboard_client(name=self.name)
 
         self.bb.register_key(key="mission/active", access=py_trees.common.Access.WRITE)
         self.bb.register_key(key="mission/type", access=py_trees.common.Access.WRITE)
+        self.bb.register_key(key="mission/request", access=py_trees.common.Access.WRITE)
         self.bb.register_key(key="mission/id", access=py_trees.common.Access.WRITE)
         self.bb.register_key(key="mission/cooldown_sec", access=py_trees.common.Access.READ)
         self.bb.register_key(key="mission/cooldown_until", access=py_trees.common.Access.WRITE)
@@ -88,25 +87,26 @@ class MissionStatusTracker(py_trees.decorators.Decorator):
 
     def _ensure_mission_context(self):
         now_sec = self._now_sec()
-        mission_type = self.bb.get("mission/type") if self.bb.exists("mission/type") else ""
-        if not mission_type:
-            self.bb.set("mission/type", self.default_mission_type)
+        mission_request = self.bb.get("mission/request") if self.bb.exists("mission/request") else None
+        if mission_request:
+            self.bb.set("mission/type", mission_request)
 
         mission_id = self.bb.get("mission/id") if self.bb.exists("mission/id") else ""
         if not mission_id:
             self.bb.set("mission/id", f"m-{int(now_sec * 1000)}")
+
+    def initialise(self) -> None:
+        mission_active = self.bb.get("mission/active") if self.bb.exists("mission/active") else False
+        if not mission_active:
+            self._ensure_mission_context()
+            self.bb.set("mission/active", True)
 
     def update(self) -> py_trees.common.Status:
         status = self.decorated.status
 
         mission_active = self.bb.get("mission/active") if self.bb.exists("mission/active") else False
 
-        if status == py_trees.common.Status.RUNNING:
-            if not mission_active:
-                self._ensure_mission_context()
-                self.bb.set("mission/active", True)
-
-        elif status in (py_trees.common.Status.SUCCESS, py_trees.common.Status.FAILURE):
+        if status in (py_trees.common.Status.SUCCESS, py_trees.common.Status.FAILURE):
             if mission_active:
                 cooldown_sec = self.bb.get("mission/cooldown_sec") if self.bb.exists("mission/cooldown_sec") else 6.0
                 self.bb.set("mission/active", False)
@@ -116,5 +116,6 @@ class MissionStatusTracker(py_trees.decorators.Decorator):
                 # Reset mission identity so the next admission creates a new mission id.
                 self.bb.set("mission/id", "")
                 self.bb.set("mission/type", "")
+                self.bb.set("mission/request", None)
 
         return status
