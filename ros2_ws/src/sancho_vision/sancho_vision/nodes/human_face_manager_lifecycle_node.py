@@ -18,7 +18,7 @@ from sancho_interfaces.msg import FaceRecognitionArray, InputTTS
 from sancho_interfaces.srv import AskUser
 
 from sancho_web_bridge.assistant.database.system_database import CONSTANTS
-from sancho_audio.assistant_node import QUESTION
+from sancho_audio.legacy.assistant_node import QUESTION
 from sancho_vision.database.people_manager import PeopleManager
 from sancho_vision.hri_bridge import HRIBridge
 
