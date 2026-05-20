@@ -11,8 +11,8 @@ action_recognition_node:
     format: "json"
 
     #LVLM Config
-    lvlm_temperature: 0.1
-    lvlm_top_p: 0.75
+    lvlm_temperature: 0.7
+    lvlm_top_p: 0.85
     lvlm_num_predict: 175
 
     #LLM Action predict config

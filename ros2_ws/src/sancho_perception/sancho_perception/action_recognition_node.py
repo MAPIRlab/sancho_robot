@@ -44,8 +44,8 @@ class ActionRecognitionNode(Node):
         self.FORMAT     = self.declare_parameter('format', 'json').value
 
         #LVLM configuration
-        self.LVLM_TEMPERATURE = self.declare_parameter('lvlm_temperature', 0.1).value
-        self.LVLM_TOP_P       = self.declare_parameter('lvlm_top_p', 0.75).value
+        self.LVLM_TEMPERATURE = self.declare_parameter('lvlm_temperature', 0.7).value
+        self.LVLM_TOP_P       = self.declare_parameter('lvlm_top_p', 0.85).value
         self.LVLM_NUM_PREDICT = self.declare_parameter('lvlm_num_predict', 175).value
 
         #LLM configuration (Action prediction)
