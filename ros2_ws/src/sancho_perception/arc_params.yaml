@@ -1,0 +1,40 @@
+action_recognition_node:
+  ros__parameters:
+    frames_route: "/home/mapir/ar_images"
+    n_predicciones_lvlm: 3
+    n_predicciones_llm: 5
+    idle_timeout: 5.0
+
+    #Model selection
+    lvlm_model: "qwen2.5vl:7b"
+    llm_model: "llama3.2:3b"
+    format: "json"
+
+    #LVLM Config
+    lvlm_temperature: 0.7
+    lvlm_top_p: 0.85
+    lvlm_num_predict: 175
+
+    #LLM Action predict config
+    llm_action_temperature: 0.6
+    llm_action_top_p: 0.5
+    llm_action_num_predict: 175
+
+    #LLM Voting config
+    llm_voting_temperature: 0.1
+    llm_voting_top_p: 0.5
+    llm_voting_num_predict: 175
+
+    #Wait time between frames
+    process_frame_every_n: 15
+
+    #Bounding box margin
+    bbox_margin: 0.2
+
+    #Diverse control variables
+    debugging: False
+    execution_enviroment: "LOCAL"
+    cropp_image_flag: True
+    read_from_hard_drive: True
+    node_as_service: True
+     
