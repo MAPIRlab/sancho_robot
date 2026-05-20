@@ -370,10 +370,14 @@ class ActionRecognitionNode(Node):
 
             final_prediction = self.confidence_filter(responseVoting.message.content)
             print(final_prediction)
+
+            #Get the final prediction to send it
+            data   = json.loads(final_prediction)
+            action = data.get("accion_final", "unknown")
             
             #Publish final prediction
             msg = String()
-            msg.data = final_prediction
+            msg.data = action
             self.last_action = msg
             self.action_publisher.publish(msg)
 
