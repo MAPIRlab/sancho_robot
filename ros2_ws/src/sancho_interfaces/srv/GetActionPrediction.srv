@@ -1,0 +1,4 @@
+# Request (vía vacía, solo dispara la acción)
+---
+# Response
+string action
