@@ -22,6 +22,9 @@ class GreetUser(py_trees_ros.action_clients.FromCallback):
         
         self.blackboard.register_key("speaker_info_json", access=py_trees.common.Access.READ)
 
+        #Get the action prediction
+        self.blackboard.register_key("predicted_action", access=py_trees.common.Access.READ)
+
     def get_goal(self):
         # Read user name
         try:
@@ -33,18 +36,22 @@ class GreetUser(py_trees_ros.action_clients.FromCallback):
             speaker_name = "amigo"
             speaker_id = "0"
 
+
+        action = self.blackboard.predicted_action if self.blackboard.exists("predicted_action") else ""
+
         # Check if the person is truly unknown
-        if speaker_name == "Unknown" or speaker_id == "":
+        if action:
+            user = f" {speaker_name}" if speaker_name != "Unknown" and speaker_name != "amigo" else ""
+            greetings = [
+                f"¡Hola {user}! Veo que estás realizando la acción de {action}. ¿En qué te puedo ayudar?",
+                f"¿Qué tal {user}? Parece que andas haciendo la acción de {action}.",
+                f"¡Hola! Me he fijado en que estás realizando la acción de {action}, ¿Verdad {user}?"
+            ]
+        else:
             greetings = [
                 "¡Hola! ¿En qué puedo ayudarte?",
                 "¡Hola! Creo que no nos conocemos. Soy Sancho.",
                 "¿Qué tal? ¡Dime!"
-            ]
-        else:
-            greetings = [
-                f"¡Hola {speaker_name}!",
-                f"¿Qué tal, {speaker_name}?",
-                f"Me alegra verte, {speaker_name}."
             ]
 
         action_goal = PlayTTS.Goal()    
