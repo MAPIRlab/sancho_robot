@@ -74,10 +74,10 @@ class ActionRecognitionNode(Node):
         self.DEBUG_MODE = self.declare_parameter('debugging', False).value
 
         # --- Wait time between frames --- 
-        self.process_frame_every_n = self.declare_parameter('process_frame_every_n', 15).value
+        self.process_frame_every_n = self.declare_parameter('process_frame_every_n', 10).value
 
         # --- Bounding box margin ---
-        self.bbox_margin = self.declare_parameter('bbox_margin', 20).value
+        self.bbox_margin = self.declare_parameter('bbox_margin', 0.2).value
 
         # --- Cropp image flag ---
         self.cropp_image_flag = self.declare_parameter('cropp_image_flag', True).value
@@ -86,7 +86,7 @@ class ActionRecognitionNode(Node):
         self.read_from_hard_drive = self.declare_parameter('read_from_hard_drive', True).value
 
         # --- Node as a service flag ---
-        self.node_as_service = self.declare_parameter('node_as_service', True).value
+        self.node_as_service = self.declare_parameter('node_as_service', False).value
 
         # --- Prompts for models ---
         self.promptLVLM = PROMPT_SCENE_DESCRIPTION
@@ -97,7 +97,7 @@ class ActionRecognitionNode(Node):
 
         # --- Utils ---
         self.idle_timeout = self.declare_parameter('idle_timeout', 3.0).value
-        self.EXECUTION_ENVIROMENT = self.declare_parameter('execution_enviroment', "LOCAL").value
+        self.EXECUTION_ENVIROMENT = self.declare_parameter('execution_enviroment', "UEDGE").value
         self.predict_frames_list = []
         self.id_match_list = []
         self.image_route_list = []
@@ -259,7 +259,7 @@ class ActionRecognitionNode(Node):
                     messages=[{
                         'role': 'user',
                         'content': updatedLVLMprompt,
-                        'images': [frame_list]
+                        'images': frame_list
                     }],
                     format = self.FORMAT,
                     options={

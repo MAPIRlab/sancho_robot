@@ -2,7 +2,7 @@ import py_trees
 import py_trees_ros
 from sancho_interfaces.srv import GetActionPrediction
 
-class PredictHumanAction(py_trees_ros.trees.Behaviour):
+class PredictHumanAction(py_trees.behaviour.Behaviour):
     def __init__(self, name="Predict Human Action"):
         super(PredictHumanAction, self).__init__(name)
         self.blackboard = self.attach_blackboard_client()

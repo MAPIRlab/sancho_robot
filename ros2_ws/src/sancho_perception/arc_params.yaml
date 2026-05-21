@@ -33,7 +33,7 @@ action_recognition_node:
 
     #Diverse control variables
     debugging: False
-    execution_enviroment: "LOCAL"
+    execution_enviroment: "EDGE"
     cropp_image_flag: True
     read_from_hard_drive: True
     node_as_service: True
