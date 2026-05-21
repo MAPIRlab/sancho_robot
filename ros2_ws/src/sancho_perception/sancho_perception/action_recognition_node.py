@@ -86,7 +86,7 @@ class ActionRecognitionNode(Node):
         self.read_from_hard_drive = self.declare_parameter('read_from_hard_drive', True).value
 
         # --- Node as a service flag ---
-        self.node_as_service = self.declare_parameter('node_as_service', False).value
+        self.node_as_service = self.declare_parameter('node_as_service', True).value
 
         # --- Prompts for models ---
         self.promptLVLM = PROMPT_SCENE_DESCRIPTION
