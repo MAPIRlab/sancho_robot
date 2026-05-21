@@ -11,7 +11,7 @@
 #include "esp_sleep.h"
 #include "math.h"
 
-#define PIN_WS2812B 17         // ESP32 GPIO pin connected to the LED strip
+#define PIN_WS2812B 16         // ESP32 GPIO pin connected to the LED strip
 #define NUM_PIXELS 12          // Number of LEDs on the strip
 #define BASE_BRIGHTNESS 80     // Base LED brightness (0–255)
 

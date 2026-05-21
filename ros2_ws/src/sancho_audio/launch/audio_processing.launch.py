@@ -7,19 +7,6 @@ from launch_ros.actions import Node, LifecycleNode
 def generate_launch_description():
     prefix_cmd = LaunchConfiguration('prefix')
 
-    hotword_node = LifecycleNode(
-        namespace='',
-        package='sancho_audio',
-        executable='hotword_detector_node',
-        name='hotword_detector',
-        output='screen',
-        prefix=prefix_cmd,
-        emulate_tty=True,
-        parameters=[
-            {'mic_topic': '/sancho_audio/microphone/mono'},
-            {'hotword_event_topic': '/voice_events/hotword_detected'}
-        ]
-    )
 
     doa_active_speaker = Node(
         package='sancho_audio',
@@ -58,12 +45,12 @@ def generate_launch_description():
         package='sancho_lifecycle_utils',            
         executable='node_configurator',          
         name='node_configurator_active',
-        parameters=[{'activate': True, 'node_names': ['audio_player_lifecycle', 'hotword_detector']}]
+        parameters=[{'activate': True, 'node_names': ['audio_player_lifecycle']}]
     )
 
     return LaunchDescription([
         DeclareLaunchArgument('prefix', default_value='xterm -hold -e' if os.environ.get('DISPLAY') else ''),
-        hotword_node,
+
         doa_active_speaker,
         vad_transcriptor_node,
         audio_player_node,

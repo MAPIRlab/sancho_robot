@@ -15,7 +15,7 @@ from sancho_interfaces.msg import InputTTS, QuestionTTS, UserTranscription, Conv
 from sancho_interfaces.srv import GreetPeople
 from sancho_interfaces.srv import TTS
 
-from sancho_audio.assistant_helper_node import HELPER_STATE
+from sancho_audio.legacy.assistant_helper_node import HELPER_STATE
 from sancho_hri.ai.sancho_ai_node import MODE
 from sancho_hri.ai.prompts.commands import COMMANDS
 

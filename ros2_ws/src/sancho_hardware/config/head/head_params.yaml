@@ -1,5 +1,6 @@
 head_controller_node:
   ros__parameters:
+    auto_move_enabled: False
     idle_move_min_interval: 10.0
     idle_move_max_interval: 20.0
     pan_limit: [-1.56, 1.56]

@@ -12,8 +12,12 @@
   <depend>geometry_msgs</depend>
   <depend>tf2_ros</depend>
   <depend>tf_transformations</depend>
+  <depend>sancho_interfaces</depend>
   
   <exec_depend>python3-numpy</exec_depend>
+  <exec_depend>topology_graph</exec_depend>
+  <exec_depend>navigation_assistant</exec_depend>
+  <exec_depend>nav_assistant_functions</exec_depend>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>
@@ -23,5 +27,4 @@
   <export>
     <build_type>ament_python</build_type>
   </export>
-  <depend>sancho_interfaces</depend>
 </package>

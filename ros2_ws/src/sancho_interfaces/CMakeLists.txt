@@ -69,6 +69,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/STTSetActiveModel.srv"
   "srv/SanchoPrompt.srv"
   "srv/SetActiveModel.srv"
+  "srv/SetAudioSession.srv"
   "srv/SetHome.srv"
   "srv/SetSessionParams.srv"
   "srv/SocialState.srv"

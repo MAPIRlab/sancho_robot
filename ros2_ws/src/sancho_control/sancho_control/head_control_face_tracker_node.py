@@ -34,7 +34,7 @@ class FaceTrackerLifecycle(LifecycleNode):
         # Node settings
         self.declare_parameter("base_frame", "base_link")
         self.declare_parameter("control_rate", 20.0)
-        self.declare_parameter("ema_alpha", 0.25)
+        self.declare_parameter("ema_alpha", 0.08)
         self.declare_parameter("timeout_no_detection", 2.0)
         
         # Hardware
@@ -42,8 +42,8 @@ class FaceTrackerLifecycle(LifecycleNode):
         self.declare_parameter("tilt_joint", "tilt")
         
         # Control parameters
-        self.declare_parameter("p_gain_pan", 0.6)
-        self.declare_parameter("p_gain_tilt", 1.0)
+        self.declare_parameter("p_gain_pan", 0.4)
+        self.declare_parameter("p_gain_tilt", 0.7)
 
     def _initialize_state_variables(self):
         """Initializes all internal tracking and state variables."""

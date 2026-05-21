@@ -170,6 +170,12 @@ private:
             for (int i = 0; i < 20; i++)
                 send_to_esp32(modified);
         }
+        // else if (std::find(valid_emotions.begin(), valid_emotions.end(), msg->data) != valid_emotions.end())
+        // {
+        //     RCLCPP_INFO(get_logger(), "Emoción recibida: %s", msg->data.c_str());
+        //     for (int i = 0; i < 20; i++)
+        //         send_to_esp32(msg->data); // Send exactly as received
+        // }
         else
         {
             RCLCPP_ERROR(get_logger(), "Mensaje recibido no reconocido: %s", msg->data.c_str());

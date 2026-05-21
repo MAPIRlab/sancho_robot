@@ -1,0 +1,8 @@
+# Request
+# true  → enter CONVERSATION mode (publish ChunkMono)
+# false → return to LISTENING mode (run hotword detection, no audio on ROS bus)
+bool active
+---
+# Response
+bool accepted
+string message

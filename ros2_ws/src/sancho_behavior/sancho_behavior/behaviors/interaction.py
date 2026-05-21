@@ -5,7 +5,7 @@ import random
 
 from std_msgs.msg import String
 
-from sancho_interfaces.srv import GetCentralFaceCluster, SanchoPrompt, SocialState
+from sancho_interfaces.srv import GetCentralFaceCluster, SanchoPrompt, SocialState, SetAudioSession
 from sancho_interfaces.action import PlayTTS, ListenVoice
 
 class GreetUser(py_trees_ros.action_clients.FromCallback):
@@ -73,7 +73,7 @@ class IdentifyCentralTarget(py_trees_ros.service_clients.FromConstant):
             service_type=GetCentralFaceCluster,
             service_name='/central_faces_cluster_node/get_central_cluster',
             service_request=request,
-            wait_for_server_timeout_sec=2.0
+            wait_for_server_timeout_sec=0.0
         )
 
         self.blackboard.register_key("speaker_info_json", access=py_trees.common.Access.WRITE)
@@ -171,7 +171,7 @@ class ListenToUser(py_trees_ros.action_clients.FromConstant):
         super().__init__(
             name=name,
             action_type=ListenVoice,
-            action_name="listen_voice",
+            action_name="/listen_voice",
             action_goal=goal,
             wait_for_server_timeout_sec=0.0
         )
@@ -185,17 +185,25 @@ class ListenToUser(py_trees_ros.action_clients.FromConstant):
         
         # 2. Intercept the SUCCESS state to read the result
         if status == py_trees.common.Status.SUCCESS:
+            self.logger.info("ListenVoice Action SUCCESS. Extracting result...")
             
-            # Extract the actual result payload from the ROS 2 wrapper
-            action_result = self.result_message.result if hasattr(self, 'result_message') else None
+            # Debug: What do we actually have here?
+            if hasattr(self, 'result_message'):
+                self.logger.info(f"Result message type: {type(self.result_message)}")
+                # In ROS2, the result is usually in .result
+                action_result = self.result_message.result
+                self.logger.info(f"Action result: {action_result}")
+            else:
+                self.logger.error("No result_message found in node!")
+                return py_trees.common.Status.FAILURE
             
-            if action_result and action_result.success:
-                self.blackboard.user_transcription = action_result.text
-                self.logger.info(f"User said: '{action_result.text}'")
+            if action_result:
+                # Store it and move on
+                self.blackboard.user_transcription = getattr(action_result, 'text', "")
+                self.logger.info(f"Blackboard updated with text: '{self.blackboard.user_transcription}'")
                 return py_trees.common.Status.SUCCESS
             else:
-                self.logger.info("Listening failed or timed out with no audio.")
-                # Return FAILURE so the Conversation Sequence aborts and the robot goes to Idle
+                self.logger.info("Listening failed or timed out (action_result is None).")
                 return py_trees.common.Status.FAILURE
                 
         return status
@@ -206,7 +214,7 @@ class GenerateLLMResponse(py_trees_ros.service_clients.FromCallback):
         super().__init__(
             name=name,
             service_type=SanchoPrompt,
-            service_name="sancho_hri/llm/prompt",
+            service_name="sancho_hri/ai/prompt",
             wait_for_server_timeout_sec=0.0
         )
         
@@ -216,6 +224,7 @@ class GenerateLLMResponse(py_trees_ros.service_clients.FromCallback):
         
         self.blackboard.register_key("ai_response_text", access=py_trees.common.Access.WRITE)
         self.blackboard.register_key("ai_emotion", access=py_trees.common.Access.WRITE)
+        self.blackboard.register_key("interaction_finished", access=py_trees.common.Access.WRITE)
 
     def get_request(self):
         """Called automatically by the parent's initialise() method"""
@@ -236,6 +245,7 @@ class GenerateLLMResponse(py_trees_ros.service_clients.FromCallback):
         req.args_json = json.dumps({"user_id": user_id, "user_name": user_name})
         req.mode = "normal"
         
+        self.logger.info(f"Generating LLM response for: '{text}'")
         return req
 
     def update(self):
@@ -249,9 +259,15 @@ class GenerateLLMResponse(py_trees_ros.service_clients.FromCallback):
                 # Use .get("text") with a fallback to .get("response") just in case
                 response_text = value.get("text", value.get("response", "Ha habido un fallo al pensar."))
                 
+                is_finished = value.get("finished", False)
                 self.blackboard.ai_response_text = response_text
                 self.blackboard.ai_emotion = value.get("emotion", "neutral")
-                self.logger.info(f"LLM Response: {self.blackboard.ai_response_text}")
+                self.blackboard.interaction_finished = is_finished
+                
+                if is_finished:
+                    self.logger.info("LLM signaled end of conversation.")
+                
+                self.logger.info(f"LLM Response: {self.blackboard.ai_response_text} (Finished: {is_finished})")
                 
             except Exception as e:
                 self.logger.error(f"Error parsing SanchoPrompt response: {e}")
@@ -263,8 +279,8 @@ class GenerateLLMResponse(py_trees_ros.service_clients.FromCallback):
             self.blackboard.ai_response_text = "Perdona, no he podido conectar con mi cerebro."
             self.blackboard.ai_emotion = "sad"
             
-        # Always return SUCCESS so that the sequence doesn't get aborted
-        return py_trees.common.Status.SUCCESS
+        # Return the actual status (RUNNING, SUCCESS, or FAILURE)
+        return status
     
 class RespondUser(py_trees_ros.action_clients.AttributesFromBlackboard):
     """Reads AI text from blackboard and sends to PlayTTS Action Server"""
@@ -274,5 +290,21 @@ class RespondUser(py_trees_ros.action_clients.AttributesFromBlackboard):
             action_type=PlayTTS,
             action_name="/play_tts",
             goal_fields={'text': 'ai_response_text'}, # {Goal Field: BB Key}
+            wait_for_server_timeout_sec=0.0
+        )
+
+class SetAudioSessionBehavior(py_trees_ros.service_clients.FromConstant):
+    """
+    Enables or disables the audio gateway stream (OWW and ROS publishing).
+    """
+    def __init__(self, active: bool, name="SetAudioSession"):
+        request = SetAudioSession.Request()
+        request.active = active
+
+        super().__init__(
+            name=f"{name}_{'Active' if active else 'Inactive'}",
+            service_type=SetAudioSession,
+            service_name='/sancho_audio/set_audio_session',
+            service_request=request,
             wait_for_server_timeout_sec=0.0
         )

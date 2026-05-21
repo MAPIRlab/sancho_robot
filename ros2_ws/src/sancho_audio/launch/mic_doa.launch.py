@@ -8,11 +8,11 @@ from launch_ros.actions import LifecycleNode, Node
 def generate_launch_description():
     prefix_cmd = LaunchConfiguration('prefix')
 
-    microphone_node = Node(
+    audio_gateway_node = LifecycleNode(
         namespace='',
         package='sancho_audio',
-        executable='microphone',
-        name='microphone',
+        executable='audio_gateway',
+        name='audio_gateway',
         output='screen',
         prefix=prefix_cmd,
         emulate_tty=True,
@@ -38,16 +38,6 @@ def generate_launch_description():
         emulate_tty=True,
     )
 
-    # audio_doa_node = LifecycleNode(
-    #     namespace='',
-    #     package='sancho_audio',
-    #     executable='audio_doa_lifecycle',
-    #     name='audio_doa_lifecycle',
-    #     output='screen',
-    #     prefix=prefix_cmd,
-    #     emulate_tty=True,
-    # )
-
 
     doa_active_speaker_node = Node(
         namespace='',
@@ -64,7 +54,7 @@ def generate_launch_description():
         parameters=[
             {
                 'activate': True,
-                'node_names': ['microphone', 'audio_doa_xvf3800_lifecycle'] # audio_doa_lifecycle
+                'node_names': ['audio_gateway', 'audio_doa_xvf3800_lifecycle'] # audio_doa_lifecycle
             }
         ],
     )
@@ -83,7 +73,7 @@ def generate_launch_description():
         #  AGRUPO TODOS LOS NODOS
         # --------------------
         GroupAction([
-            microphone_node,
+            audio_gateway_node,
             face_node,
             audio_doa_node,
             doa_active_speaker_node,

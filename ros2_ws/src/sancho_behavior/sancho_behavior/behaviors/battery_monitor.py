@@ -37,57 +37,65 @@ class BatteryMonitor(py_trees.behaviour.Behaviour):
         self.bb.register_key(key="battery_critical", access=py_trees.common.Access.WRITE)
         self.bb.register_key(key="is_charging", access=py_trees.common.Access.WRITE)
         self.bb.register_key(key="has_greeted_charging", access=py_trees.common.Access.WRITE)
+        self.bb.register_key(key="has_requested_charge", access=py_trees.common.Access.WRITE)
+        self.bb.register_key(key="has_greeted_full", access=py_trees.common.Access.WRITE)
 
-    def initialize(self):
+    def initialise(self):
         self.bb.battery_critical = False
         self.bb.battery_degraded = False
         self.bb.battery_level = 1.0
         self.bb.is_charging = False
+        self.bb.has_requested_charge = False
+        self.bb.has_greeted_full = False
 
     def update(self) -> py_trees.common.Status:
 
-        battery_msg = self.bb.battery_msg
-
-        if battery_msg is None:
+        if not self.bb.exists("battery_msg") or self.bb.battery_msg is None:
             self.logger.warning("No battery message on blackboard yet")
             return py_trees.common.Status.FAILURE
 
-        # --- Hardware Patch 1: Percentage Scaling ---
-        # Hardware outputs 0-100 (e.g., 81.0), convert to ROS standard 0.0-1.0
+        battery_msg = self.bb.battery_msg
         percentage = battery_msg.percentage / 100.0
-        #percentage = 0.05 # --- TEMP OVERRIDE FOR TESTING ---
 
-        # --- Hardware Patch 2: Charging Status ---
-        # Hardware outputs status: 0 (UNKNOWN). Use current instead.
-        # Negative current (-1.8A) means discharging, positive means charging.
-        is_charging = battery_msg.current > 0.0
+        current = battery_msg.current
+        if current > 0.1:
+            is_charging = True
+        elif current < -0.1:
+            is_charging = False
+        else:
+            is_charging = self.bb.is_charging if self.bb.exists("is_charging") else False
 
         if self._is_first_message:
-            # If booted up while plugged in, pretend we already said thanks
             self.bb.has_greeted_charging = is_charging
             self._is_first_message = False
         else:
-            # Normal operation: reset the flag when physically unplugged
             if not is_charging:
                 self.bb.has_greeted_charging = False
+                self.bb.has_greeted_full = False
+            else:
+                self.bb.has_requested_charge = False
 
-        # --- Write level ---
+        # --- 1. CLEARING LOGIC (Requires unplugging) ---
+        if not is_charging:
+            if percentage >= self.THRESHOLD_DEGRADED:
+                self._was_critical = False
+                self._was_degraded = False
+
+        # --- 2. TRIGGERING LOGIC ---
+        if percentage <= self.THRESHOLD_CRITICAL:
+            self._was_critical = True
+            self._was_degraded = True 
+        elif percentage <= self.THRESHOLD_DEGRADED:
+            self._was_degraded = True
+
+        # --- 3. UI/GREETING LOGIC ---
+        if percentage >= self.THRESHOLD_RECOVERY and is_charging:
+            # Handle the "Hi, I have enough battery" speech flag here
+            pass
+
+        # --- Write variables ---
         self.bb.battery_level = percentage
         self.bb.is_charging = is_charging
-
-        # --- Hysteresis logic ---
-        # Once a flag is set, it only clears when charging AND above recovery threshold.
-        if is_charging and percentage >= self.THRESHOLD_RECOVERY:
-            self._was_critical = False
-            self._was_degraded = False
-        else:
-            if percentage < self.THRESHOLD_CRITICAL:
-                self._was_critical = True
-                self._was_degraded = True  # critical implies degraded
-            elif percentage < self.THRESHOLD_DEGRADED:
-                self._was_degraded = True
-
-        # --- Write flags ---
         self.bb.battery_critical = self._was_critical
         self.bb.battery_degraded = self._was_degraded
 

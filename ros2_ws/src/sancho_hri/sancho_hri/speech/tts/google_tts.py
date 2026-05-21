@@ -9,6 +9,9 @@ from ..models import TTS_SPEAKERS
 
 
 class GoogleTTS(TTSModel):
+    def __init__(self, speaker="com", **kwargs):
+        pass
+
 
     def synthesize(self, text: str, speaker: str) -> tuple[list[int], str]:
         if not speaker:

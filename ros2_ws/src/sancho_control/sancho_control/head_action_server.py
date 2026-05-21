@@ -69,11 +69,24 @@ class HeadActionServer(Node):
     def _joint_states_callback(self, msg: JointState):
         """Updates head state in real time"""
         try:
-            index = msg.name.index(self.joint_name)
-            with self._state_lock:
-                self._current_angle_rad = msg.position[index]
-        except ValueError:
-            pass
+            # Try exact match or suffix match (e.g. 'pan' or 'wxxms/pan')
+            index = -1
+            for i, name in enumerate(msg.name):
+                if name == self.joint_name or name.endswith('/' + self.joint_name):
+                    index = i
+                    break
+            
+            if index != -1:
+                with self._state_lock:
+                    self._current_angle_rad = msg.position[index]
+            else:
+                # Log once every 100 messages if joint not found to avoid spamming
+                if not hasattr(self, '_log_counter'): self._log_counter = 0
+                self._log_counter += 1
+                if self._log_counter % 100 == 0:
+                    self.get_logger().warn(f"Joint '{self.joint_name}' not found in current JointState. Available: {msg.name}")
+        except Exception as e:
+            self.get_logger().error(f"Error in joint_states callback: {e}")
 
     # --- Action callbacks ---
     def goal_callback(self, goal_request):
@@ -165,6 +178,7 @@ class HeadActionServer(Node):
         msg.pose.orientation.z = q[2]
         msg.pose.orientation.w = q[3]
 
+        self.get_logger().info(f"Publishing to /head_goal: pan={angle_deg:.2f}º")
         self.goal_pub.publish(msg)
 
 def main(args=None):

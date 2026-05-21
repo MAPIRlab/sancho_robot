@@ -236,21 +236,16 @@ public:
                 "[InjectWaypoints] PATH CROSSES CP '%s'! Preparing waypoint injection...",
                 cp.label.c_str());
 
-            // Find the segment of the path that is within the passage region.
-            // We define the passage region as poses within a radius that encompasses 
-            // the CP center and its ING waypoints.
             double passage_radius = 0.0;
             for (const auto& wp : cp.waypoints) {
                 double d = std::hypot(wp.x - cp.node_center.x, wp.y - cp.node_center.y);
                 passage_radius = std::max(passage_radius, d);
             }
-            // Add some margin
             passage_radius += 0.3;
 
             size_t region_start = closest_index;
             size_t region_end = closest_index;
 
-            // Expand backwards to find where path enters the passage region
             for (size_t i = closest_index; i > 0; --i) {
                 double dist = std::hypot(
                     path.poses[i].pose.position.x - cp.node_center.x,
@@ -259,7 +254,6 @@ public:
                 if (dist > passage_radius) break;
                 region_start = i;
             }
-            // Expand forwards to find where path exits the passage region
             for (size_t i = closest_index; i < path.poses.size(); ++i) {
                 double dist = std::hypot(
                     path.poses[i].pose.position.x - cp.node_center.x,
@@ -269,12 +263,6 @@ public:
                 region_end = i;
             }
 
-            RCLCPP_INFO(node_->get_logger(), 
-                "[InjectWaypoints] Passage region: poses [%zu - %zu] (passage_radius=%.2f m)",
-                region_start, region_end, passage_radius);
-
-            // Build the injection sequence: [ING1, CP_center, ING2]
-            // Determine direction of travel to order the ING points correctly
             Insertion inst;
             inst.start_index = region_start;
             inst.end_index = region_end;
@@ -282,8 +270,6 @@ public:
             std::vector<geometry_msgs::msg::Point> points_to_inject = cp.waypoints;
 
             // --- DIRECTION OF TRAVEL LOGIC ---
-            // Look at where the path EXITS the passage region.
-            // When navigating, path.poses[region_end] is where we leave the passage.
             double dist_end_to_first = std::hypot(
                 path.poses[region_end].pose.position.x - points_to_inject.front().x,
                 path.poses[region_end].pose.position.y - points_to_inject.front().y
@@ -293,17 +279,34 @@ public:
                 path.poses[region_end].pose.position.y - points_to_inject.back().y
             );
 
-            // We want points_to_inject.back() to be the EXIT waypoint.
             if (dist_end_to_first < dist_end_to_last) {
                 std::reverse(points_to_inject.begin(), points_to_inject.end());
                 RCLCPP_INFO(node_->get_logger(), "[InjectWaypoints] Reversed ING order based on path exit");
             }
 
+            // ==========================================================
+            // BLOCK 1 GOES HERE: Calculate Yaw BEFORE dropping waypoints
+            // ==========================================================
+            // --- CALCULATE FIXED PASSAGE YAW ---
+            double fixed_passage_yaw = std::atan2(
+                points_to_inject.back().y - points_to_inject.front().y,
+                points_to_inject.back().x - points_to_inject.front().x
+            );
+
+            tf2::Quaternion q_fixed;
+            q_fixed.setRPY(0, 0, fixed_passage_yaw);
+            geometry_msgs::msg::Quaternion fixed_orientation = tf2::toMsg(q_fixed);
+
+            RCLCPP_INFO(node_->get_logger(), 
+                "[InjectWaypoints] Locked passage yaw at %.2f rad", fixed_passage_yaw);
+            // ==========================================================
+
+
             // Build raw passage sequence: ING_approach → CP_center → ING_exit
             std::vector<geometry_msgs::msg::Point> raw_sequence;
-            raw_sequence.push_back(points_to_inject[0]);      // ING approach
-            raw_sequence.push_back(cp.node_center);           // CP center (passage midpoint)
-            raw_sequence.push_back(points_to_inject[1]);      // ING exit
+            raw_sequence.push_back(points_to_inject[0]);      
+            raw_sequence.push_back(cp.node_center);           
+            raw_sequence.push_back(points_to_inject[1]);      
 
             // --- SKIP ALREADY-PASSED WAYPOINTS ---
             if (have_robot_pose) {
@@ -312,42 +315,23 @@ public:
                     robot_position.y - cp.node_center.y
                 );
 
-                // Check if we are inside the passage zone
                 if (robot_to_cp <= passage_radius) {
-                    
-                    // Define a 1D axis along the passage from ING_approach to ING_exit
                     double dx = raw_sequence.back().x - raw_sequence.front().x;
                     double dy = raw_sequence.back().y - raw_sequence.front().y;
                     double axis_len_sq = dx*dx + dy*dy;
                     
                     if (axis_len_sq > 0.001) {
-                        // Project robot onto this axis
                         double rx = robot_position.x - raw_sequence.front().x;
                         double ry = robot_position.y - raw_sequence.front().y;
-                        
-                        // robot_progress is the fraction of distance along the axis [0.0 = ING_approach, 1.0 = ING_exit]
                         double robot_progress = (rx*dx + ry*dy) / axis_len_sq;
                         
-                        // CP_progress is where the CP center is along this axis (usually ~0.5)
                         double cx = cp.node_center.x - raw_sequence.front().x;
                         double cy = cp.node_center.y - raw_sequence.front().y;
                         double cp_progress = (cx*dx + cy*dy) / axis_len_sq;
 
-                        RCLCPP_INFO(node_->get_logger(),
-                            "[InjectWaypoints] Robot 1D progress=%.2f, CP 1D progress=%.2f",
-                            robot_progress, cp_progress);
-
-                        // If robot has passed CP, keep ONLY the exit waypoint
                         if (robot_progress > cp_progress) {
-                            RCLCPP_INFO(node_->get_logger(),
-                                "[InjectWaypoints] Robot is past CP center. Keeping ONLY exit waypoint.");
                             raw_sequence.erase(raw_sequence.begin(), raw_sequence.begin() + 2);
-                        }
-                        // Drop ING_approach aggressively if within 20% distance of it (robot_progress > -0.2)
-                        // This prevents dogleg sharp turns if the path/robot is approaching from the side.
-                        else if (robot_progress > -0.20) {
-                            RCLCPP_INFO(node_->get_logger(),
-                                "[InjectWaypoints] Robot is near or mid-passage. Aiming straight for CP.");
+                        } else if (robot_progress > -0.20) {
                             raw_sequence.erase(raw_sequence.begin(), raw_sequence.begin() + 1);
                         }
                     }
@@ -356,62 +340,35 @@ public:
 
             // Build the FINAL anchored sequence bridging the global path cuts
             std::vector<geometry_msgs::msg::Point> full_sequence;
-            
-            // Anchor 1: Where the global path was cut
             full_sequence.push_back(path.poses[region_start].pose.position);
-            
-            // Insert the remaining passage points
             full_sequence.insert(full_sequence.end(), raw_sequence.begin(), raw_sequence.end());
-            
-            // Anchor 2: Where the global path resumes
             if (region_end < path.poses.size()) {
                 full_sequence.push_back(path.poses[region_end].pose.position);
             }
 
-            // --- INTERPOLATE & YAW CALCULATION ---
-            // SimpleSmoother requires dense paths. We linearly interpolate between the waypoints 
-            // to restore density (e.g. 5cm spacing).
+            // ==========================================================
+            // BLOCK 2 GOES HERE: Replaces the old atan2 look-ahead loop
+            // ==========================================================
+            // --- INTERPOLATE WITH FIXED YAW ---
             double desired_spacing = 0.05; // 5 cm
 
             for (size_t w = 0; w < full_sequence.size(); ++w) {
-                // Determine direction to the NEXT waypoint for yaw calculation
-                double yaw = 0.0;
                 geometry_msgs::msg::Point current_pt = full_sequence[w];
-                geometry_msgs::msg::Point next_pt;
-                bool has_next = false;
-
-                if (w < full_sequence.size() - 1) {
-                    next_pt = full_sequence[w+1];
-                    has_next = true;
-                    yaw = std::atan2(next_pt.y - current_pt.y, next_pt.x - current_pt.x);
-                } else if (region_end + 1 < path.poses.size()) {
-                    next_pt = path.poses[region_end + 1].pose.position;
-                    has_next = true;
-                    yaw = std::atan2(next_pt.y - current_pt.y, next_pt.x - current_pt.x);
-                } else if (full_sequence.size() > 1) {
-                    // Very end of path, just use previous direction
-                    yaw = std::atan2(current_pt.y - full_sequence[w-1].y, current_pt.x - full_sequence[w-1].x);
-                }
 
                 // Add the exact waypoint
                 geometry_msgs::msg::PoseStamped new_pose;
                 new_pose.header = path.header;
                 new_pose.pose.position = current_pt;
-                tf2::Quaternion q;
-                q.setRPY(0, 0, yaw);
-                new_pose.pose.orientation = tf2::toMsg(q);
+                new_pose.pose.orientation = fixed_orientation; // Apply the locked passage yaw
                 inst.poses.push_back(new_pose);
 
-                RCLCPP_INFO(node_->get_logger(), 
-                    "[InjectWaypoints] Waypoint %zu: (%.3f, %.3f) yaw=%.2f rad",
-                    w, current_pt.x, current_pt.y, yaw);
-
                 // Interpolate dense points up to the next waypoint
-                if (has_next) {
+                if (w < full_sequence.size() - 1) {
+                    geometry_msgs::msg::Point next_pt = full_sequence[w+1];
                     double dist = std::hypot(next_pt.x - current_pt.x, next_pt.y - current_pt.y);
                     int num_interpolated = std::floor(dist / desired_spacing);
                     
-                    if (num_interpolated > 0) { // Don't interpolate if they are identical
+                    if (num_interpolated > 0) { 
                         double dx = (next_pt.x - current_pt.x) / (num_interpolated + 1);
                         double dy = (next_pt.y - current_pt.y) / (num_interpolated + 1);
                         
@@ -421,12 +378,16 @@ public:
                             interp_pose.pose.position.x = current_pt.x + dx * k;
                             interp_pose.pose.position.y = current_pt.y + dy * k;
                             interp_pose.pose.position.z = current_pt.z; // Usually 0
-                            interp_pose.pose.orientation = new_pose.pose.orientation; // Keep same yaw along segment
+                            
+                            // Keep the same locked yaw for all interpolated points
+                            interp_pose.pose.orientation = fixed_orientation; 
                             inst.poses.push_back(interp_pose);
                         }
                     }
                 }
             }
+            // ==========================================================
+
             pending_insertions.push_back(inst);
         }
 

@@ -121,6 +121,8 @@ class TurnActionServer(Node):
 
         # --- STEP 3: Compensate head rotation ---
         last_head_angle = None
+        step3_start_time = time.time()
+        timeout_step3 = 10.0 # Safety timeout for base rotation
 
         # While base is moving, adjust properly head rotation
         result_future = spin_goal_handle.get_result_async()
@@ -132,6 +134,13 @@ class TurnActionServer(Node):
                 goal_handle.canceled()
                 return TurnToAngle.Result(success=False)
             
+            # Check for safety timeout
+            if (time.time() - step3_start_time) > timeout_step3:
+                self.get_logger().error('Nav2 spin timed out! Aborting.')
+                spin_goal_handle.cancel_goal_async()
+                goal_handle.abort()
+                return TurnToAngle.Result(success=False)
+
             # Compensate head rotation
             diff = self.normalize_angle(target_abs_deg - self.current_yaw_deg)
             
