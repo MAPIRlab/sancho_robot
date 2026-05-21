@@ -1,0 +1,7 @@
+fastmcp==3.3.1
+langchain-core==1.4.0
+langchain-openai==1.2.1
+
+# ROS 2 packages such as rclpy, cv_bridge, nav2_msgs, sensor_msgs,
+# geometry_msgs, topology_graph and sancho_interfaces are provided by the
+# sourced ROS 2 environment / workspace overlay, not by pip.
