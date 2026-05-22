@@ -1,0 +1,12 @@
+# sancho_interfaces/action/Mission.action
+
+# Request (Goal) - Set by the LLM
+string mission_type
+string json_parameters
+---
+# Result - Sent back to the LLM when the tree finishes
+bool success
+string final_message
+---
+# Feedback - Streamed back while the tree is running
+string current_state
