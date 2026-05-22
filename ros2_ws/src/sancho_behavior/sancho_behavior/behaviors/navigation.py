@@ -5,7 +5,7 @@ from nav2_msgs.action import NavigateToPose
 from geometry_msgs.msg import PoseStamped
 from nav2_msgs.srv import ManageLifecycleNodes
 import random
-from topology_graph.srv import Graph
+#from topology_graph.srv import Graph
 
 class NavigateToGroupPose(py_trees_ros.action_clients.FromBlackboard):
     """

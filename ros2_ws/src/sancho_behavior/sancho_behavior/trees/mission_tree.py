@@ -54,23 +54,6 @@ def create_mission_subtree() -> py_trees.behaviour.Behaviour:
     navigate = NavigateToGroupPose(name="NavigateToGroupPose")
 
     # Socialize
-<<<<<<< HEAD
-    tracking_mode_mission = CapabilitySetMode(
-        name="TrackingModeMission",
-        topic="/attention_manager/capability/tracking/set_mode",
-        mode="active",
-    )
-    tracking_enable_mission = CapabilityEnable(
-        name="EnableTrackingMission",
-        service_name="/attention_manager/capability/tracking/enable",
-    )
-
-
-    predict_action = PredictHumanAction(name="IdentifyHumanAction")
-
-
-=======
->>>>>>> develop
     activate_social = ActivateNode(name="ActivateInteractionManager", node_name="interaction_manager")
 
     # Wait for social interaction to finish
@@ -88,12 +71,6 @@ def create_mission_subtree() -> py_trees.behaviour.Behaviour:
         has_waypoint_check,
         deactivate_waypoint_node,
         navigate,
-<<<<<<< HEAD
-        tracking_mode_mission,
-        tracking_enable_mission,
-        predict_action,
-=======
->>>>>>> develop
         activate_social,
         wait_for_social,
         deactivate_social,
