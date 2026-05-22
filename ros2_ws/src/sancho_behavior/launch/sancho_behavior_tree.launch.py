@@ -55,6 +55,15 @@ def generate_launch_description():
         arguments=['--ros-args', '--log-level', 'WARN']
     )
 
+    sancho_ai_node = Node(
+        package='sancho_hri',
+        executable='sancho_ai',
+        name='sancho_ai',
+        output='screen',
+        emulate_tty=True,
+        prefix='xterm -hold -e'
+    )
+
     behavior_tree = Node(
         package='sancho_behavior',
         executable='sancho_behavior_tree',
@@ -80,6 +89,7 @@ def generate_launch_description():
         turn_action_server,
         tracking_node,
         central_face_cluster_service,
+        sancho_ai_node,
         behavior_tree,
         configurator_inactive
     ])

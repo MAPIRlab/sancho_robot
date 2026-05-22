@@ -7,7 +7,7 @@ import py_trees_ros
 from sancho_interfaces.action import PlayTTS
 
 from sancho_behavior.behaviors.layer_reporter import LayerReporter
-from sancho_behavior.behaviors.navigation import NavigateToDock
+from sancho_behavior.behaviors.navigation import NavigateToDock, NavigateToPoseBehavior
 
 
 def create_survival_subtree() -> py_trees.behaviour.Behaviour:
@@ -139,9 +139,8 @@ def create_survival_subtree() -> py_trees.behaviour.Behaviour:
 
     # ================= DOCKING BRANCH =================
 
-    navigate_to_dock = NavigateToDock(name="NavigateToDock")
     dock_with_timeout = py_trees.decorators.Timeout(
-        child=navigate_to_dock, name="DockTimeout", duration=120.0,
+        child=NavigateToPoseBehavior(name="NavigateToDock", pose_bb_key="config/dock_pose"), name="DockTimeout", duration=120.0,
     )
 
     sos_goal = PlayTTS.Goal()

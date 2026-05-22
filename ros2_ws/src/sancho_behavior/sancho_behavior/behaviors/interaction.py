@@ -223,8 +223,9 @@ class GenerateLLMResponse(py_trees_ros.service_clients.FromCallback):
         """Called automatically by the parent's initialise() method"""
         text = self.blackboard.user_transcription if self.blackboard.exists("user_transcription") else ""
         
+        raw_speaker_data = self.blackboard.speaker_info_json if self.blackboard.exists("speaker_info_json") else "{}"
         try:
-            speaker_data = json.loads(self.blackboard.speaker_info_json)
+            speaker_data = json.loads(raw_speaker_data)
             user_id = str(speaker_data.get("id", "Unknown"))
             user_name = str(speaker_data.get("name", "Unknown"))
         except (TypeError, json.JSONDecodeError):
@@ -277,12 +278,12 @@ class GenerateLLMResponse(py_trees_ros.service_clients.FromCallback):
     
 class RespondUser(py_trees_ros.action_clients.AttributesFromBlackboard):
     """Reads AI text from blackboard and sends to PlayTTS Action Server"""
-    def __init__(self, name="RespondUser"):
+    def __init__(self, name="RespondUser", text_bb_key="ai_response_text"):
         super().__init__(
             name=name,
             action_type=PlayTTS,
             action_name="/play_tts",
-            goal_fields={'text': 'ai_response_text'}, # {Goal Field: BB Key}
+            goal_fields={'text': text_bb_key}, # {Goal Field: BB Key}
             wait_for_server_timeout_sec=0.0
         )
 
@@ -301,3 +302,25 @@ class SetAudioSessionBehavior(py_trees_ros.service_clients.FromConstant):
             service_request=request,
             wait_for_server_timeout_sec=0.0
         )
+
+class CheckSilence(py_trees.behaviour.Behaviour):
+    """
+    Reads the user transcription. If it is empty or whitespace, 
+    it ends the interaction and aborts the current sequence.
+    """
+    def __init__(self, name="CheckSilence"):
+        super().__init__(name)
+        self.blackboard = py_trees.blackboard.Client(name=name)
+        self.blackboard.register_key("user_transcription", access=py_trees.common.Access.READ)
+        self.blackboard.register_key("interaction_finished", access=py_trees.common.Access.WRITE)
+
+    def update(self):
+        text = self.blackboard.get("user_transcription")
+        
+        # If text is None, empty, or just spaces
+        if not text or text.strip() == "":
+            self.logger.info("Silence detected. Aborting conversation turn.")
+            self.blackboard.set("interaction_finished", True)
+            return py_trees.common.Status.FAILURE 
+            
+        return py_trees.common.Status.SUCCESS

@@ -71,15 +71,6 @@ class ManageNav2Lifecycle(py_trees.behaviour.Behaviour):
 
         return py_trees.common.Status.RUNNING
 
-class PauseNavigation(ManageNav2Lifecycle):
-    def __init__(self, name="PauseNavigation"):
-        super().__init__(name, command=1)
-
-class ResumeNavigation(ManageNav2Lifecycle):
-    def __init__(self, name="ResumeNavigation"):
-        super().__init__(name, command=2)
-
-
 class NavigateToDock(py_trees_ros.action_clients.FromBlackboard):
     """
     BTA-010: Sends a NavigateToPose goal to Nav2 using the dock pose stored
@@ -233,3 +224,122 @@ class NavigateToRoamingPose(py_trees_ros.action_clients.FromBlackboard):
         goal.pose = pose
         self.bb.navigate_goal = goal
         return super().initialise()
+
+class NavigateToPoseBehavior(py_trees_ros.action_clients.FromBlackboard):
+    """
+    Universal navigation behavior. Reads a PoseStamped from a specified
+    blackboard key and sends it to the Nav2 action server.
+    """
+    def __init__(self, name="NavigateToPose", pose_bb_key="mission/target_pose", action_name="navigate_to_pose"):
+        super().__init__(
+            name=name,
+            action_type=NavigateToPose, # This is the nav2_msgs type
+            action_name=action_name,
+            key="navigate_goal",
+            wait_for_server_timeout_sec=0.0
+        )
+        self.pose_bb_key = pose_bb_key
+        self.bb = self.attach_blackboard_client(name=self.name)
+        self.bb.register_key(self.pose_bb_key, access=py_trees.common.Access.READ)
+        self.bb.register_key("navigate_goal", access=py_trees.common.Access.WRITE)
+
+    def initialise(self):
+        pose = self.bb.get(self.pose_bb_key) if self.bb.exists(self.pose_bb_key) else None
+        
+        if pose is None:
+            self.node.get_logger().error(f"{self.name}: Target pose not found on blackboard key '{self.pose_bb_key}'!")
+            self.bb.navigate_goal = None
+            return super().initialise()
+
+        goal = NavigateToPose.Goal()
+        goal.pose = pose
+        self.bb.navigate_goal = goal
+        self.node.get_logger().info(f"{self.name}: Sending goal from '{self.pose_bb_key}'")
+        return super().initialise()
+
+import py_trees
+from geometry_msgs.msg import PoseStamped
+from topology_graph.srv import Graph
+
+class ResolveTargetNode(py_trees.behaviour.Behaviour):
+    """
+    Lee una etiqueta de texto desde el blackboard (ej. 'salon'), llama al
+    servicio /topology_graph/graph para buscar sus coordenadas (x, y)
+    y reemplaza el texto en el blackboard con un objeto PoseStamped válido.
+    """
+    def __init__(self, name="ResolveTargetNode", location_key="mission/target_pose"):
+        super().__init__(name)
+        self.location_key = location_key
+        self.bb = self.attach_blackboard_client(name=self.name)
+        # Pedimos permiso de lectura y escritura para poder sobrescribir la variable
+        self.bb.register_key(self.location_key, access=py_trees.common.Access.READ)
+        self.bb.register_key(self.location_key, access=py_trees.common.Access.WRITE)
+
+    def setup(self, **kwargs):
+        self.node = kwargs['node']
+        self.cli = self.node.create_client(Graph, '/topology_graph/graph')
+
+    def initialise(self):
+        self.future = None
+        self.target_data = self.bb.get(self.location_key)
+        
+        # Si ya es un PoseStamped (porque el nodo se reinicia o viene de otro sitio), no tocamos nada
+        if isinstance(self.target_data, PoseStamped):
+            return
+            
+        # Si no es un texto, no podemos buscarlo
+        if not isinstance(self.target_data, str):
+            self.node.get_logger().error(f"{self.name}: El destino no es un texto. No se puede traducir.")
+            self.future = "FAILED"
+            return
+
+        # Comprobamos que el servicio del mapa está vivo
+        if not self.cli.wait_for_service(timeout_sec=1.0):
+            self.node.get_logger().error(f"{self.name}: Servicio de grafo no disponible")
+            self.future = "FAILED"
+
+    def update(self):
+        if isinstance(self.bb.get(self.location_key), PoseStamped):
+            return py_trees.common.Status.SUCCESS
+
+        if self.future == "FAILED":
+            return py_trees.common.Status.FAILURE
+
+        if self.future is None:
+            req = Graph.Request()
+            req.cmd = "GetAllNodes"
+            self.future = self.cli.call_async(req)
+            return py_trees.common.Status.RUNNING
+        
+        if self.future.done():
+            res = self.future.result()
+            if not res or not res.success or not res.result:
+                self.node.get_logger().error(f"{self.name}: Error al obtener el grafo.")
+                return py_trees.common.Status.FAILURE
+            
+            target_name_lower = self.target_data.lower()
+            
+            # Buscamos la coincidencia en la respuesta del grafo
+            for node_str in res.result:
+                parts = node_str.split()
+                if len(parts) >= 6 and parts[1].lower() == target_name_lower:
+                    x = float(parts[3])
+                    y = float(parts[4])
+                    
+                    # Construimos el objeto matemático
+                    pose = PoseStamped()
+                    pose.header.frame_id = "map"
+                    pose.pose.position.x = x
+                    pose.pose.position.y = y
+                    pose.pose.orientation.w = 1.0 
+                    
+                    # Sobrescribimos la variable en el Blackboard
+                    self.bb.set(self.location_key, pose)
+                    self.node.get_logger().info(f"{self.name}: Traducción exitosa. '{self.target_data}' = ({x}, {y})")
+                    return py_trees.common.Status.SUCCESS
+            
+            # Si terminamos el bucle y no lo encontramos
+            self.node.get_logger().error(f"{self.name}: La etiqueta '{self.target_data}' no existe en el mapa.")
+            return py_trees.common.Status.FAILURE
+            
+        return py_trees.common.Status.RUNNING
