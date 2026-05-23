@@ -259,7 +259,7 @@ class NavigateToPoseBehavior(py_trees_ros.action_clients.FromBlackboard):
 
 import py_trees
 from geometry_msgs.msg import PoseStamped
-from topology_graph.srv import Graph
+#from topology_graph.srv import Graph
 
 class ResolveTargetNode(py_trees.behaviour.Behaviour):
     """

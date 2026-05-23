@@ -148,10 +148,61 @@ def create_mission_subtree() -> py_trees.behaviour.Behaviour:
     roaming_branch.add_children([roaming_guard, continuous_roaming])
 
     # -------------------------------------------------------------------------
+    # Mission 4: Action Recognition and Interaction
+    # -------------------------------------------------------------------------
+    action_branch = py_trees.composites.Sequence(name="Action_Interact_Branch", memory=False)
+    
+    # 1. El Guard que activa esta misión específica
+    action_guard = py_trees.behaviours.CheckBlackboardVariableValue(
+        name="IsActionMission?",
+        check=py_trees.common.ComparisonExpression("mission/request", "recognize_action", operator.eq)
+    )
+
+    action_executor = py_trees.composites.Selector(name="Action_Executor", memory=False)
+
+    # 2A. Happy Path
+    action_seq = py_trees.composites.Sequence(name="Action_Sequence", memory=True)
+    action_seq.add_children([
+        py_trees.behaviours.CheckBlackboardVariableExists(name="HasTargetPose?", variable_name="mission/target_pose"),
+        
+        # Navegación hacia el sujeto
+        ResolveTargetNode(name="TranslateLocationName", location_key="mission/target_pose"),
+        NavigateToPoseBehavior(name="NavigateToDestination", pose_bb_key="mission/target_pose"), 
+
+        # Ejecutamos la predicción
+        PredictHumanAction(name="AnalyzeUserAction"),
+        
+        # Interacción basada en la acción
+        SetFaceMode(mode="speaking", name="SetFaceSpeaking"),
+        # RespondUser tendría que leer la variable 'mission/predicted_action' o un prompt combinado
+        RespondUser(name="DeliverActionFeedback", text_bb_key="mission/predicted_action"), 
+        SetFaceMode(mode="idle", name="SetFaceIdle"),
+        
+        # Esperar respuesta
+        ActivateNode(name="ActivateInteraction", node_name="interaction_manager"),
+        WaitForSocialInteraction(name="WaitForInteraction"),
+        DeactivateNode(name="DeactivateInteraction", node_name="interaction_manager"),
+        
+        report_status("SUCCESS", "SetActionSuccess") 
+    ])
+
+    # 2B. Recovery Path (Manejo de errores si falla la navegación o la cámara)
+    action_recovery = py_trees.composites.Sequence(name="Action_Recovery", memory=True)
+    action_recovery.add_children([
+        DeactivateNode(name="EnsureInteractionDeactivated", node_name="interaction_manager"),
+        report_status("FAILURE", "SetActionFailure"),
+        py_trees.behaviours.Failure(name="PropagateActionFailure")
+    ])
+
+    action_executor.add_children([action_seq, action_recovery])
+    action_branch.add_children([action_guard, action_executor])
+
+
+    # -------------------------------------------------------------------------
     # Assembly
     # -------------------------------------------------------------------------
     # Place all branches inside the selector
-    mission_selector.add_children([social_branch, speak_branch, roaming_branch])
+    mission_selector.add_children([social_branch, speak_branch, roaming_branch, action_branch])
     mission_root.add_children([reporter, mission_selector])
 
     return WithPreemptionContract(
