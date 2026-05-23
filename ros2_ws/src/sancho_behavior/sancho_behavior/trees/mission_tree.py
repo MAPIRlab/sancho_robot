@@ -3,7 +3,7 @@ import operator
 from py_trees.composites import Sequence, Selector, Parallel
 from sancho_behavior.behaviors.navigation import NavigateToGroupPose, SelectRandomTopoNode, ResolveTargetNode, NavigateToPoseBehavior
 from sancho_behavior.behaviors.lifecycle_actions import ActivateNode, DeactivateNode
-from sancho_behavior.behaviors.interaction import WaitForSocialInteraction, RespondUser, SetFaceMode
+from sancho_behavior.behaviors.interaction import WaitForSocialInteraction, RespondUser, SetFaceMode, FormatActionMessage
 from sancho_behavior.behaviors.layer_reporter import LayerReporter
 from sancho_behavior.behaviors.preemption_contract import WithPreemptionContract
 from sancho_behavior.behaviors.action_recognition import PredictHumanAction
@@ -171,11 +171,14 @@ def create_mission_subtree() -> py_trees.behaviour.Behaviour:
 
         # Ejecutamos la predicción
         PredictHumanAction(name="AnalyzeUserAction"),
+
+        # Preparamos el mensaje para que lo diga Sancho
+        FormatActionMessage(name="FormatMessage"),
         
         # Interacción basada en la acción
         SetFaceMode(mode="speaking", name="SetFaceSpeaking"),
         # RespondUser tendría que leer la variable 'mission/predicted_action' o un prompt combinado
-        RespondUser(name="DeliverActionFeedback", text_bb_key="mission/predicted_action"), 
+        RespondUser(name="DeliverActionFeedback", text_bb_key="mission/speech_message"), 
         SetFaceMode(mode="idle", name="SetFaceIdle"),
         
         # Esperar respuesta

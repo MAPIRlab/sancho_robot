@@ -4,7 +4,7 @@ import json
 import random
 
 from std_msgs.msg import String
-
+from ollama import Client
 from sancho_interfaces.srv import GetCentralFaceCluster, SanchoPrompt, SocialState, SetAudioSession
 from sancho_interfaces.action import PlayTTS, ListenVoice
 
@@ -293,6 +293,47 @@ class RespondUser(py_trees_ros.action_clients.AttributesFromBlackboard):
             goal_fields={'text': text_bb_key}, # {Goal Field: BB Key}
             wait_for_server_timeout_sec=0.0
         )
+
+
+class FormatActionMessage(py_trees.behaviour.Behaviour):
+    """Convierte la etiqueta de la acción cruda en una frase natural para el TTS."""
+    def __init__(self, name="FormatActionMessage"):
+        super().__init__(name)
+        self.blackboard = self.attach_blackboard_client()
+        self.client = Client(host = 'http://10.2.26.241:11434')
+        # Leemos la acción cruda
+        self.blackboard.register_key(key="predicted_action", access=py_trees.common.Access.READ)
+        # Escribimos el mensaje final
+        self.blackboard.register_key(key="speech_message", access=py_trees.common.Access.WRITE)
+
+    def update(self):
+        try:
+            accion = self.blackboard.predicted_action
+            prompt_saludo = f"Eres Sancho, un robot social simpático. El usuario que tienes enfrente está realizando la acción: '{accion}'. Genera una frase natural, corta y amigable en español para saludarle o iniciar una conversación relacionada con lo que está haciendo. No uses comillas."
+
+            respuesta_saludo = self.client.chat(
+            model='gemma3:4b',
+            messages=[{'role': 'user', 'content': prompt_saludo}],
+
+            format='json',  
+
+            options={
+                    'temperature':0.6,  
+                    'top_p': 0.8,
+                    'num_predict': 175,
+            },
+            )
+            saludoSancho = respuesta_saludo.message.content
+            # Guardamos la frase formateada en la Blackboard
+            
+            self.blackboard.speech_message = saludoSancho
+            self.logger.info(f"Mensaje generado: {saludoSancho}")
+            
+            return py_trees.common.Status.SUCCESS
+            
+        except KeyError:
+            self.logger.error("No se encontró 'predicted_action' en la Blackboard.")
+            return py_trees.common.Status.FAILURE
 
 class SetAudioSessionBehavior(py_trees_ros.service_clients.FromConstant):
     """
