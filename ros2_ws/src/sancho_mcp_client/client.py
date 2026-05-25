@@ -150,6 +150,32 @@ def _wrap_take_photo(tools: list[Any]) -> list[Any]:
     return [tool for tool in tools if tool.name != "take_photo"] + [wrapped]
 
 
+def _serialize_tools(tools: list[Any]) -> list[Any]:
+    """Wraps all tools in a shared asyncio.Lock to execute them sequentially.
+    This prevents concurrent execution issues over the streamable HTTP transport.
+    """
+    lock = asyncio.Lock()
+
+    for tool in tools:
+        original_coroutine = tool.coroutine
+        original_func = tool.func
+
+        # Use a closure to capture the original coroutine/func for each tool
+        def make_serialized_coroutine(coro, func):
+            async def serialized_coroutine(*args, **kwargs):
+                async with lock:
+                    if coro:
+                        return await coro(*args, **kwargs)
+                    else:
+                        return await asyncio.to_thread(func, *args, **kwargs)
+            return serialized_coroutine
+
+        tool.coroutine = make_serialized_coroutine(original_coroutine, original_func)
+
+    return tools
+
+
+
 def _build_llm() -> ChatGoogleGenerativeAI:
     load_dotenv()
 
@@ -276,7 +302,7 @@ async def main() -> None:
     connection = {"transport": "streamable_http", "url": server_url}
     async with create_session(connection) as session:
         await session.initialize()
-        tools = _wrap_take_photo(await load_mcp_tools(session))
+        tools = _serialize_tools(_wrap_take_photo(await load_mcp_tools(session)))
 
         agent = create_agent(llm, tools)
         await chat_loop(agent, system_prompt)
