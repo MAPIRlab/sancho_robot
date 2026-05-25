@@ -20,6 +20,7 @@ from sancho_behavior.trees.mission_tree import create_mission_subtree
 from sancho_behavior.trees.idle_tree import create_idle_subtree
 from sancho_behavior.behaviors.battery_monitor import BatteryMonitor
 from sancho_behavior.behaviors.mission_arbitration import MissionAdmissionGate, MissionStatusTracker
+from sancho_behavior.behaviors.mission_server import MissionActionServer
 
 def create_root() -> py_trees.behaviour.Behaviour:
     """Creates the main 4-priority hierarchical behavior tree"""
@@ -84,14 +85,7 @@ def create_root() -> py_trees.behaviour.Behaviour:
 
     battery_monitor = BatteryMonitor()
 
-    mission_req2bb = py_trees_ros.subscribers.ToBlackboard(
-        name="MissionRequest2BB",
-        topic_name="/mission_request",
-        topic_type=String,
-        qos_profile=QoSProfile(depth=10),
-        blackboard_variables={"mission/request": "data"},
-        clearing_policy=py_trees.common.ClearingPolicy.ON_SUCCESS
-    )
+    mission_server_node = MissionActionServer(name="MissionActionServer")
 
     # --- BRANCH 3: 4-LEVEL PRIORITIES ---
     # Memory must be false so higher priority branches can preempt lower priority ones continuously
@@ -118,7 +112,7 @@ def create_root() -> py_trees.behaviour.Behaviour:
 
     # -- Build Tree ---
     root.add_children([topics2bb, priorities])
-    topics2bb.add_children([doa2bb, hotword2bb, odom_yaw2bb, speaker2bb, waypoint2bb, battery2bb, battery_monitor, mission_req2bb])
+    topics2bb.add_children([doa2bb, hotword2bb, odom_yaw2bb, speaker2bb, waypoint2bb, battery2bb, battery_monitor, mission_server_node])
     priorities.add_children([survival_l1, preemption_l2, mission_l3, idle_l4])
     
     return root

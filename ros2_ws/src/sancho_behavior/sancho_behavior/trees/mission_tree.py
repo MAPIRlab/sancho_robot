@@ -1,127 +1,156 @@
 import py_trees
 import operator
-from py_trees.composites import Sequence
-from sancho_behavior.behaviors.navigation import NavigateToGroupPose, SelectRandomTopoNode, NavigateToRoamingPose
+from py_trees.composites import Sequence, Selector, Parallel
+from sancho_behavior.behaviors.navigation import NavigateToGroupPose, SelectRandomTopoNode, ResolveTargetNode, NavigateToPoseBehavior
 from sancho_behavior.behaviors.lifecycle_actions import ActivateNode, DeactivateNode
-from sancho_behavior.behaviors.interaction import WaitForSocialInteraction
+from sancho_behavior.behaviors.interaction import WaitForSocialInteraction, RespondUser, SetFaceMode
 from sancho_behavior.behaviors.layer_reporter import LayerReporter
 from sancho_behavior.behaviors.preemption_contract import WithPreemptionContract
+
+def report_status(status: str, name: str) -> py_trees.behaviour.Behaviour:
+    """Helper to signal the Action Server that the mission ended."""
+    return py_trees.behaviours.SetBlackboardVariable(
+        name=name,
+        variable_name="mission/status",
+        variable_value=status,
+        overwrite=True
+    )
 
 def create_mission_subtree() -> py_trees.behaviour.Behaviour:
     """
     Level 3: Mission
-
     Handles the orchestrator logic. Supports multiple mission types via a Selector.
     """
-    # Root of L3 execution. Must be memory=False so the Selector evaluates properly.
     mission_root = py_trees.composites.Sequence(name="L3_Mission", memory=False)
 
-    # BTA-002: Reporter placed first so it executes whenever L3 is ticked.
     reporter = LayerReporter(
         layer="L3",
         reason_key="mission/active",
         reason_label="mission_active",
     )
 
-    # The selector chooses which mission to run based on mission/type
     mission_selector = py_trees.composites.Selector(name="L3_Mission_Selector", memory=False)
 
     # -------------------------------------------------------------------------
-    # Mission: Social Approach
+    # Mission 1: Social Approach
     # -------------------------------------------------------------------------
-    social_seq = py_trees.composites.Sequence(name="Social_Approach_Mission", memory=True)
+    # BRANCH: Combines the guard and the execution module
+    social_branch = py_trees.composites.Sequence(name="Social_Approach_Branch", memory=False)
     
     social_guard = py_trees.behaviours.CheckBlackboardVariableValue(
         name="IsSocialMission?",
-        check=py_trees.common.ComparisonExpression(
-            variable="mission/type",
-            value="social_approach",
-            operator=operator.eq
-        )
+        check=py_trees.common.ComparisonExpression("mission/request", "social_approach", operator.eq)
     )
     
-    # Condition: DO we have a group waypoint? (Still required for social approach)
-    has_waypoint_check = py_trees.behaviours.CheckBlackboardVariableExists(
-        name="HasWaypoint?",
-        variable_name="group_waypoint_pose"
-    )
+    # EXECUTOR: Tries the happy path, falls back to recovery if it fails
+    social_executor = py_trees.composites.Selector(name="Social_Executor", memory=False)
 
-    # Deactivate group detection during navigation
-    deactivate_waypoint_node = DeactivateNode(name="DeactivateGroupWaypoint", node_name="group_waypoint_generator_node")
-
-    # Navigate
-    navigate = NavigateToGroupPose(name="NavigateToGroupPose")
-
-    # Socialize
-    activate_social = ActivateNode(name="ActivateInteractionManager", node_name="interaction_manager")
-
-    # Wait for social interaction to finish
-    wait_for_social = WaitForSocialInteraction(name="WaitForSocialInteraction")
-
-    # After social is done, restore waypoint detection
-    deactivate_social = DeactivateNode(name="DeactivateInteractionManager", node_name="interaction_manager")
-    activate_waypoint_node = ActivateNode(name="ActivateGroupWaypoint", node_name="group_waypoint_generator_node")
-
-    # Clear waypoint from blackboard so we wait for a new one
-    clear_waypoint = py_trees.behaviours.UnsetBlackboardVariable(name="ClearWaypoint", key="group_waypoint_pose")
-
+    # 1A. Happy Path
+    social_seq = py_trees.composites.Sequence(name="Social_Sequence", memory=True)
     social_seq.add_children([
-        social_guard,
-        has_waypoint_check,
-        deactivate_waypoint_node,
-        navigate,
-        activate_social,
-        wait_for_social,
-        deactivate_social,
-        activate_waypoint_node,
-        clear_waypoint
+        py_trees.behaviours.CheckBlackboardVariableExists(name="HasWaypoint?", variable_name="group_waypoint_pose"),
+        DeactivateNode(name="DeactivateGroupWaypoint", node_name="group_waypoint_generator_node"),
+        NavigateToGroupPose(name="NavigateToGroupPose"),
+        ActivateNode(name="ActivateInteractionManager", node_name="interaction_manager"),
+        WaitForSocialInteraction(name="WaitForSocialInteraction"),
+        DeactivateNode(name="DeactivateInteractionManager", node_name="interaction_manager"),
+        ActivateNode(name="ActivateGroupWaypoint", node_name="group_waypoint_generator_node"),
+        py_trees.behaviours.UnsetBlackboardVariable(name="ClearWaypoint", key="group_waypoint_pose"),
+        report_status("SUCCESS", "SetSocialSuccess") # Wakes up the Action Server
     ])
 
+    # 1B. Recovery Path
+    social_recovery = py_trees.composites.Sequence(name="Social_Recovery", memory=True)
+    social_recovery.add_children([
+        ActivateNode(name="RestoreGroupWaypoint", node_name="group_waypoint_generator_node"),
+        report_status("FAILURE", "SetSocialFailure"), # Informs Action Server
+        py_trees.behaviours.Failure(name="PropagateSocialFailure") # Ensure the tree knows it failed
+    ])
+
+    social_executor.add_children([social_seq, social_recovery])
+    social_branch.add_children([social_guard, social_executor])
+
     # -------------------------------------------------------------------------
-    # Mission: Continuous Random Roaming
+    # Mission 2: Speak and Interact
     # -------------------------------------------------------------------------
-    # Use memory=False so the guard is evaluated every tick, allowing mid-mission cancellation
-    roaming_seq = py_trees.composites.Sequence(name="Random_Roaming_Mission", memory=False)
+    speak_branch = py_trees.composites.Sequence(name="Speak_Interact_Branch", memory=False)
+    
+    speak_guard = py_trees.behaviours.CheckBlackboardVariableValue(
+        name="IsSpeakInteractMission?",
+        check=py_trees.common.ComparisonExpression("mission/request", "speak_and_interact", operator.eq)
+    )
+
+    speak_executor = py_trees.composites.Selector(name="Speak_Executor", memory=False)
+
+    # 2A. Happy Path
+    speak_seq = py_trees.composites.Sequence(name="Speak_Sequence", memory=True)
+    speak_seq.add_children([
+        # 1. Parameter Checks
+        py_trees.behaviours.CheckBlackboardVariableExists(name="HasTargetPose?", variable_name="mission/target_pose"),
+        py_trees.behaviours.CheckBlackboardVariableExists(name="HasSpeechText?", variable_name="mission/speech_text"),
+        
+        # 2. Traducir el nombre de la habitación a coordenadas X, Y
+        ResolveTargetNode(name="TranslateLocationName", location_key="mission/target_pose"),
+        
+        # 3. Navigate to destination (ahora con el argumento pose_bb_key explícito)
+        NavigateToPoseBehavior(name="NavigateToDestination", pose_bb_key="mission/target_pose"), 
+        
+        # 4. Speak the payload using your modified RespondUser
+        SetFaceMode(mode="speaking", name="SetFaceSpeaking"),
+        RespondUser(name="DeliverMessage", text_bb_key="mission/speech_text"), 
+        SetFaceMode(mode="idle", name="SetFaceIdle"),
+        
+        # 5. Trigger the Interaction Manager to wait for a human response
+        ActivateNode(name="ActivateInteraction", node_name="interaction_manager"),
+        WaitForSocialInteraction(name="WaitForInteraction"),
+        DeactivateNode(name="DeactivateInteraction", node_name="interaction_manager"),
+        
+        # 6. Report Success to the Orchestrator
+        report_status("SUCCESS", "SetSpeakSuccess") 
+    ])
+
+    # 2B. Recovery Path
+    speak_recovery = py_trees.composites.Sequence(name="Speak_Recovery", memory=True)
+    speak_recovery.add_children([
+        DeactivateNode(name="EnsureInteractionDeactivated", node_name="interaction_manager"),
+        report_status("FAILURE", "SetSpeakFailure"),
+        py_trees.behaviours.Failure(name="PropagateSpeakFailure")
+    ])
+
+    speak_executor.add_children([speak_seq, speak_recovery])
+    speak_branch.add_children([speak_guard, speak_executor])
+
+    # -------------------------------------------------------------------------
+    # Mission 3: Continuous Random Roaming (Infinite)
+    # -------------------------------------------------------------------------
+    roaming_branch = py_trees.composites.Sequence(name="Random_Roaming_Branch", memory=False)
     
     roaming_guard = py_trees.behaviours.CheckBlackboardVariableValue(
         name="IsRoamingMission?",
-        check=py_trees.common.ComparisonExpression(
-            variable="mission/request",
-            value="roaming",
-            operator=operator.eq
-        )
+        check=py_trees.common.ComparisonExpression("mission/request", "roaming", operator.eq)
     )
     
-    select_topo_node = SelectRandomTopoNode(name="SelectRandomTopoNode")
-    
-    # Ignore individual navigation failures so roaming continues to the next node
-    navigate_to_roaming = py_trees.decorators.FailureIsSuccess(
-        name="IgnoreNavFailures",
-        child=NavigateToRoamingPose(name="NavigateToRoamingPose")
-    )
-    
-    # Inner loop body: Select -> Navigate
     roaming_loop_body = py_trees.composites.Sequence(name="RoamingLoopBody", memory=True)
     roaming_loop_body.add_children([
-        select_topo_node,
-        navigate_to_roaming
+        SelectRandomTopoNode(name="SelectRandomTopoNode"),
+        py_trees.decorators.FailureIsSuccess(
+            name="IgnoreNavFailures",
+            child=NavigateToPoseBehavior(name="NavigateToRoamingPose", pose_bb_key="roaming_goal_pose")
+        )
     ])
     
-    # Loop forever as long as the guard passes
     continuous_roaming = py_trees.decorators.SuccessIsRunning(
         name="ContinuousRoaming",
         child=roaming_loop_body
     )
     
-    roaming_seq.add_children([
-        roaming_guard,
-        continuous_roaming
-    ])
+    roaming_branch.add_children([roaming_guard, continuous_roaming])
 
     # -------------------------------------------------------------------------
     # Assembly
     # -------------------------------------------------------------------------
-    mission_selector.add_children([social_seq, roaming_seq])
+    # Place all branches inside the selector
+    mission_selector.add_children([social_branch, speak_branch, roaming_branch])
     mission_root.add_children([reporter, mission_selector])
 
     return WithPreemptionContract(
