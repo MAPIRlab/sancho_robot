@@ -15,7 +15,7 @@ It uses:
 ## Requirements
 
 - Python 3.10+
-- An active Google Gemini API Key (`GOOGLE_API_KEY`).
+- A Google Vertex AI service account credentials JSON file.
 - A running instance of `sancho_mcp_server`.
 
 ---
@@ -37,7 +37,7 @@ It uses:
 3. **Configure the Environment**:
    Ensure you have a `.env` file in the package root. Example configuration:
    ```ini
-   GOOGLE_API_KEY=your-api-key-here
+   SANCHO_MCP_CREDENTIALS_PATH=credentials/gen-lang-client-0742066178-e5b7549d7a18.json
    SANCHO_MCP_LLM_MODEL=gemini-3.1-flash-lite
    SANCHO_MCP_LLM_TEMPERATURE=0.2
    SANCHO_MCP_SERVER_URL=http://127.0.0.1:8000/mcp
@@ -65,7 +65,7 @@ Once running, type your requests into the prompt (e.g., *"take a photo and descr
 
 | Variable | Description | Default |
 | --- | --- | --- |
-| `GOOGLE_API_KEY` | Required API Key to access Google Generative AI (Gemini). | *None* |
+| `SANCHO_MCP_CREDENTIALS_PATH` | Path to the Google Vertex AI service account credentials JSON file. | *Required (None)* |
 | `SANCHO_MCP_SERVER_URL` | Endpoint of the running `sancho_mcp_server`. | `http://127.0.0.1:8000/mcp` |
 | `SANCHO_MCP_LLM_MODEL` | Gemini model to use for the agent's logic. | `gemini-3.1-flash-lite` |
 | `SANCHO_MCP_LLM_TEMPERATURE` | Controls the creativity/determinism of the agent. | `0.2` |
