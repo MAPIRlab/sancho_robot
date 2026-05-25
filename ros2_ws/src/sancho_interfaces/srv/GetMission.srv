@@ -1,0 +1,8 @@
+# Request (Empty, just asking for the current mission)
+---
+# Response
+bool success
+string mission_type
+string json_parameters  # The current state or data of the mission
+string status           # e.g., "RUNNING", "PENDING"
+string message

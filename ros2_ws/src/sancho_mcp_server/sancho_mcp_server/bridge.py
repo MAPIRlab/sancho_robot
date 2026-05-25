@@ -1,4 +1,6 @@
 import threading
+import json
+
 from importlib import import_module
 from typing import Any, Optional
 
@@ -9,6 +11,7 @@ from rclpy.node import Node
 from geometry_msgs.msg import PoseWithCovarianceStamped
 from nav2_msgs.action import NavigateToPose, Spin
 from sensor_msgs.msg import Image
+from std_srvs.srv import Trigger
 
 from .config import (
     BASE_FRAME_ID,
@@ -19,7 +22,7 @@ from .config import (
     POSE_TOPIC,
     TF_TIMEOUT_SEC,
 )
-from .vision import LMStudioVisionDescriber
+from .vision import ros_image_to_data_uri
 
 try:
     CvBridge: Any = import_module("cv_bridge").CvBridge
@@ -32,6 +35,8 @@ except Exception as exc:
 try:
     Graph: Any = import_module("topology_graph.srv").Graph
     PlayTTS: Any = import_module("sancho_interfaces.action").PlayTTS
+    Mission: Any = import_module("sancho_interfaces.action").Mission
+    GetMission: Any = import_module("sancho_interfaces.srv").GetMission
 except Exception as exc:
     raise ImportError(
         f"Failed to import custom ROS 2 interfaces: {exc}. Make sure to source install/setup.bash."
@@ -72,10 +77,16 @@ class SanchoBridgeNode(Node):
         )
         self.tf_buffer = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
-        # Pass the rclpy Node logger so LMStudioVisionDescriber can log via ROS logger
-        self.image_describer = LMStudioVisionDescriber(logger=self.get_logger())
 
         self.tts_action_client = ActionClient(self, PlayTTS, "/play_tts")
+
+        #######################################################
+        # MISSION CLIENTS
+        #######################################################
+        self.mission_client = ActionClient(self, Mission, "mission_action")
+        self.get_client = self.create_client(GetMission, "/bt/get_mission")
+        self.pop_client = self.create_client(Trigger, "/bt/pop_mission")
+        self.clear_client = self.create_client(Trigger, "/bt/clear_missions")
 
     def _image_callback(self, msg: Image):
         self.latest_image = msg
@@ -221,26 +232,6 @@ class SanchoBridgeNode(Node):
             return "Spin succeeded!"
         return f"Spin ended with status code: {result.status if result else 'Unknown'}"
 
-    def sync_take_photo(self) -> str:
-        self.get_logger().info("Waiting for image...")
-        self.image_received_event.clear()
-
-        waited = 0.0
-        while not self.image_received_event.is_set() and waited < IMAGE_CAPTURE_TIMEOUT_SEC:
-            rclpy.spin_once(self, timeout_sec=0.1)
-            waited += 0.1
-
-        if not self.image_received_event.is_set() or self.latest_image is None:
-            return f"Error: Timeout waiting for image from {CAMERA_TOPIC}"
-
-        image_msg = self.latest_image
-        self.latest_image = None
-
-        try:
-            return self.image_describer.describe_ros_image(image_msg, self.cv_bridge, cv2)
-        except Exception as exc:
-            return f"Error describing image with LMStudio: {exc}"
-
     def sync_take_photo_raw(self) -> dict[str, str]:
         self.get_logger().info("Waiting for image...")
         self.image_received_event.clear()
@@ -257,7 +248,7 @@ class SanchoBridgeNode(Node):
         self.latest_image = None
 
         try:
-            data_uri = LMStudioVisionDescriber._ros_image_to_data_uri(
+            data_uri = ros_image_to_data_uri(
                 image_msg, self.cv_bridge, cv2
             )
             if "," in data_uri:
@@ -385,3 +376,40 @@ class SanchoBridgeNode(Node):
                 f"TTS Success: {res_val.message if hasattr(res_val, 'message') else 'Speech completed.'}"
             )
         return f"TTS ended with status code: {result.status if result else 'Unknown'}"
+
+##############################################################
+# MISSION RELATED METHODS
+##############################################################
+
+    def sync_execute_mission(self, mission_type: str, json_params: str) -> str:
+        """Sends the payload and waits."""
+        if not self.mission_client.wait_for_server(timeout_sec=5.0):
+            return "Error: BT unavailable."
+            
+        goal_msg = Mission.Goal(mission_type=mission_type, json_parameters=json_params)
+        future = self.mission_client.send_goal_async(goal_msg)
+        rclpy.spin_until_future_complete(self, future)
+        
+        goal_handle = future.result()
+        res_future = goal_handle.get_result_async()
+        rclpy.spin_until_future_complete(self, res_future)
+        return "Mission completed or preempted."
+
+    def sync_get_mission(self) -> dict[str, Any]:
+        req = GetMission.Request()
+        future = self.get_client.call_async(req)
+        rclpy.spin_until_future_complete(self, future)
+        res = future.result()
+        if res is None:
+            return {"type": "error", "queue": "Service call failed or timed out"}
+        return {"type": res.mission_type, "queue": res.message}
+
+    def sync_pop_mission(self) -> str:
+        future = self.pop_client.call_async(Trigger.Request())
+        rclpy.spin_until_future_complete(self, future)
+        return future.result().message
+
+    def sync_clear_missions(self) -> str:
+        future = self.clear_client.call_async(Trigger.Request())
+        rclpy.spin_until_future_complete(self, future)
+        return future.result().message

@@ -4,7 +4,9 @@ import json
 import asyncio
 from rclpy.action import ActionServer, GoalResponse, CancelResponse
 from rclpy.callback_groups import ReentrantCallbackGroup
+from sancho_interfaces.srv import GetMission
 from sancho_interfaces.action import Mission
+from std_srvs.srv import Trigger
 
 class MissionActionServer(py_trees.behaviour.Behaviour):
     def __init__(self, name="MissionActionServer", action_name="mission_action"):
@@ -26,23 +28,61 @@ class MissionActionServer(py_trees.behaviour.Behaviour):
 
     def setup(self, **kwargs):
         self.node = kwargs.get('node')
+        cb_group = ReentrantCallbackGroup()
+        # 1. Action Server (Receives missions)
         self.action_server = ActionServer(
-            self.node,
-            Mission,
-            self.action_name,
+            self.node, Mission, "mission_action",
             execute_callback=self.execute_callback,
-            goal_callback=self.goal_callback,
-            cancel_callback=self.cancel_callback,
-            callback_group=ReentrantCallbackGroup() # Critical: allows concurrent goals
+            goal_callback=lambda request: GoalResponse.ACCEPT,
+            cancel_callback=lambda handle: CancelResponse.ACCEPT,
+            callback_group=cb_group
         )
+
+        # 2. Srv Server (Legacy compatibility for MCP)
+        self.get_srv = self.node.create_service(GetMission, "/bt/get_mission", self.get_cb, callback_group=cb_group)
+        self.pop_srv = self.node.create_service(Trigger, "/bt/pop_mission", self.pop_cb, callback_group=cb_group)
+        self.clear_srv = self.node.create_service(Trigger, "/bt/clear_missions", self.clear_cb, callback_group=cb_group)
+
         self.logger.debug(f"[{self.name}] Priority Action Server initialized.")
 
-    def goal_callback(self, goal_request):
-        # We now accept ALL valid goals so they can be queued
-        return GoalResponse.ACCEPT
+    async def get_cb(self, request, response):
+        """AI asks: What are you doing?"""
+        async with self.queue_lock:
+            response.success = True
+            if self.active_mission:
+                response.mission_type = self.active_mission['request'].mission_type
+                response.json_parameters = json.dumps(self.active_mission['params'])
+                response.status = "RUNNING"
+                response.message = f"Queue length: {len(self.mission_queue)}"
+            else:
+                response.mission_type = "none"
+                response.json_parameters = "{}"
+                response.status = "IDLE"
+                response.message = "Queue is empty."
+        return response
 
-    def cancel_callback(self, goal_handle):
-        return CancelResponse.ACCEPT
+    async def pop_cb(self, request, response):
+        """AI says: Skip the current task."""
+        async with self.queue_lock:
+            if self.active_mission:
+                self.active_mission['handle'].canceled() # Abort current goal
+                # execute_callback will naturally catch this and promote the next queue item
+                response.success = True
+                response.message = "Popped active mission."
+            else:
+                response.success = False
+                response.message = "Nothing to pop."
+        return response
+
+    async def clear_cb(self, request, response):
+        """AI says: Stop everything, wipe the queue."""
+        async with self.queue_lock:
+            self.mission_queue.clear() # 1. Delete all waiting tasks
+            if self.active_mission:
+                self.active_mission['handle'].canceled() # 2. Kill the active one
+            response.success = True
+            response.message = "All missions cleared."
+        return response
 
     async def execute_callback(self, goal_handle):
         request = goal_handle.request

@@ -1,0 +1,6 @@
+google-genai==2.6.0
+pyaudio
+opencv-python
+python-dotenv
+langchain-mcp-adapters==0.2.2
+numpy<2.0.0

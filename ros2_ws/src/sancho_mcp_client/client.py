@@ -1,23 +1,25 @@
 from __future__ import annotations
 
 import asyncio
+import json
+import logging
 import os
 from pathlib import Path
 from typing import Any
 
+from dotenv import load_dotenv
+from langchain.agents import create_agent
 from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.tools import StructuredTool
-from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.agents import create_agent
-
 from langchain_mcp_adapters.sessions import create_session
 from langchain_mcp_adapters.tools import load_mcp_tools
 
-DEFAULT_PROMPT_PATH = (
-    Path(__file__).resolve().parents[1] / "sancho_mcp_server" / "SYSTEM_PROMPT.md"
-)
+# Silence langchain_google_genai schema warnings
+logging.getLogger("langchain_google_genai._function_utils").setLevel(logging.ERROR)
+
+DEFAULT_PROMPT_PATH = Path(__file__).resolve().parent / "SYSTEM_PROMPT.md"
 
 
 def load_system_prompt() -> str:
@@ -75,17 +77,48 @@ async def _call_tool(tool: Any, args: dict) -> Any:
 
 
 def _mcp_image_payload_to_content(payload: Any) -> Any:
+    # Handle list of blocks (from langchain-mcp-adapters)
+    if isinstance(payload, list):
+        new_blocks = []
+        for block in payload:
+            if isinstance(block, dict) and block.get("type") == "text":
+                text = block.get("text", "")
+                try:
+                    data = json.loads(text)
+                    if isinstance(data, dict) and data.get("type") == "image":
+                        new_blocks.extend(_create_multimodal_content(data))
+                        continue
+                except json.JSONDecodeError:
+                    pass
+            new_blocks.append(block)
+        return new_blocks
+
+    # Handle direct string
+    if isinstance(payload, str):
+        try:
+            data = json.loads(payload)
+            if isinstance(data, dict) and data.get("type") == "image":
+                return _create_multimodal_content(data)
+        except json.JSONDecodeError:
+            pass
+
+    # Handle direct dict
     if isinstance(payload, dict) and payload.get("type") == "image":
-        data = payload.get("data")
-        if not data:
-            return {"error": "Empty image payload from take_photo"}
-        mime = payload.get("mime_type", "image/jpeg")
-        data_url = f"data:{mime};base64,{data}"
-        return [
-            {"type": "text", "text": "Captured image from robot camera."},
-            {"type": "image_url", "image_url": {"url": data_url}},
-        ]
+        return _create_multimodal_content(payload)
+
     return payload
+
+
+def _create_multimodal_content(data: dict) -> list[dict]:
+    b64_data = data.get("data")
+    if not b64_data:
+        return [{"type": "text", "text": "error: Empty image payload"}]
+    mime = data.get("mime_type") or data.get("mimeType") or "image/jpeg"
+    data_url = f"data:{mime};base64,{b64_data}"
+    return [
+        {"type": "text", "text": "Captured image from robot camera."},
+        {"type": "image_url", "image_url": {"url": data_url}},
+    ]
 
 
 def _wrap_take_photo(tools: list[Any]) -> list[Any]:
@@ -100,7 +133,8 @@ def _wrap_take_photo(tools: list[Any]) -> list[Any]:
 
     wrapped = StructuredTool.from_function(
         name="take_photo",
-        description=raw_tool.description or "Capture a camera frame as an image payload.",
+        description=raw_tool.description
+        or "Capture a camera frame as an image payload.",
         coroutine=_take_photo,
     )
 
@@ -155,10 +189,13 @@ async def main() -> None:
 
     connection = {"transport": "streamable_http", "url": server_url}
     async with create_session(connection) as session:
+        await session.initialize()
         tools = _wrap_take_photo(await load_mcp_tools(session))
 
         agent = create_agent(llm, tools)
         await chat_loop(agent, system_prompt)
+
+        # agent.invoke(stt_result)
 
 
 if __name__ == "__main__":

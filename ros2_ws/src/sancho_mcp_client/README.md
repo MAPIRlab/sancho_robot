@@ -69,7 +69,7 @@ Once running, type your requests into the prompt (e.g., *"take a photo and descr
 | `SANCHO_MCP_SERVER_URL` | Endpoint of the running `sancho_mcp_server`. | `http://127.0.0.1:8000/mcp` |
 | `SANCHO_MCP_LLM_MODEL` | Gemini model to use for the agent's logic. | `gemini-3.1-flash-lite` |
 | `SANCHO_MCP_LLM_TEMPERATURE` | Controls the creativity/determinism of the agent. | `0.2` |
-| `SANCHO_SYSTEM_PROMPT_PATH` | Path to the system instruction prompt file. | `../sancho_mcp_server/SYSTEM_PROMPT.md` |
+| `SANCHO_SYSTEM_PROMPT_PATH` | Path to the system instruction prompt file. | `SYSTEM_PROMPT.md` |
 
 ---
 
