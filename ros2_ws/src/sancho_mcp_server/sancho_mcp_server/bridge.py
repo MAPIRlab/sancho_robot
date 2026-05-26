@@ -382,27 +382,53 @@ class SanchoBridgeNode(Node):
 ##############################################################
 
     def sync_execute_mission(self, mission_type: str, json_params: str) -> str:
-        """Sends the payload and waits."""
+        """Sends a mission goal to the BT action server and waits for the result."""
         if not self.mission_client.wait_for_server(timeout_sec=5.0):
-            return "Error: BT unavailable."
+            return "Error: BT mission_action server not available."
             
         goal_msg = Mission.Goal(mission_type=mission_type, json_parameters=json_params)
         future = self.mission_client.send_goal_async(goal_msg)
-        rclpy.spin_until_future_complete(self, future)
+        rclpy.spin_until_future_complete(self, future, timeout_sec=5.0)
+
+        if not future.done():
+            return "Error: Mission goal send request timed out."
         
         goal_handle = future.result()
+        if goal_handle is None or not getattr(goal_handle, "accepted", False):
+            return "Error: Mission goal was rejected by the BT."
+
         res_future = goal_handle.get_result_async()
         rclpy.spin_until_future_complete(self, res_future)
-        return "Mission completed or preempted."
+
+        result = res_future.result()
+        if result is None:
+            return "Error: Mission result was None."
+
+        # result.status: 4=SUCCEEDED, 5=CANCELED, 6=ABORTED
+        status_code = result.status
+        res_val = result.result
+        if status_code == 4:
+            return f"Mission succeeded: {res_val.final_message}"
+        elif status_code == 5:
+            return f"Mission canceled: {res_val.final_message}"
+        else:
+            return f"Mission ended (status {status_code}): {res_val.final_message}"
 
     def sync_get_mission(self) -> dict[str, Any]:
+        if not self.get_client.wait_for_service(timeout_sec=5.0):
+            return {"error": "/bt/get_mission service not available."}
         req = GetMission.Request()
         future = self.get_client.call_async(req)
-        rclpy.spin_until_future_complete(self, future)
+        rclpy.spin_until_future_complete(self, future, timeout_sec=5.0)
         res = future.result()
         if res is None:
-            return {"type": "error", "queue": "Service call failed or timed out"}
-        return {"type": res.mission_type, "queue": res.message}
+            return {"error": "Service call failed or timed out."}
+        return {
+            "mission_type": res.mission_type,
+            "status": res.status,
+            "parameters": res.json_parameters,
+            "queue_info": res.message,
+        }
 
     def sync_pop_mission(self) -> str:
         future = self.pop_client.call_async(Trigger.Request())
