@@ -110,28 +110,40 @@ async def clear_all_missions_from_blackboard() -> str:
     return await run_in_ros_thread(require_sancho_node().sync_clear_missions)
 
 @mcp.tool()
-async def mission_random_move() -> str:
-    """Triggers the robot to execute a random exploration mission."""
-    # No parameters needed for a random move, so send an empty JSON object
+async def mission_random_move(priority: int = 5) -> str:
+    """Triggers the robot to execute a random exploration mission.
+    
+    Args:
+        priority: Mission priority (lower = higher priority). Default is 5.
+    """
+    import json
+    params = {"priority": priority}
     return await run_in_ros_thread(
         require_sancho_node().sync_execute_mission, 
         "roaming", 
-        "{}"
+        json.dumps(params)
     )
 
 @mcp.tool()
-async def mission_move_and_talk(x: float, y: float, message: str) -> str:
+async def mission_move_and_talk(target_pose: str, message: str, priority: int = 5) -> str:
     """
-    Sends the robot to a specific map coordinate (x, y) and makes it speak 
-    the provided message upon arrival.
+    Sends the robot to a named location (e.g. 'office', 'kitchen') or
+    coordinates as 'x,y' and makes it speak the provided message upon arrival.
+    
+    Args:
+        target_pose: A location name from the topological map, or coordinates as 'x,y'.
+        message: The text the robot will speak when it arrives.
+        priority: Mission priority (lower = higher priority). Default is 5.
     """
     import json
-    # Pack the LLM's arguments into a JSON string
     params = {
-        "x": x,
-        "y": y,
-        "message": message
+        "target_pose": target_pose,
+        "speech_text": message,
+        "priority": priority,
     }
+
+    #log the message and the target pose
+    require_sancho_node().get_logger().info(f"Mission move and talk: {params}")
     
     return await run_in_ros_thread(
         require_sancho_node().sync_execute_mission, 
