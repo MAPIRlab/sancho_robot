@@ -301,8 +301,10 @@ class FormatActionMessage(py_trees.behaviour.Behaviour):
         super().__init__(name)
         self.blackboard = self.attach_blackboard_client()
         self.client = Client(host = 'http://10.2.26.241:11434')
-        # Leemos la acción cruda
+
+        # Leemos la predicción de la acción 
         self.blackboard.register_key(key="predicted_action", access=py_trees.common.Access.READ)
+
         # Escribimos el mensaje final
         self.blackboard.register_key(key="speech_message", access=py_trees.common.Access.WRITE)
 
@@ -313,19 +315,16 @@ class FormatActionMessage(py_trees.behaviour.Behaviour):
 
             respuesta_saludo = self.client.chat(
             model='gemma3:4b',
-            messages=[{'role': 'user', 'content': prompt_saludo}],
-
-            format='json',  
-
+            messages=[{'role': 'user', 'content': prompt_saludo}], 
             options={
                     'temperature':0.6,  
                     'top_p': 0.8,
                     'num_predict': 175,
             },
             )
-            saludoSancho = respuesta_saludo.message.content
-            # Guardamos la frase formateada en la Blackboard
-            
+
+            # Guardamos la frase en la Blackboard
+            saludoSancho = respuesta_saludo.message.content.strip()
             self.blackboard.speech_message = saludoSancho
             self.logger.info(f"Mensaje generado: {saludoSancho}")
             

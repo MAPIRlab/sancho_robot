@@ -1,6 +1,7 @@
 import py_trees
 import operator
 from py_trees.composites import Sequence, Selector, Parallel
+from sancho_behavior.trees import interaction_tree
 from sancho_behavior.behaviors.navigation import NavigateToGroupPose, SelectRandomTopoNode, ResolveTargetNode, NavigateToPoseBehavior
 from sancho_behavior.behaviors.lifecycle_actions import ActivateNode, DeactivateNode
 from sancho_behavior.behaviors.interaction import WaitForSocialInteraction, RespondUser, SetFaceMode, FormatActionMessage
@@ -152,10 +153,14 @@ def create_mission_subtree() -> py_trees.behaviour.Behaviour:
     # -------------------------------------------------------------------------
     action_branch = py_trees.composites.Sequence(name="Action_Interact_Branch", memory=False)
     
+    #Create the Interaction subtree
+    interaction_subtree = interaction_tree.create_interaction_tree()
+
+
     # 1. El Guard que activa esta misión específica
     action_guard = py_trees.behaviours.CheckBlackboardVariableValue(
         name="IsActionMission?",
-        check=py_trees.common.ComparisonExpression("mission/request", "recognize_action", operator.eq)
+        check=py_trees.common.ComparisonExpression("mission/request", "action_recognition", operator.eq)
     )
 
     action_executor = py_trees.composites.Selector(name="Action_Executor", memory=False)
@@ -175,16 +180,17 @@ def create_mission_subtree() -> py_trees.behaviour.Behaviour:
         # Preparamos el mensaje para que lo diga Sancho
         FormatActionMessage(name="FormatMessage"),
         
-        # Interacción basada en la acción
+        # Cambiamos la UI de la cara de SANCHO a "speaking"
         SetFaceMode(mode="speaking", name="SetFaceSpeaking"),
-        # RespondUser tendría que leer la variable 'mission/predicted_action' o un prompt combinado
-        RespondUser(name="DeliverActionFeedback", text_bb_key="mission/speech_message"), 
+
+        # Interacción basada en la acción
+        RespondUser(name="DeliverActionFeedback", text_bb_key="speech_message"), 
+
+        # Cambiamos la UI de la cara de SANCHO a "idle"
         SetFaceMode(mode="idle", name="SetFaceIdle"),
         
-        # Esperar respuesta
-        ActivateNode(name="ActivateInteraction", node_name="interaction_manager"),
-        WaitForSocialInteraction(name="WaitForInteraction"),
-        DeactivateNode(name="DeactivateInteraction", node_name="interaction_manager"),
+        # Creamos el sub arbol de interacción una vez se haya saludado al usuario con el mensaje personalizado
+        interaction_subtree,
         
         report_status("SUCCESS", "SetActionSuccess") 
     ])
