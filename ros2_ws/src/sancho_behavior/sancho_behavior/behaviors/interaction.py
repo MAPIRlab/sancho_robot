@@ -312,7 +312,7 @@ class FormatActionMessage(py_trees.behaviour.Behaviour):
     def update(self):
         try:
             accion = self.blackboard.predicted_action
-            prompt_saludo = f"Eres Sancho, un robot social simpático. El usuario que tienes enfrente está realizando la acción: '{accion}'. Genera una frase natural, corta y amigable en español para saludarle o iniciar una conversación relacionada con lo que está haciendo. No uses comillas."
+            prompt_saludo = f"Eres Sancho, un robot social simpático. El usuario que tienes enfrente está realizando la acción: '{accion}'. Genera una frase natural y amigable en español para saludarle o iniciar una conversación relacionada con lo que está haciendo el usuario. No uses comillas."
 
             respuesta_saludo = self.client.chat(
             model='gemma3:4b',
