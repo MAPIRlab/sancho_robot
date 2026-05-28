@@ -64,7 +64,8 @@ class SanchoAINode(Node):
 
         if mode == MODE.NORMAL:
             self.get_logger().info("Normal Sancho Prompt")
-            return self.normal_message(response, request.chat_id, request.text, args.get("user_id", ""), args.get("user_name", ""))
+            current_action = args.get("current_user_action", "desconocida")
+            return self.normal_message(response, request.chat_id, request.text, args.get("user_id", ""), args.get("user_name", ""),current_action)
         
         elif mode in self.MODE_TASK:
             self.get_logger().info(f"{mode.name} Sancho Prompt")
@@ -99,14 +100,14 @@ class SanchoAINode(Node):
 
         return response
 
-    def normal_message(self, response, chat_id, text, real_user_id, real_user_name):
+    def normal_message(self, response, chat_id, text, real_user_id, real_user_name, current_user_action):
         display_user_id = real_user_id or "Unknown"
         display_user_name = real_user_name or "Usuario"
         user_timestamp = datetime.now().timestamp()
 
         chat_history = self.chats.get(chat_id, [])
         user_memory = self.memory_manager.get_memory_text(real_user_id) # If no user_id, memory will be ""
-        value, intent, arguments, provider, model = self.ai.on_message(text, chat_history, display_user_id, display_user_name, user_memory)
+        value, intent, arguments, provider, model = self.ai.on_message(text, chat_history, display_user_id, display_user_name, user_memory, current_user_action)
         assistant_timestamp = datetime.now().timestamp()
 
         response.value_json = json.dumps(value)

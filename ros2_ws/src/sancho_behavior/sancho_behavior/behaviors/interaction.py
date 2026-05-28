@@ -221,7 +221,8 @@ class GenerateLLMResponse(py_trees_ros.service_clients.FromCallback):
         # Register keys on the automatically created self.blackboard
         self.blackboard.register_key("user_transcription", access=py_trees.common.Access.READ)
         self.blackboard.register_key("speaker_info_json", access=py_trees.common.Access.READ)
-        
+        self.blackboard.register_key("predicted_action", access=py_trees.common.Access.READ)
+
         self.blackboard.register_key("ai_response_text", access=py_trees.common.Access.WRITE)
         self.blackboard.register_key("ai_emotion", access=py_trees.common.Access.WRITE)
         self.blackboard.register_key("interaction_finished", access=py_trees.common.Access.WRITE)
@@ -229,7 +230,7 @@ class GenerateLLMResponse(py_trees_ros.service_clients.FromCallback):
     def get_request(self):
         """Called automatically by the parent's initialise() method"""
         text = self.blackboard.user_transcription if self.blackboard.exists("user_transcription") else ""
-        
+        current_action = self.blackboard.predicted_action if self.blackboard.exists("predicted_action") else "desconocida"
         raw_speaker_data = self.blackboard.speaker_info_json if self.blackboard.exists("speaker_info_json") else "{}"
         try:
             speaker_data = json.loads(raw_speaker_data)
@@ -243,7 +244,7 @@ class GenerateLLMResponse(py_trees_ros.service_clients.FromCallback):
         req = SanchoPrompt.Request()
         req.chat_id = "0"
         req.text = text
-        req.args_json = json.dumps({"user_id": user_id, "user_name": user_name})
+        req.args_json = json.dumps({"user_id": user_id, "user_name": user_name, "current_user_action": current_action})
         req.mode = "normal"
         
         self.logger.info(f"Generating LLM response for: '{text}'")
@@ -300,7 +301,7 @@ class FormatActionMessage(py_trees.behaviour.Behaviour):
     def __init__(self, name="FormatActionMessage"):
         super().__init__(name)
         self.blackboard = self.attach_blackboard_client()
-        self.client = Client(host = 'http://10.2.26.241:11434')
+        self.client = Client(host = 'http://10.1.26.67:11434')
 
         # Leemos la predicción de la acción 
         self.blackboard.register_key(key="predicted_action", access=py_trees.common.Access.READ)

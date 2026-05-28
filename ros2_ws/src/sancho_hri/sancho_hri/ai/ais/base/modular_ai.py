@@ -18,7 +18,7 @@ class ModularAI(ABC):
         self.executor = executor
         self.response_generator = response_generator
 
-    def on_message(self, user_input: str, chat_history: list, user_id: str, user_name: str, user_memory: str):
+    def on_message(self, user_input: str, chat_history: list, user_id: str, user_name: str, user_memory: str, current_user_action: str):
         history_classify = self._get_history_for_classify(chat_history) 
         intent, arguments, _, _ = self.classifier.classify(user_input, history_classify)
         
@@ -32,7 +32,7 @@ class ModularAI(ABC):
         else:
             data = {}
 
-            robot_context = self._build_robot_context()
+            robot_context = self._build_robot_context(current_user_action)
             history_conversation = self._get_history_for_conversation(chat_history)
             response, emotion, provider_used, model_used = self.response_generator.continue_conversation(
                 user_input, robot_context, history_conversation, user_id, user_name, user_memory
@@ -53,7 +53,7 @@ class ModularAI(ABC):
         return [{k: (f"[{m['id']}|{m['name']}] {m[k]}" if k == "content" and m["role"] == "user" else m[k]) 
                  for k in ["role", "content"] if k in m} for m in chat_history]
     
-    def _build_robot_context(self):
+    def _build_robot_context(self, current_user_action: str):
         actual_people_json = self.hri_engine.get_actual_people_request()
         actual_people = json.loads(actual_people_json)
         visible_ids = [int(fpid) for fpid, t in actual_people.items() if t < 1]
@@ -84,5 +84,6 @@ class ModularAI(ABC):
             "visible_people": visible_people,
             "known_people": known_people,
             "times_seen": times_seen,
-            "last_seen": last_seen
+            "last_seen": last_seen,
+            "current_user_action": current_user_action
         }
