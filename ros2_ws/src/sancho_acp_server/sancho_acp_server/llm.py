@@ -17,10 +17,7 @@ from google.oauth2 import service_account
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
 
-# Silence langchain_google_genai schema warnings.
-logging.getLogger("langchain_google_genai._function_utils").setLevel(
-    logging.ERROR
-)
+logging.getLogger("langchain_google_genai._function_utils").setLevel(logging.ERROR)
 
 logger = logging.getLogger("sancho_acp_server.llm")
 
@@ -53,34 +50,37 @@ def load_thought_prompt() -> str:
     return prompt_path.read_text(encoding="utf-8")
 
 
-def _format_ai_message(content: Any) -> str:
+def format_ai_message(content: Any) -> str:
     """Extract human-readable text from an AI message content block."""
-    if isinstance(content, list):
-        parts: list[str] = []
-        for part in content:
-            if isinstance(part, dict):
-                if part.get("type") == "text":
-                    parts.append(str(part.get("text", "")))
-                elif part.get("type") == "image_url":
-                    parts.append("[image]")
-        return "\n".join(p for p in parts if p)
-    return str(content)
+    if not isinstance(content, list):
+        return str(content)
+
+    parts: list[str] = []
+    for part in content:
+        if not isinstance(part, dict):
+            continue
+        part_type = part.get("type")
+        if part_type == "text":
+            text = part.get("text", "")
+            if text:
+                parts.append(text)
+        elif part_type == "image_url":
+            parts.append("[image]")
+    return "\n".join(parts)
 
 
 def build_llm() -> ChatGoogleGenerativeAI:
-    """Instantiate the Google Gemini LLM using Vertex AI credentials from environment variables."""
+    """Instantiate the Google Gemini LLM using Vertex AI credentials."""
     load_dotenv()
 
-    # Locate and read service account credentials for Vertex AI
     env_path = os.environ.get("SANCHO_MCP_CREDENTIALS_PATH")
     if not env_path:
         raise RuntimeError(
-            "SANCHO_MCP_CREDENTIALS_PATH environment variable is not set in the environment or .env file."
+            "SANCHO_MCP_CREDENTIALS_PATH environment variable is not set."
         )
 
     credentials_path = Path(env_path)
     if not credentials_path.is_absolute():
-        # Resolve relative to the sancho_acp_server root directory (parent of sancho_acp_server package directory)
         credentials_path = Path(__file__).resolve().parent.parent / credentials_path
 
     if not credentials_path.exists():
@@ -92,8 +92,10 @@ def build_llm() -> ChatGoogleGenerativeAI:
         project_id = credentials_data.get("project_id")
         if not project_id:
             raise RuntimeError("project_id missing in service account JSON.")
-    except Exception as e:
-        raise RuntimeError(f"Failed to read service account credentials: {e}")
+    except json.JSONDecodeError as e:
+        raise RuntimeError(f"Invalid JSON in credentials file: {e}")
+    except OSError as e:
+        raise RuntimeError(f"Failed to read credentials file: {e}")
 
     credentials = service_account.Credentials.from_service_account_file(
         str(credentials_path),
@@ -101,9 +103,7 @@ def build_llm() -> ChatGoogleGenerativeAI:
     )
 
     model = os.environ.get("SANCHO_MCP_LLM_MODEL", "gemini-3.1-flash-lite")
-    temperature = float(
-        os.environ.get("SANCHO_MCP_LLM_TEMPERATURE", "0.2")
-    )
+    temperature = float(os.environ.get("SANCHO_MCP_LLM_TEMPERATURE", "0.2"))
 
     return ChatGoogleGenerativeAI(
         model=model,
@@ -114,52 +114,55 @@ def build_llm() -> ChatGoogleGenerativeAI:
     )
 
 
-def _ensure_non_empty_ai_messages(messages: list[Any]) -> list[Any]:
-    """Gemini API requires that every message in the conversation history has at least
-    one non-empty part/content block. When using ReAct agents, LangGraph/LangChain
-    might generate AIMessages with empty text content (e.g., when the agent only calls
-    a tool). This function patches any empty AIMessage by adding a minimal text placeholder
-    to prevent 400 Invalid Argument API crashes, without deleting history or losing context.
-    """
-    patched_messages = []
-    for msg in messages:
-        if not isinstance(msg, AIMessage):
-            patched_messages.append(msg)
+def _has_content(msg: AIMessage) -> bool:
+    """Check if an AIMessage has meaningful content (text, image, etc.)."""
+    if isinstance(msg.content, str):
+        return bool(msg.content.strip())
+
+    if not isinstance(msg.content, list):
+        return False
+
+    for part in msg.content:
+        if not isinstance(part, dict):
             continue
-
-        has_text_or_media = False
-        if isinstance(msg.content, str):
-            has_text_or_media = bool(msg.content.strip())
-        elif isinstance(msg.content, list):
-            for part in msg.content:
-                if isinstance(part, str) and part.strip():
-                    has_text_or_media = True
-                    break
-                if isinstance(part, dict) and part.get("type") in {
-                    "text",
-                    "image",
-                    "media",
-                    "thinking",
-                    "reasoning",
-                }:
-                    # If it's a text block, ensure the text itself is not empty
-                    if part.get("type") == "text" and not str(part.get("text", "")).strip():
-                        continue
-                    has_text_or_media = True
-                    break
-
-        if not has_text_or_media:
-            # Replace empty content with a minimal placeholder to satisfy Gemini's API schema
-            if isinstance(msg.content, list):
-                new_content = list(msg.content) + [{"type": "text", "text": "."}]
+        part_type = part.get("type")
+        if part_type in {"text", "image", "media", "thinking", "reasoning"}:
+            if part_type == "text":
+                if str(part.get("text", "")).strip():
+                    return True
             else:
-                new_content = "."
-            msg = AIMessage(
-                content=new_content,
-                tool_calls=msg.tool_calls,
-                additional_kwargs=msg.additional_kwargs,
-                response_metadata=msg.response_metadata,
-                id=msg.id,
-            )
-        patched_messages.append(msg)
-    return patched_messages
+                return True
+    return False
+
+
+def _patch_empty_message(msg: AIMessage) -> AIMessage:
+    """Replace empty content with a minimal placeholder."""
+    if isinstance(msg.content, list):
+        new_content = list(msg.content) + [{"type": "text", "text": "."}]
+    else:
+        new_content = "."
+    return AIMessage(
+        content=new_content,
+        tool_calls=msg.tool_calls,
+        additional_kwargs=msg.additional_kwargs,
+        response_metadata=msg.response_metadata,
+        id=msg.id,
+    )
+
+
+def ensure_non_empty_ai_messages(messages: list[Any]) -> list[Any]:
+    """Patch empty AIMessages to satisfy Gemini API requirements.
+
+    Gemini requires every message in the conversation history to have at least
+    one non-empty part/content block. When using ReAct agents, LangChain might
+    generate AIMessages with empty content (e.g., when the agent only calls
+    a tool). This function patches empty messages by adding a minimal placeholder
+    to prevent 400 Invalid Argument API errors, without losing history or context.
+    """
+    patched: list[Any] = []
+    for msg in messages:
+        if not isinstance(msg, AIMessage) or _has_content(msg):
+            patched.append(msg)
+        else:
+            patched.append(_patch_empty_message(msg))
+    return patched

@@ -20,20 +20,13 @@ import argparse
 import asyncio
 import logging
 import os
-import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
 
-# Ensure the package root is on the import path so that ``sancho_acp_server``
-# can be resolved when running directly with ``python -m``.
-_pkg_root = Path(__file__).resolve().parent.parent
-if str(_pkg_root) not in sys.path:
-    sys.path.insert(0, str(_pkg_root))
+from acp.agent.connection import AgentSideConnection
 
-from acp.agent.connection import AgentSideConnection  # noqa: E402
-
-from .agent import SanchoAgent  # noqa: E402
+from .agent import SanchoAgent
 
 logger = logging.getLogger("sancho_acp_server.tcp_server")
 

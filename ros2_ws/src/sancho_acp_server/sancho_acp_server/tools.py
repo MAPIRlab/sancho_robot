@@ -9,7 +9,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from uuid import uuid4
+from dataclasses import dataclass
 from typing import Any, Callable, Awaitable
 
 from langchain_core.tools import StructuredTool
@@ -17,27 +17,30 @@ from langchain_core.callbacks import BaseCallbackHandler
 
 logger = logging.getLogger("sancho_acp_server.tools")
 
-# Tools that require explicit human authorization via ACP before execution.
 PERMISSION_REQUIRED_TOOLS: set[str] = {
     "navigate_to_pose",
 }
+
+ToolStartCallback = Callable[[str, str, str], Awaitable[None]]
+ToolEndCallback = Callable[[str, str, str], Awaitable[None]]
+PermissionCallback = Callable[[str, dict[str, Any]], Awaitable[bool]]
 
 
 class ToolLogger(BaseCallbackHandler):
     """Prints tool invocation traces to the server console."""
 
     def on_tool_start(
-        self, serialized: dict, input_str: str, **kwargs: Any
+        self, serialized: dict[str, Any], input_str: str, **kwargs: Any
     ) -> None:
-        name = serialized.get("name", "tool")
+        name = serialized.get("name", "unknown")
         logger.info("[tool:start] %s <- %s", name, input_str)
 
     def on_tool_end(self, output: Any, **kwargs: Any) -> None:
-        name = kwargs.get("name", "tool")
-        logger.info("[tool:end] %s -> %s", name, _summarize_tool_output(output))
+        name = kwargs.get("name", "unknown")
+        logger.info("[tool:end] %s -> %s", name, summarize_tool_output(output))
 
 
-def _summarize_tool_output(output: Any) -> str:
+def summarize_tool_output(output: Any) -> str:
     """Create a short, human-readable summary of a tool's return value.
 
     Handles raw strings, dicts, lists, and LangChain ``ToolMessage``
@@ -104,7 +107,7 @@ def _mcp_image_payload_to_content(payload: Any) -> Any:
     return payload
 
 
-def _create_multimodal_content(data: dict) -> list[dict]:
+def _create_multimodal_content(data: dict[str, Any]) -> list[dict[str, Any]]:
     b64_data = data.get("data")
     if not b64_data:
         return [{"type": "text", "text": "error: Empty image payload"}]
@@ -116,14 +119,14 @@ def _create_multimodal_content(data: dict) -> list[dict]:
     ]
 
 
-async def _call_tool(tool: Any, args: dict) -> Any:
+async def _call_tool(tool: Any, args: dict[str, Any]) -> Any:
     """Invoke a LangChain tool, handling both sync and async variants."""
     if hasattr(tool, "ainvoke"):
         return await tool.ainvoke(args)
     return await asyncio.to_thread(tool.invoke, args)
 
 
-def _wrap_take_photo(tools: list[Any]) -> list[Any]:
+def wrap_take_photo(tools: list[Any]) -> list[Any]:
     """Wrap the ``take_photo`` tool so its raw base64 image is converted
     into a multimodal content block that the LLM can interpret directly."""
     tool_map = {tool.name: tool for tool in tools}
@@ -137,22 +140,88 @@ def _wrap_take_photo(tools: list[Any]) -> list[Any]:
 
     wrapped = StructuredTool.from_function(
         name="take_photo",
-        description=(
-            raw_tool.description
-            or "Capture a camera frame as an image payload."
-        ),
+        description=raw_tool.description or "Capture a camera frame as an image payload.",
         coroutine=_take_photo,
     )
     return [t for t in tools if t.name != "take_photo"] + [wrapped]
 
 
-# Type aliases for async callbacks from the tool wrappers.
-ToolStartCallback = Callable[[str, str, str], Awaitable[None]]
-ToolEndCallback = Callable[[str, str, str], Awaitable[None]]
-PermissionCallback = Callable[[str, dict[str, Any]], Awaitable[bool]]
+@dataclass
+class _ToolWrapper:
+    """Encapsulates tool wrapping logic with explicit dependencies."""
+
+    tool: Any
+    needs_permission: bool
+    on_tool_start: ToolStartCallback | None
+    on_tool_end: ToolEndCallback | None
+    permission_callback: PermissionCallback | None
+
+    async def invoke(self, args: dict[str, Any]) -> Any:
+        """Execute the tool with streaming notifications and permission gating."""
+        tool_call_id = uuid4().hex[:12]
+        input_summary = json.dumps(args, ensure_ascii=False, default=str)
+
+        await self._notify_start(tool_call_id, input_summary)
+
+        if self.needs_permission:
+            approved = await self._check_permission(args)
+            if not approved:
+                return self._denied_message(tool_call_id)
+
+        output = await self._execute(args)
+        await self._notify_end(tool_call_id, output)
+        return output
+
+    def _make_sync_wrapper(self) -> Callable[..., Any]:
+        async def _async_invoke(**kwargs: Any) -> Any:
+            return await self.invoke(kwargs)
+
+        def _sync_invoke(**kwargs: Any) -> Any:
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                loop = None
+            if loop and loop.is_running():
+                return asyncio.run_coroutine_threadsafe(
+                    _async_invoke(**kwargs), loop
+                ).result()
+            return asyncio.run(_async_invoke(**kwargs))
+
+        return _sync_invoke
+
+    async def _notify_start(self, tool_call_id: str, input_summary: str) -> None:
+        if self.on_tool_start:
+            await self.on_tool_start(tool_call_id, self.tool.name, input_summary)
+
+    async def _check_permission(self, args: dict[str, Any]) -> bool:
+        if self.permission_callback is None:
+            return True
+        return await self.permission_callback(self.tool.name, args)
+
+    def _denied_message(self, tool_call_id: str) -> str:
+        msg = f"⛔ User denied permission for '{self.tool.name}'. The action was NOT executed."
+        if self.on_tool_end:
+            asyncio.create_task(
+                self.on_tool_end(tool_call_id, self.tool.name, msg)
+            )
+        return msg
+
+    async def _execute(self, args: dict[str, Any]) -> Any:
+        try:
+            return await _call_tool(self.tool, args)
+        except Exception as exc:
+            error_msg = f"Tool error: {exc}"
+            if self.on_tool_end:
+                await self.on_tool_end(tool_call_id := uuid4().hex[:12], self.tool.name, error_msg)
+            raise
+
+    async def _notify_end(self, tool_call_id: str, output: Any) -> None:
+        if self.on_tool_end:
+            summary = summarize_tool_output(output)
+            await self.on_tool_end(tool_call_id, self.tool.name, summary)
 
 
-def _wrap_all_tools(
+def wrap_all_tools(
     tools: list[Any],
     *,
     on_tool_start: ToolStartCallback | None = None,
@@ -164,76 +233,25 @@ def _wrap_all_tools(
     """
     result: list[Any] = []
     for tool in tools:
-        original = tool
         needs_permission = (
-            original.name in PERMISSION_REQUIRED_TOOLS
+            tool.name in PERMISSION_REQUIRED_TOOLS
             and permission_callback is not None
         )
 
-        async def _instrumented_invoke(
-            _orig=original,
-            _perm=needs_permission,
-            **kwargs: Any,
-        ) -> Any:
-            logger.info("Inside _instrumented_invoke for tool: %s, args: %s", _orig.name, kwargs)
-            tool_call_id = uuid4().hex[:12]
-            input_summary = json.dumps(kwargs, ensure_ascii=False, default=str)
-
-            # ── Notify ACP: tool is starting ──
-            if on_tool_start:
-                await on_tool_start(tool_call_id, _orig.name, input_summary)
-
-            # ── Permission gate (only for sensitive tools) ──
-            if _perm and permission_callback is not None:
-                approved = await permission_callback(_orig.name, kwargs)
-                if not approved:
-                    denied_msg = (
-                        f"⛔ User denied permission for '{_orig.name}'. "
-                        "The action was NOT executed."
-                    )
-                    if on_tool_end:
-                        await on_tool_end(tool_call_id, _orig.name, denied_msg)
-                    return denied_msg
-
-            # ── Execute the real tool ──
-            try:
-                output = await _call_tool(_orig, kwargs)
-            except Exception as exc:
-                error_msg = f"Tool error: {exc}"
-                if on_tool_end:
-                    await on_tool_end(tool_call_id, _orig.name, error_msg)
-                raise
-
-            # ── Notify ACP: tool finished ──
-            if on_tool_end:
-                summary = _summarize_tool_output(output)
-                await on_tool_end(tool_call_id, _orig.name, summary)
-
-            return output
-
-        def _sync_wrapper(
-            _orig=original,
-            _perm=needs_permission,
-            **kwargs: Any,
-        ) -> Any:
-            try:
-                loop = asyncio.get_running_loop()
-            except RuntimeError:
-                loop = None
-            if loop and loop.is_running():
-                return asyncio.run_coroutine_threadsafe(
-                    _instrumented_invoke(_orig=_orig, _perm=_perm, **kwargs),
-                    loop
-                ).result()
-            else:
-                return asyncio.run(_instrumented_invoke(_orig=_orig, _perm=_perm, **kwargs))
+        wrapper = _ToolWrapper(
+            tool=tool,
+            needs_permission=needs_permission,
+            on_tool_start=on_tool_start,
+            on_tool_end=on_tool_end,
+            permission_callback=permission_callback,
+        )
 
         wrapped = StructuredTool.from_function(
-            name=original.name,
-            description=original.description or original.name,
-            func=_sync_wrapper,
-            coroutine=_instrumented_invoke,
-            args_schema=getattr(original, "args_schema", None),
+            name=tool.name,
+            description=tool.description or tool.name,
+            func=wrapper._make_sync_wrapper(),
+            coroutine=wrapper.invoke,
+            args_schema=getattr(tool, "args_schema", None),
         )
         result.append(wrapped)
 
