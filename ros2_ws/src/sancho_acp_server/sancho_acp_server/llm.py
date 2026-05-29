@@ -25,6 +25,26 @@ PROMPTS_DIR = Path(__file__).resolve().parent.parent / "prompt"
 DEFAULT_SYSTEM_PROMPT_PATH = PROMPTS_DIR / "SYSTEM_PROMPT.md"
 DEFAULT_THOUGHT_PROMPT_PATH = PROMPTS_DIR / "THOUGHT_PROMPT.md"
 
+DEFAULT_MODEL_ID = "gemini-3.1-flash-lite"
+
+SUPPORTED_MODELS = [
+    {
+        "modelId": "gemini-3.1-flash-lite",
+        "name": "Gemini 3.1 Flash Lite",
+        "description": "Fast and lightweight model, optimized for speed and real-time responses.",
+    },
+    {
+        "modelId": "gemini-3-flash-preview",
+        "name": "Gemini 3 Flash Preview",
+        "description": "Latest Gemini 3 Flash model (preview), balanced speed and quality.",
+    },
+    {
+        "modelId": "gemini-3.1-pro-preview",
+        "name": "Gemini 3.1 Pro Preview",
+        "description": "High-reasoning model for complex logical tasks and advanced tool coordination.",
+    },
+]
+
 
 def load_system_prompt() -> str:
     """Load the system prompt from disk or use a sensible default."""
@@ -69,8 +89,13 @@ def format_ai_message(content: Any) -> str:
     return "\n".join(parts)
 
 
-def build_llm() -> ChatGoogleGenerativeAI:
-    """Instantiate the Google Gemini LLM using Vertex AI credentials."""
+def build_llm(model: str | None = None) -> ChatGoogleGenerativeAI:
+    """Instantiate the Google Gemini LLM using Vertex AI credentials.
+
+    Args:
+        model: The model identifier to use. Defaults to SANCHO_MCP_LLM_MODEL
+               env var or DEFAULT_MODEL_ID.
+    """
     load_dotenv()
 
     env_path = os.environ.get("SANCHO_MCP_CREDENTIALS_PATH")
@@ -102,7 +127,7 @@ def build_llm() -> ChatGoogleGenerativeAI:
         scopes=["https://www.googleapis.com/auth/cloud-platform"]
     )
 
-    model = os.environ.get("SANCHO_MCP_LLM_MODEL", "gemini-3.1-flash-lite")
+    model = model or os.environ.get("SANCHO_MCP_LLM_MODEL", DEFAULT_MODEL_ID)
     temperature = float(os.environ.get("SANCHO_MCP_LLM_TEMPERATURE", "0.2"))
 
     return ChatGoogleGenerativeAI(

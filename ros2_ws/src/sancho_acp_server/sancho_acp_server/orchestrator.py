@@ -24,6 +24,7 @@ from .llm import (
     load_thought_prompt,
     ensure_non_empty_ai_messages,
     format_ai_message,
+    DEFAULT_MODEL_ID,
 )
 from .tools import (
     wrap_take_photo,
@@ -49,6 +50,7 @@ class SessionState:
     on_tool_start: ToolStartCallback | None = None
     on_tool_end: ToolEndCallback | None = None
     permission_callback: PermissionCallback | None = None
+    model_id: str = DEFAULT_MODEL_ID
 
     def reset_cancel(self) -> None:
         self.cancelled.clear()
@@ -58,7 +60,6 @@ class Orchestrator:
     """Manages MCP connections and runs the ReAct agent loop for a session."""
 
     def __init__(self) -> None:
-        self.llm = build_llm()
         self.server_url = os.environ.get(
             "SANCHO_MCP_SERVER_URL", "http://127.0.0.1:8000/mcp"
         )
@@ -95,8 +96,14 @@ class Orchestrator:
             permission_callback=self._proxy_permission(session),
         )
 
-        session.agent = create_agent(self.llm, tools)
-        logger.info("MCP connected — %d tools loaded from %s", len(tools), self.server_url)
+        llm = build_llm(model=session.model_id)
+        session.agent = create_agent(llm, tools)
+        logger.info(
+            "MCP connected — %d tools loaded from %s (model=%s)",
+            len(tools),
+            self.server_url,
+            session.model_id,
+        )
 
     def _proxy_tool_start(self, session: SessionState) -> ToolStartCallback | None:
         async def proxy(tool_call_id: str, name: str, input_summary: str) -> None:
@@ -139,7 +146,8 @@ class Orchestrator:
         ]
 
         try:
-            response = await self.llm.ainvoke(thought_messages)
+            llm = build_llm(model=session.model_id)
+            response = await llm.ainvoke(thought_messages)
             thought_text = format_ai_message(response.content)
         except Exception as exc:
             logger.warning("Failed to generate preliminary thought: %s", exc)

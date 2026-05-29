@@ -42,6 +42,7 @@ from acp.schema import (
     Implementation,
     ListSessionsResponse,
     McpServerStdio,
+    ModelInfo,
     PermissionOption,
     ResourceContentBlock,
     ResumeSessionResponse,
@@ -50,12 +51,15 @@ from acp.schema import (
     SessionForkCapabilities,
     SessionInfo,
     SessionListCapabilities,
+    SessionModelState,
     SessionResumeCapabilities,
+    SetSessionModelResponse,
     SseMcpServer,
     TextContentBlock,
     ToolCallUpdate,
 )
 
+from .llm import SUPPORTED_MODELS, DEFAULT_MODEL_ID
 from .orchestrator import Orchestrator, SessionState
 
 logger = logging.getLogger("sancho_acp_server.agent")
@@ -63,6 +67,21 @@ logger = logging.getLogger("sancho_acp_server.agent")
 AGENT_NAME = "sancho-acp-server"
 AGENT_TITLE = "Sancho ACP Server Agent"
 AGENT_VERSION = "0.1.0"
+
+
+def _build_model_info(model: dict) -> ModelInfo:
+    return ModelInfo(
+        modelId=model["modelId"],
+        name=model["name"],
+        description=model.get("description"),
+    )
+
+
+def _get_model_state(session: SessionState) -> SessionModelState:
+    return SessionModelState(
+        availableModels=[_build_model_info(m) for m in SUPPORTED_MODELS],
+        currentModelId=session.model_id,
+    )
 
 
 class _SessionManager:
@@ -125,6 +144,7 @@ class _SessionManager:
         source = self._sessions[source_id]
         new_state = self.create(new_id, cwd)
         new_state.messages = list(source.messages)
+        new_state.model_id = source.model_id
         return new_state
 
 
@@ -190,9 +210,13 @@ class SanchoAgent(Agent):
         **kwargs: Any,
     ) -> NewSessionResponse:
         session_id = uuid4().hex
-        self._session_mgr.create(session_id, cwd)
+        session = self._session_mgr.create(session_id, cwd)
         logger.info("New session created: %s", session_id)
-        return NewSessionResponse(session_id=session_id, modes=None)
+        return NewSessionResponse(
+            session_id=session_id,
+            modes=None,
+            models=_get_model_state(session),
+        )
 
     async def load_session(
         self,
@@ -203,8 +227,8 @@ class SanchoAgent(Agent):
         **kwargs: Any,
     ) -> LoadSessionResponse | None:
         logger.info("Load session request: %s", session_id)
-        self._session_mgr.get_or_create(session_id, cwd)
-        return LoadSessionResponse()
+        session = self._session_mgr.get_or_create(session_id, cwd)
+        return LoadSessionResponse(models=_get_model_state(session))
 
     async def list_sessions(
         self,
@@ -226,8 +250,11 @@ class SanchoAgent(Agent):
         logger.info("Fork session: source=%s", session_id)
         self._session_mgr.get_or_create(session_id, cwd)
         new_session_id = uuid4().hex
-        self._session_mgr.fork(session_id, new_session_id, cwd)
-        return ForkSessionResponse(sessionId=new_session_id)
+        new_state = self._session_mgr.fork(session_id, new_session_id, cwd)
+        return ForkSessionResponse(
+            sessionId=new_session_id,
+            models=_get_model_state(new_state),
+        )
 
     async def resume_session(
         self,
@@ -237,8 +264,8 @@ class SanchoAgent(Agent):
         **kwargs: Any,
     ) -> ResumeSessionResponse:
         logger.info("Resume session: %s (cwd=%s)", session_id, cwd)
-        self._session_mgr.get_or_create(session_id, cwd)
-        return ResumeSessionResponse()
+        session = self._session_mgr.get_or_create(session_id, cwd)
+        return ResumeSessionResponse(models=_get_model_state(session))
 
     async def close_session(
         self, session_id: str, **kwargs: Any
@@ -252,6 +279,29 @@ class SanchoAgent(Agent):
     ) -> SetSessionModeResponse | None:
         logger.info("Set session mode: %s -> %s", session_id, mode_id)
         return SetSessionModeResponse()
+
+    async def set_session_model(
+        self, model_id: str, session_id: str, **kwargs: Any
+    ) -> SetSessionModelResponse | None:
+        logger.info("Set session model: session=%s, model=%s", session_id, model_id)
+        session = self._session_mgr.get(session_id)
+        if session is None:
+            logger.warning("set_session_model: session %s not found", session_id)
+            return None
+
+        available_ids = {m["modelId"] for m in SUPPORTED_MODELS}
+        if model_id not in available_ids:
+            logger.warning(
+                "set_session_model: model '%s' not in supported models: %s",
+                model_id,
+                available_ids,
+            )
+            return None
+
+        session.model_id = model_id
+        session.agent = None
+        logger.info("Session %s model switched to %s", session_id, model_id)
+        return SetSessionModelResponse()
 
     async def prompt(
         self,
