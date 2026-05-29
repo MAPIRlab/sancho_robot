@@ -11,6 +11,7 @@ import json
 import logging
 from dataclasses import dataclass
 from typing import Any, Callable, Awaitable
+from uuid import uuid4
 
 from langchain_core.tools import StructuredTool
 from langchain_core.callbacks import BaseCallbackHandler
@@ -156,25 +157,25 @@ class _ToolWrapper:
     on_tool_end: ToolEndCallback | None
     permission_callback: PermissionCallback | None
 
-    async def invoke(self, args: dict[str, Any]) -> Any:
+    async def invoke(self, **kwargs: Any) -> Any:
         """Execute the tool with streaming notifications and permission gating."""
         tool_call_id = uuid4().hex[:12]
-        input_summary = json.dumps(args, ensure_ascii=False, default=str)
+        input_summary = json.dumps(kwargs, ensure_ascii=False, default=str)
 
         await self._notify_start(tool_call_id, input_summary)
 
         if self.needs_permission:
-            approved = await self._check_permission(args)
+            approved = await self._check_permission(kwargs)
             if not approved:
                 return self._denied_message(tool_call_id)
 
-        output = await self._execute(args)
+        output = await self._execute(kwargs)
         await self._notify_end(tool_call_id, output)
         return output
 
     def _make_sync_wrapper(self) -> Callable[..., Any]:
         async def _async_invoke(**kwargs: Any) -> Any:
-            return await self.invoke(kwargs)
+            return await self.invoke(**kwargs)
 
         def _sync_invoke(**kwargs: Any) -> Any:
             try:

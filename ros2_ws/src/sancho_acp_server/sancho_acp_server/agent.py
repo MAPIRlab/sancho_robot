@@ -70,9 +70,9 @@ class _SessionManager:
 
     Handles creation, retrieval, and cleanup of session state objects.
     """
+    _sessions: dict[str, SessionState] = {}
 
     def __init__(self, orchestrator: Orchestrator) -> None:
-        self._sessions: dict[str, SessionState] = {}
         self._orchestrator = orchestrator
 
     def create(self, session_id: str, cwd: str) -> SessionState:
@@ -138,7 +138,8 @@ class SanchoAgent(Agent):
     _conn: Client
 
     def __init__(self) -> None:
-        self._session_mgr = _SessionManager(Orchestrator())
+        self._orchestrator = Orchestrator()
+        self._session_mgr = _SessionManager(self._orchestrator)
 
     def on_connect(self, conn: Client) -> None:
         """Called by the ACP SDK when a client connection is established."""
@@ -266,27 +267,31 @@ class SanchoAgent(Agent):
         **kwargs: Any,
     ) -> PromptResponse:
         logger.info("Prompt received for session %s", session_id)
-        session = self._session_mgr.get_or_create(session_id, "/tmp")
+        try:
+            session = self._session_mgr.get_or_create(session_id, "/tmp")
 
-        user_text = self._extract_user_text(prompt)
+            user_text = self._extract_user_text(prompt)
 
-        thought_text = await self._orchestrator.generate_thought(session, user_text)
-        await self._conn.session_update(
-            session_id, update_agent_thought_text(thought_text)
-        )
+            thought_text = await self._orchestrator.generate_thought(session, user_text)
+            await self._conn.session_update(
+                session_id, update_agent_thought_text(thought_text)
+            )
 
-        await self._orchestrator.run_prompt(
-            session,
-            user_text=user_text,
-            thought_text=thought_text,
-            on_agent_message=self._make_on_agent_message(session_id),
-            on_tool_start=self._make_on_tool_start(session_id),
-            on_tool_end=self._make_on_tool_end(session_id),
-            permission_callback=self._make_permission_callback(session_id),
-        )
+            await self._orchestrator.run_prompt(
+                session,
+                user_text=user_text,
+                thought_text=thought_text,
+                on_agent_message=self._make_on_agent_message(session_id),
+                on_tool_start=self._make_on_tool_start(session_id),
+                on_tool_end=self._make_on_tool_end(session_id),
+                permission_callback=self._make_permission_callback(session_id),
+            )
 
-        session.updated_at = datetime.datetime.utcnow().isoformat() + "Z"
-        return PromptResponse(stop_reason="end_turn", user_message_id=message_id)
+            session.updated_at = datetime.datetime.utcnow().isoformat() + "Z"
+            return PromptResponse(stop_reason="end_turn", user_message_id=message_id)
+        except Exception as e:
+            logger.exception("CRITICAL ERROR IN PROMPT:")
+            raise e
 
     def _extract_user_text(
         self,
