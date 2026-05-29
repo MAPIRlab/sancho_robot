@@ -4,14 +4,36 @@ import json
 from importlib import import_module
 from typing import Any, Optional
 
-import rclpy
-from rclpy.action import ActionClient
-from rclpy.node import Node
+try:
+    import sys
+    if "--mock" in sys.argv:
+        raise ImportError("Mock mode requested via command line argument")
+    import rclpy
+    from rclpy.action import ActionClient
+    from rclpy.node import Node
 
-from geometry_msgs.msg import PoseWithCovarianceStamped
-from nav2_msgs.action import NavigateToPose, Spin
-from sensor_msgs.msg import Image
-from std_srvs.srv import Trigger
+    from geometry_msgs.msg import PoseWithCovarianceStamped
+    from nav2_msgs.action import NavigateToPose, Spin
+    from sensor_msgs.msg import Image
+    from std_srvs.srv import Trigger
+    ROS_AVAILABLE = True
+except ImportError:
+    ROS_AVAILABLE = False
+    class Node:
+        def __init__(self, *args, **kwargs):
+            pass
+    class ActionClient:
+        pass
+    class PoseWithCovarianceStamped:
+        pass
+    class NavigateToPose:
+        pass
+    class Spin:
+        pass
+    class Image:
+        pass
+    class Trigger:
+        pass
 
 from .config import (
     BASE_FRAME_ID,
@@ -28,9 +50,13 @@ try:
     CvBridge: Any = import_module("cv_bridge").CvBridge
     cv2: Any = import_module("cv2")
 except Exception as exc:
-    raise ImportError(
-        f"Failed to import OpenCV/cv_bridge: {exc}. Please ensure the ROS 2 environment is sourced."
-    ) from exc
+    if ROS_AVAILABLE:
+        raise ImportError(
+            f"Failed to import OpenCV/cv_bridge: {exc}. Please ensure the ROS 2 environment is sourced."
+        ) from exc
+    else:
+        CvBridge = None
+        cv2 = None
 
 try:
     Graph: Any = import_module("topology_graph.srv").Graph
@@ -38,16 +64,25 @@ try:
     Mission: Any = import_module("sancho_interfaces.action").Mission
     GetMission: Any = import_module("sancho_interfaces.srv").GetMission
 except Exception as exc:
-    raise ImportError(
-        f"Failed to import custom ROS 2 interfaces: {exc}. Make sure to source install/setup.bash."
-    ) from exc
+    if ROS_AVAILABLE:
+        raise ImportError(
+            f"Failed to import custom ROS 2 interfaces: {exc}. Make sure to source install/setup.bash."
+        ) from exc
+    else:
+        Graph = None
+        PlayTTS = None
+        Mission = None
+        GetMission = None
 
 try:
     tf2_ros: Any = import_module("tf2_ros")
 except Exception as exc:
-    raise ImportError(
-        f"Failed to import tf2_ros: {exc}. Please ensure the ROS 2 environment is sourced."
-    ) from exc
+    if ROS_AVAILABLE:
+        raise ImportError(
+            f"Failed to import tf2_ros: {exc}. Please ensure the ROS 2 environment is sourced."
+        ) from exc
+    else:
+        tf2_ros = None
 
 
 class SanchoBridgeNode(Node):

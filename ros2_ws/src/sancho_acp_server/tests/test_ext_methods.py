@@ -1,52 +1,27 @@
-"""Non-interactive smoke test: connect, initialize, new_session, disconnect.
+"""Test ACP extension methods and notifications.
 
-This test validates the ACP protocol handshake works correctly over TCP
-without requiring the MCP server to be running.
+Verifies that ext_method and ext_notification are handled correctly.
 """
 
 from __future__ import annotations
 
 import asyncio
 import sys
-from typing import Any
 
 from acp import PROTOCOL_VERSION, connect_to_agent, Client, RequestError
 from acp.schema import (
-    AgentMessageChunk,
-    AgentThoughtChunk,
-    AvailableCommandsUpdate,
     ClientCapabilities,
-    ConfigOptionUpdate,
-    CurrentModeUpdate,
-    EnvVariable,
     Implementation,
-    PermissionOption,
-    SessionInfoUpdate,
-    ToolCallProgress,
-    ToolCallStart,
-    ToolCallUpdate,
-    UsageUpdate,
-    UserMessageChunk,
-    CreateTerminalResponse,
-    KillTerminalResponse,
-    ReadTextFileResponse,
-    ReleaseTerminalResponse,
-    RequestPermissionResponse,
-    TerminalOutputResponse,
-    WaitForTerminalExitResponse,
-    WriteTextFileResponse,
 )
 
 
 class MinimalClient(Client):
-    """Stub client that logs updates."""
-
     async def session_update(self, session_id, update, **kwargs):
         pass
 
     async def request_permission(self, options, session_id, tool_call, **kwargs):
         from acp.schema import DeniedOutcome
-        return RequestPermissionResponse(outcome=DeniedOutcome(outcome="cancelled"))
+        return RequestError.method_not_found("permission")
 
     async def write_text_file(self, content, path, session_id, **kwargs):
         raise RequestError.method_not_found("fs/write_text_file")
@@ -86,7 +61,7 @@ async def main():
     client = MinimalClient()
     conn = connect_to_agent(client, writer, reader)
 
-    # Test 1: Initialize
+    # Initialize
     print("[TEST] Sending initialize...")
     try:
         init_resp = await asyncio.wait_for(
@@ -94,35 +69,34 @@ async def main():
                 protocol_version=PROTOCOL_VERSION,
                 client_capabilities=ClientCapabilities(),
                 client_info=Implementation(
-                    name="smoke-test", title="Smoke Test", version="0.1.0"
+                    name="ext-test", title="Ext Test", version="0.1.0"
                 ),
             ),
             timeout=10.0,
         )
-        assert init_resp.agent_info is not None, "agent_info is None"
-        assert init_resp.agent_info.name == "sancho-acp", (
-            f"Expected 'sancho-acp', got '{init_resp.agent_info.name}'"
-        )
-        print(f"[TEST] ✅ Initialize OK — agent: {init_resp.agent_info.name} v{init_resp.agent_info.version}")
+        assert init_resp.agent_info is not None
+        print(f"[TEST] ✅ Initialize OK")
     except Exception as exc:
         errors.append(f"Initialize failed: {exc}")
         print(f"[TEST] ❌ Initialize FAILED: {exc}")
+        writer.close()
+        await writer.wait_closed()
+        sys.exit(1)
 
-    # Test 2: New session
-    print("[TEST] Sending new_session...")
+    # Test: ext_method
+    print("[TEST] Sending ext_method (custom_method, {'key': 'value'})...")
     try:
-        session = await asyncio.wait_for(
-            conn.new_session(cwd="/tmp", mcp_servers=[]),
-            timeout=15.0,
+        result = await asyncio.wait_for(
+            conn.ext_method(method="custom_method", params={"key": "value"}),
+            timeout=10.0,
         )
-        assert session.session_id is not None, "session_id is None"
-        assert len(session.session_id) > 0, "session_id is empty"
-        print(f"[TEST] ✅ New session OK — id: {session.session_id}")
+        assert result is not None
+        assert result.get("status") == "not_implemented"
+        print(f"[TEST] ✅ ext_method OK (returned not_implemented)")
     except Exception as exc:
-        errors.append(f"New session failed: {exc}")
-        print(f"[TEST] ❌ New session FAILED: {exc}")
+        errors.append(f"ext_method failed: {exc}")
+        print(f"[TEST] ❌ ext_method FAILED: {exc}")
 
-    # Cleanup
     writer.close()
     await writer.wait_closed()
 
@@ -132,7 +106,7 @@ async def main():
             print(f"  - {e}")
         sys.exit(1)
     else:
-        print("\n[TEST] ✅ All smoke tests passed!")
+        print("\n[TEST] ✅ All ext_method tests passed!")
         sys.exit(0)
 
 

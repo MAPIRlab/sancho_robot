@@ -11,7 +11,7 @@ adapter straightforward.
 
 Usage::
 
-    python -m sancho_acp.tcp_server [--host HOST] [--port PORT]
+    python -m sancho_acp_server.tcp_server [--host HOST] [--port PORT]
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-# Ensure the package root is on the import path so that ``sancho_acp``
+# Ensure the package root is on the import path so that ``sancho_acp_server``
 # can be resolved when running directly with ``python -m``.
 _pkg_root = Path(__file__).resolve().parent.parent
 if str(_pkg_root) not in sys.path:
@@ -35,7 +35,7 @@ from acp.agent.connection import AgentSideConnection  # noqa: E402
 
 from .agent import SanchoAgent  # noqa: E402
 
-logger = logging.getLogger("sancho_acp.tcp_server")
+logger = logging.getLogger("sancho_acp_server.tcp_server")
 
 # Default buffer limit for the TCP stream (50 MB — matches ACP SDK default).
 TCP_BUFFER_LIMIT = 50 * 1024 * 1024
@@ -57,6 +57,7 @@ async def _handle_client(
             writer,       # input_stream  (server writes TO client)
             reader,       # output_stream (server reads FROM client)
             listening=False,
+            use_unstable_protocol=True,
         )
         await conn.listen()
     except asyncio.CancelledError:

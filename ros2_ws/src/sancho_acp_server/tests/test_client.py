@@ -2,6 +2,8 @@
 
 Connects via TCP, sends initialize + new_session + a simple prompt,
 and prints all session updates received from the agent.
+
+Supports both interactive mode and single-command mode for testing.
 """
 
 from __future__ import annotations
@@ -20,54 +22,44 @@ from acp import (
 from acp.schema import (
     AgentMessageChunk,
     AgentThoughtChunk,
-    AvailableCommandsUpdate,
+    AllowedOutcome,
     ClientCapabilities,
-    ConfigOptionUpdate,
-    CreateTerminalResponse,
-    CurrentModeUpdate,
-    EnvVariable,
     Implementation,
-    KillTerminalResponse,
-    PermissionOption,
-    ReadTextFileResponse,
-    ReleaseTerminalResponse,
     RequestPermissionResponse,
-    SessionInfoUpdate,
-    TerminalOutputResponse,
-    TextContentBlock,
     ToolCallProgress,
     ToolCallStart,
-    ToolCallUpdate,
-    UsageUpdate,
-    UserMessageChunk,
-    WaitForTerminalExitResponse,
-    WriteTextFileResponse,
-    AllowedOutcome,
 )
 
 
 class TestClient(Client):
     """Minimal ACP client that prints all session updates."""
 
+    def __init__(self):
+        super().__init__()
+        self.tool_calls_received = []
+        self.agent_messages_received = []
+        self.thoughts_received = []
+
     async def session_update(self, session_id, update, **kwargs):
         if isinstance(update, AgentMessageChunk):
             content = update.content
-            if isinstance(content, TextContentBlock):
-                print(f"  📨 Agent: {content.text}")
-            elif isinstance(content, dict):
-                print(f"  📨 Agent: {content.get('text', content)}")
+            if isinstance(content, dict):
+                text = content.get("text", str(content))
             else:
-                print(f"  📨 Agent: {content}")
+                text = str(content)
+            print(f"  📨 Agent: {text[:200]}...")
+            self.agent_messages_received.append(text)
         elif isinstance(update, AgentThoughtChunk):
             content = update.content
-            if isinstance(content, TextContentBlock):
-                print(f"  💭 Thought: {content.text}")
-            elif isinstance(content, dict):
-                print(f"  💭 Thought: {content.get('text', content)}")
+            if isinstance(content, dict):
+                text = content.get("text", str(content))
             else:
-                print(f"  💭 Thought: {content}")
+                text = str(content)
+            print(f"  💭 Thought: {text[:200]}...")
+            self.thoughts_received.append(text)
         elif isinstance(update, ToolCallStart):
-            print(f"  🔧 Tool start: {update.title}")
+            print(f"  🔧 Tool start: {update.title} ({update.tool_call_id})")
+            self.tool_calls_received.append(update.title)
         elif isinstance(update, ToolCallProgress):
             print(f"  🔧 Tool progress: {update.tool_call_id}")
         else:
@@ -75,7 +67,6 @@ class TestClient(Client):
 
     async def request_permission(self, options, session_id, tool_call, **kwargs):
         print(f"  🔐 Permission requested for: {tool_call.title}")
-        # Auto-approve for testing
         if options:
             return RequestPermissionResponse(
                 outcome=AllowedOutcome(
@@ -115,9 +106,27 @@ class TestClient(Client):
         pass
 
 
+async def run_single_command(conn, session_id, command: str) -> TestClient:
+    """Run a single command and return the client for inspection."""
+    client = TestClient()
+    print(f"\n>>> Command: {command}")
+    try:
+        resp = await conn.prompt(
+            session_id=session_id,
+            prompt=[text_block(command)],
+        )
+        print(f"  ✅ Prompt completed: {resp.stop_reason}")
+    except Exception as exc:
+        print(f"  ❌ Error: {exc}")
+    return client
+
+
 async def main():
     host = sys.argv[1] if len(sys.argv) > 1 else "127.0.0.1"
     port = int(sys.argv[2]) if len(sys.argv) > 2 else 9100
+
+    # Single command mode for automated testing
+    single_command = sys.argv[3] if len(sys.argv) > 3 else None
 
     print(f"Connecting to Sancho ACP server at {host}:{port}...")
 
@@ -141,37 +150,41 @@ async def main():
     print("\n--- New Session ---")
     session = await conn.new_session(cwd="/tmp", mcp_servers=[])
     print(f"  ✅ Session ID: {session.session_id}")
+    session_id = session.session_id
 
-    # 3. Interactive prompt loop
-    print("\n--- Interactive Mode ---")
-    print("Type a message (or 'exit' to quit):\n")
+    if single_command:
+        await run_single_command(conn, session_id, single_command)
+    else:
+        # 3. Interactive prompt loop
+        print("\n--- Interactive Mode ---")
+        print("Type a message (or 'exit' to quit):\n")
 
-    loop = asyncio.get_running_loop()
-    while True:
-        try:
-            line = await loop.run_in_executor(
-                None, lambda: input("> ").strip()
-            )
-        except (EOFError, KeyboardInterrupt):
-            break
+        loop = asyncio.get_running_loop()
+        while True:
+            try:
+                line = await loop.run_in_executor(
+                    None, lambda: input("> ").strip()
+                )
+            except (EOFError, KeyboardInterrupt):
+                break
 
-        if not line:
-            continue
-        if line.lower() in {"exit", "quit"}:
-            break
-        if line.lower() == ":cancel":
-            await conn.cancel(session_id=session.session_id)
-            print("  ⚡ Cancel sent.")
-            continue
+            if not line:
+                continue
+            if line.lower() in {"exit", "quit"}:
+                break
+            if line.lower() == ":cancel":
+                await conn.cancel(session_id=session_id)
+                print("  ⚡ Cancel sent.")
+                continue
 
-        try:
-            resp = await conn.prompt(
-                session_id=session.session_id,
-                prompt=[text_block(line)],
-            )
-            print(f"  ✅ Prompt completed: {resp.stop_reason}")
-        except Exception as exc:
-            print(f"  ❌ Error: {exc}")
+            try:
+                resp = await conn.prompt(
+                    session_id=session_id,
+                    prompt=[text_block(line)],
+                )
+                print(f"  ✅ Prompt completed: {resp.stop_reason}")
+            except Exception as exc:
+                print(f"  ❌ Error: {exc}")
 
     # Cleanup
     writer.close()

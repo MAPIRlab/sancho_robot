@@ -27,4 +27,4 @@ pip install --quiet -r "${REQUIREMENTS}"
 
 # Launch the ACP TCP server.
 echo "🚀 Starting Sancho ACP server..."
-python3 -m sancho_acp.tcp_server "$@"
+python3 -m sancho_acp_server.tcp_server "$@"

@@ -1,16 +1,16 @@
-# Sancho ACP Server (`sancho_acp`)
+# Sancho ACP Server (`sancho_acp_server`)
 
 This package implements the **cognitive layer** of the three-layer HRI architecture. It functions as an **ACP server** (listening for TCP connections from front-end user interfaces) and acts as an **MCP client** (connecting to the `sancho_mcp_server` to run robot tools via LangChain and Google Gemini).
 
 ```
-ACP Client (HRI) ──TCP:9100──► sancho_acp (Agent) ──HTTP──► sancho_mcp_server ──ROS 2──► Robot
+ACP Client (HRI) ──TCP:9100──► sancho_acp_server (Agent) ──HTTP──► sancho_mcp_server ──ROS 2──► Robot
 ```
 
 ## Structure
 
-- `sancho_acp/tcp_server.py`: Starts the TCP server using `asyncio.start_server`. Each incoming TCP socket gets a dedicated `AgentSideConnection` and a fresh `SanchoAgent`.
-- `sancho_acp/agent.py`: Implements the `acp.Agent` protocol interface. Receives prompts, runs them through the orchestrator, and streams agent thoughts and messages back.
-- `sancho_acp/orchestrator.py`: ReAct reasoning loop. Lazily connects to the MCP server URL on the first prompt, handles multimodal cameras (`take_photo`), and executes tools using LangChain.
+- `sancho_acp_server/tcp_server.py`: Starts the TCP server using `asyncio.start_server`. Each incoming TCP socket gets a dedicated `AgentSideConnection` and a fresh `SanchoAgent`.
+- `sancho_acp_server/agent.py`: Implements the `acp.Agent` protocol interface. Receives prompts, runs them through the orchestrator, and streams agent thoughts and messages back.
+- `sancho_acp_server/orchestrator.py`: ReAct reasoning loop. Lazily connects to the MCP server URL on the first prompt, handles multimodal cameras (`take_photo`), and executes tools using LangChain.
 - `SYSTEM_PROMPT.md`: System prompt defining the robot's identity, navigation, and speech policies.
 - `run.sh`: Shell script that automatically sets up the Python virtual environment (`.venv`), installs dependencies, and launches the server.
 
@@ -40,7 +40,7 @@ Simply execute the launcher script:
 Alternatively, to run the module directly:
 ```bash
 source .venv/bin/activate
-python -m sancho_acp.tcp_server --port 9100 --debug
+python -m sancho_acp_server.tcp_server --port 9100 --debug
 ```
 
 *Note: The ACP server utilizes a **lazy connection** strategy for the MCP backend. The TCP server will start instantly and accept user sessions even if the MCP server is not running yet. Connection to the MCP server is only established when the client sends their first prompt.*
