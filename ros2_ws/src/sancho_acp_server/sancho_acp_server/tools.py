@@ -18,9 +18,6 @@ from langchain_core.callbacks import BaseCallbackHandler
 
 logger = logging.getLogger("sancho_acp_server.tools")
 
-PERMISSION_REQUIRED_TOOLS: set[str] = {
-    "navigate_to_pose",
-}
 
 ToolStartCallback = Callable[[str, str, str], Awaitable[None]]
 ToolEndCallback = Callable[[str, str, str], Awaitable[None]]
@@ -152,10 +149,10 @@ class _ToolWrapper:
     """Encapsulates tool wrapping logic with explicit dependencies."""
 
     tool: Any
-    needs_permission: bool
     on_tool_start: ToolStartCallback | None
     on_tool_end: ToolEndCallback | None
     permission_callback: PermissionCallback | None
+    permission_required_tools_fn: Callable[[], set[str]] | None = None
 
     async def invoke(self, **kwargs: Any) -> Any:
         """Execute the tool with streaming notifications and permission gating."""
@@ -164,7 +161,14 @@ class _ToolWrapper:
 
         await self._notify_start(tool_call_id, input_summary)
 
-        if self.needs_permission:
+        # Dynamically resolve permission at invocation time
+        needs_permission = (
+            self.permission_required_tools_fn is not None
+            and self.tool.name in self.permission_required_tools_fn()
+            and self.permission_callback is not None
+        )
+
+        if needs_permission:
             approved = await self._check_permission(kwargs)
             if not approved:
                 return self._denied_message(tool_call_id)
@@ -228,23 +232,23 @@ def wrap_all_tools(
     on_tool_start: ToolStartCallback | None = None,
     on_tool_end: ToolEndCallback | None = None,
     permission_callback: PermissionCallback | None = None,
+    permission_required_tools_fn: Callable[[], set[str]] | None = None,
 ) -> list[Any]:
     """Wrap every tool to emit ACP streaming notifications and, for
     sensitive tools, request user permission before execution.
+
+    The ``permission_required_tools_fn`` callable is evaluated at every
+    tool invocation, so changes to session mode take effect immediately
+    without rebuilding the agent.
     """
     result: list[Any] = []
     for tool in tools:
-        needs_permission = (
-            tool.name in PERMISSION_REQUIRED_TOOLS
-            and permission_callback is not None
-        )
-
         wrapper = _ToolWrapper(
             tool=tool,
-            needs_permission=needs_permission,
             on_tool_start=on_tool_start,
             on_tool_end=on_tool_end,
             permission_callback=permission_callback,
+            permission_required_tools_fn=permission_required_tools_fn,
         )
 
         wrapped = StructuredTool.from_function(

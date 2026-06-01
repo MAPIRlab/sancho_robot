@@ -12,6 +12,7 @@ import os
 from pathlib import Path
 from typing import Any
 
+from acp.schema import SessionMode, SessionModeState
 from dotenv import load_dotenv
 from google.oauth2 import service_account
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
@@ -45,6 +46,27 @@ SUPPORTED_MODELS = [
     },
 ]
 
+DEFAULT_MODE_ID = "interact"
+
+SUPPORTED_MODES = [
+    SessionMode(id="observe", name="Observe", description="Only look around, no movement"),
+    SessionMode(id="navigate", name="Navigate", description="Move freely and explore"),
+    SessionMode(id="interact", name="Interact", description="Full interaction with speech and tools"),
+]
+
+# Maps mode_id -> set of tool names that require user permission in that mode
+MODE_PERMISSION_TOOLS: dict[str, set[str]] = {
+    "observe": {"navigate_to_pose", "rotate_in_place"},
+    "navigate": {"navigate_to_pose"},
+    "interact": set(),
+}
+
+MODE_PROMPT_FILES: dict[str, str] = {
+    "observe": "MODE_OBSERVE.md",
+    "navigate": "MODE_NAVIGATE.md",
+    "interact": "MODE_INTERACT.md",
+}
+
 
 def load_system_prompt() -> str:
     """Load the system prompt from disk or use a sensible default."""
@@ -67,6 +89,17 @@ def load_thought_prompt() -> str:
             "plan to do to fulfill the user's request. Be concise and specific "
             "about which tools you will use and why. Respond ONLY with the plan."
         )
+    return prompt_path.read_text(encoding="utf-8")
+
+
+def load_mode_prompt(mode_id: str) -> str:
+    """Load the mode-specific prompt fragment from disk."""
+    filename = MODE_PROMPT_FILES.get(mode_id)
+    if not filename:
+        return ""
+    prompt_path = PROMPTS_DIR / filename
+    if not prompt_path.exists():
+        return ""
     return prompt_path.read_text(encoding="utf-8")
 
 

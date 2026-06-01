@@ -51,6 +51,8 @@ from acp.schema import (
     SessionForkCapabilities,
     SessionInfo,
     SessionListCapabilities,
+    SessionMode,
+    SessionModeState,
     SessionModelState,
     SessionResumeCapabilities,
     SetSessionModelResponse,
@@ -59,7 +61,7 @@ from acp.schema import (
     ToolCallUpdate,
 )
 
-from .llm import SUPPORTED_MODELS, DEFAULT_MODEL_ID
+from .llm import SUPPORTED_MODELS, SUPPORTED_MODES, DEFAULT_MODE_ID, DEFAULT_MODEL_ID
 from .orchestrator import Orchestrator, SessionState
 
 logger = logging.getLogger("sancho_acp_server.agent")
@@ -81,6 +83,13 @@ def _get_model_state(session: SessionState) -> SessionModelState:
     return SessionModelState(
         availableModels=[_build_model_info(m) for m in SUPPORTED_MODELS],
         currentModelId=session.model_id,
+    )
+
+
+def _get_mode_state(session: SessionState) -> SessionModeState:
+    return SessionModeState(
+        availableModes=SUPPORTED_MODES,
+        currentModeId=session.mode_id,
     )
 
 
@@ -145,6 +154,7 @@ class _SessionManager:
         new_state = self.create(new_id, cwd)
         new_state.messages = list(source.messages)
         new_state.model_id = source.model_id
+        new_state.mode_id = source.mode_id
         return new_state
 
 
@@ -214,7 +224,7 @@ class SanchoAgent(Agent):
         logger.info("New session created: %s", session_id)
         return NewSessionResponse(
             session_id=session_id,
-            modes=None,
+            modes=_get_mode_state(session),
             models=_get_model_state(session),
         )
 
@@ -228,7 +238,10 @@ class SanchoAgent(Agent):
     ) -> LoadSessionResponse | None:
         logger.info("Load session request: %s", session_id)
         session = self._session_mgr.get_or_create(session_id, cwd)
-        return LoadSessionResponse(models=_get_model_state(session))
+        return LoadSessionResponse(
+            modes=_get_mode_state(session),
+            models=_get_model_state(session),
+        )
 
     async def list_sessions(
         self,
@@ -253,6 +266,7 @@ class SanchoAgent(Agent):
         new_state = self._session_mgr.fork(session_id, new_session_id, cwd)
         return ForkSessionResponse(
             sessionId=new_session_id,
+            modes=_get_mode_state(new_state),
             models=_get_model_state(new_state),
         )
 
@@ -265,7 +279,10 @@ class SanchoAgent(Agent):
     ) -> ResumeSessionResponse:
         logger.info("Resume session: %s (cwd=%s)", session_id, cwd)
         session = self._session_mgr.get_or_create(session_id, cwd)
-        return ResumeSessionResponse(models=_get_model_state(session))
+        return ResumeSessionResponse(
+            modes=_get_mode_state(session),
+            models=_get_model_state(session),
+        )
 
     async def close_session(
         self, session_id: str, **kwargs: Any
@@ -278,6 +295,18 @@ class SanchoAgent(Agent):
         self, mode_id: str, session_id: str, **kwargs: Any
     ) -> SetSessionModeResponse | None:
         logger.info("Set session mode: %s -> %s", session_id, mode_id)
+        session = self._session_mgr.get(session_id)
+        if session is None:
+            logger.warning("set_session_mode: session %s not found", session_id)
+            return None
+
+        valid_ids = {m.id for m in SUPPORTED_MODES}
+        if mode_id not in valid_ids:
+            logger.warning("set_session_mode: invalid mode '%s'", mode_id)
+            return None
+
+        session.mode_id = mode_id
+        logger.info("Session %s mode switched to %s", session_id, mode_id)
         return SetSessionModeResponse()
 
     async def set_session_model(

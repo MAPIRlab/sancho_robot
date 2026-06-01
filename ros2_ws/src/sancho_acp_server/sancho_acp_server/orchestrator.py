@@ -22,9 +22,12 @@ from .llm import (
     build_llm,
     load_system_prompt,
     load_thought_prompt,
+    load_mode_prompt,
     ensure_non_empty_ai_messages,
     format_ai_message,
     DEFAULT_MODEL_ID,
+    DEFAULT_MODE_ID,
+    MODE_PERMISSION_TOOLS,
 )
 from .tools import (
     wrap_take_photo,
@@ -51,6 +54,7 @@ class SessionState:
     on_tool_end: ToolEndCallback | None = None
     permission_callback: PermissionCallback | None = None
     model_id: str = DEFAULT_MODEL_ID
+    mode_id: str = DEFAULT_MODE_ID
 
     def reset_cancel(self) -> None:
         self.cancelled.clear()
@@ -94,6 +98,9 @@ class Orchestrator:
             on_tool_start=self._proxy_tool_start(session),
             on_tool_end=self._proxy_tool_end(session),
             permission_callback=self._proxy_permission(session),
+            permission_required_tools_fn=lambda: MODE_PERMISSION_TOOLS.get(
+                session.mode_id, set()
+            ),
         )
 
         llm = build_llm(model=session.model_id)
@@ -138,11 +145,13 @@ class Orchestrator:
         """Generate a brief preliminary thought about the planned actions.
 
         Uses a lightweight LLM call with the current conversation context
-        plus a meta-prompt.
+        plus a meta-prompt, with the current mode prompt injected.
         """
         thought_prompt = load_thought_prompt()
+        mode_prompt = load_mode_prompt(session.mode_id)
+        user_content = f"{mode_prompt}\n\n{thought_prompt}\n\nUser request:\n{user_text}"
         thought_messages = list(session.messages) + [
-            HumanMessage(content=f"{thought_prompt}\n\nUser request:\n{user_text}"),
+            HumanMessage(content=user_content),
         ]
 
         try:
@@ -199,7 +208,9 @@ class Orchestrator:
 
         start_index = len(session.messages)
 
+        mode_prompt = load_mode_prompt(session.mode_id)
         plan_instruction = (
+            f"{mode_prompt}\n\n"
             f"You must follow this preliminary plan to address the user's request:\n"
             f"\"\"\"\n{thought_text}\n\"\"\"\n"
             f"Call the corresponding tools to execute this plan.\n\n"
