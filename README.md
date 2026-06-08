@@ -6,6 +6,16 @@
 
 ---
 
+## Demonstration Video
+
+A video demonstration of the robot and its hierarchical decision-making architecture is available on YouTube:
+
+📺 **https://youtu.be/1JcaW7hJzJc**
+
+The video showcases autonomous roaming, human-initiated task assignment through speech interaction, mission execution, task interruption, and battery-aware priority management using Behavior Trees.
+
+---
+
 ## System Architecture Diagram
 
 ```
