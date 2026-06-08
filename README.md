@@ -6,13 +6,21 @@
 
 ---
 
-## Demonstration Video
+## Research Demonstration Videos
 
-A video demonstration of the robot and its hierarchical decision-making architecture is available on YouTube:
+### Hierarchical Decision-Making Architecture for Service Robots
 
-📺 **https://youtu.be/1JcaW7hJzJc**
+https://youtu.be/1JcaW7hJzJc
 
-The video showcases autonomous roaming, human-initiated task assignment through speech interaction, mission execution, task interruption, and battery-aware priority management using Behavior Trees.
+Demonstration of a hierarchical Behavior Tree architecture for the *Sancho* service robot. The video showcases autonomous roaming, speech-based task assignment, mission execution, task interruption, and battery-aware priority management. The system is capable of dynamically switching between behaviors while preserving execution state and ensuring safe operation.
+
+---
+
+### Multimodal Attention and Robust Interlocutor Tracking in Natural HRI
+
+https://youtu.be/HzKdb3460BQ
+
+Demonstration of a multimodal Human-Robot Interaction (HRI) architecture that combines audio and visual perception to identify, localize, and track human interlocutors. The system uses sound source localization, body tracking, face recognition, and an identity cache to maintain robust attention during natural interactions, even under temporary occlusions or face turns. The robot coordinates its mobile base and pan-tilt head to naturally orient itself toward the active speaker.
 
 ---
 
