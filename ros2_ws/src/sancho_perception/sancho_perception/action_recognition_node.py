@@ -97,7 +97,7 @@ class ActionRecognitionNode(Node):
 
         # --- Utils ---
         self.idle_timeout = self.declare_parameter('idle_timeout', 3.0).value
-        self.EXECUTION_ENVIROMENT = self.declare_parameter('execution_enviroment', "EDGE").value
+        self.EXECUTION_ENVIROMENT = self.declare_parameter('execution_enviroment', "UEDGE").value
         self.predict_frames_list = []
         self.id_match_list = []
         self.image_route_list = []

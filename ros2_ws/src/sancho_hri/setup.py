@@ -1,3 +1,5 @@
+import os
+from glob import glob
 from setuptools import find_packages, setup
 
 package_name = 'sancho_hri'
@@ -10,6 +12,7 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
+        (os.path.join('share', package_name, 'tts_models'), glob('sancho_hri/speech/tts/tts_models/*')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,

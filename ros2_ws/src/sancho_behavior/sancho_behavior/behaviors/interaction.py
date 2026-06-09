@@ -301,7 +301,7 @@ class FormatActionMessage(py_trees.behaviour.Behaviour):
     def __init__(self, name="FormatActionMessage"):
         super().__init__(name)
         self.blackboard = self.attach_blackboard_client()
-        self.client = Client(host = 'http://10.1.26.67:11434')
+        self.client = Client(host = 'http://10.2.26.241:11434')
 
         # Leemos la predicción de la acción 
         self.blackboard.register_key(key="predicted_action", access=py_trees.common.Access.READ)

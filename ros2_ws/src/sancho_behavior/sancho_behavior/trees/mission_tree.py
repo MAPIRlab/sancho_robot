@@ -168,11 +168,11 @@ def create_mission_subtree() -> py_trees.behaviour.Behaviour:
     # 2A. Happy Path
     action_seq = py_trees.composites.Sequence(name="Action_Sequence", memory=True)
     action_seq.add_children([
-        py_trees.behaviours.CheckBlackboardVariableExists(name="HasTargetPose?", variable_name="mission/target_pose"),
+        py_trees.behaviours.CheckBlackboardVariableExists(name="HasTargetPose?_Action", variable_name="mission/target_pose"),
         
         # Navegación hacia el sujeto
-        ResolveTargetNode(name="TranslateLocationName", location_key="mission/target_pose"),
-        NavigateToPoseBehavior(name="NavigateToDestination", pose_bb_key="mission/target_pose"), 
+        ResolveTargetNode(name="TranslateLocationName_Action", location_key="mission/target_pose"),
+        NavigateToPoseBehavior(name="NavigateToDestination_Action", pose_bb_key="mission/target_pose"), 
 
         # Ejecutamos la predicción
         PredictHumanAction(name="AnalyzeUserAction"),
@@ -181,7 +181,7 @@ def create_mission_subtree() -> py_trees.behaviour.Behaviour:
         FormatActionMessage(name="FormatMessage"),
         
         # Cambiamos la UI de la cara de SANCHO a "speaking"
-        SetFaceMode(mode="speaking", name="SetFaceSpeaking"),
+        SetFaceMode(mode="speaking", name="SetFaceSpeaking_Action"),
 
         # Interacción basada en la acción
         RespondUser(name="DeliverActionFeedback", text_bb_key="speech_message"), 
