@@ -42,7 +42,7 @@ def create_interaction_tree():
     conversation_turn.add_children([
         SetAudioSessionBehavior(active=True),
         SetFaceMode("listening"),
-        ListenToUser(name="ListenToUser", timeout_sec=10.0),
+        ListenToUser(name="ListenToUser", timeout_sec=15.0),
         SetAudioSessionBehavior(active=False),
         
         # --- NEW: Intercept silence before triggering the LLM ---

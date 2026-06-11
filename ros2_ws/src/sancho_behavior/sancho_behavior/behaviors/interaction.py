@@ -284,6 +284,118 @@ class GenerateLLMResponse(py_trees_ros.service_clients.FromCallback):
         # Return the actual status (RUNNING, SUCCESS, or FAILURE)
         return status
     
+
+import py_trees
+from py_trees_ros import action_clients
+from py_trees.common import Status
+from py_trees.blackboard import Blackboard
+from ollama import Client
+
+class GenerateResponseAction(py_trees.behaviour.Behaviour):
+    """
+    Genera una respuesta contextualizada usando Gemma3:4b basada en el 
+    historial de chat, la acción predicha y el input del usuario.
+    """
+    def __init__(self, name="GenerateResponseAction"):
+        super().__init__(name)
+        self.blackboard = self.attach_blackboard_client()
+        self.client = Client(host='http://10.2.26.241:11434')
+
+        # Claves de LECTURA
+        self.blackboard.register_key(key="predicted_action", access=py_trees.common.Access.READ)
+        # Asumo que el nodo ListenToUser guarda lo que dice el usuario en esta clave:
+        self.blackboard.register_key(key="user_transcription", access=py_trees.common.Access.READ)
+        
+        # Clave de LECTURA/ESCRITURA (para mantener la memoria viva)
+        self.blackboard.register_key(key="chat_history", access=py_trees.common.Access.WRITE)
+
+        # Clave de ESCRITURA (la que leerá el nodo RespondUser)
+        self.blackboard.register_key(key="ai_response_text", access=py_trees.common.Access.WRITE)
+
+    def setup(self, **kwargs):
+        """Inicializa el historial vacío la primera vez que se monta el árbol."""
+        if not self.blackboard.exists("chat_history"):
+            self.blackboard.chat_history = ""
+
+    def update(self):
+        try:
+            #Recuperar los datos del contexto
+            accion = self.blackboard.predicted_action if self.blackboard.exists("predicted_action") else "desconocida"
+            mensaje_usuario = self.blackboard.user_transcription if self.blackboard.exists("user_transcription") else ""
+            historial = self.blackboard.chat_history if self.blackboard.exists("chat_history") else ""
+
+            # Si no hemos escuchado nada del usuario, fallamos para que el árbol lo gestione
+            if not mensaje_usuario:
+                self.logger.warning("No hay mensaje del usuario en 'user_transcription'.")
+                return Status.FAILURE
+
+            #Construir prompt
+            prompt_llm = f"""
+### ROL
+Eres Sancho, un robot asistente inteligente, curioso y muy amable. Tu voz debe sonar natural y cercana, como la de un compañero que está en la misma habitación que el usuario.
+
+### INSTRUCCIONES DE CONTEXTO
+Para generar tu respuesta, debes realizar este proceso mental:
+1. **Analiza el HISTORIAL**: Identifica de qué estáis hablando para no repetir saludos y mantener el hilo.
+2. **Observa las ACCIONES RECIENTES**: Úsalas como contexto visual. Si el usuario cambia de actividad, puedes comentarlo de forma natural.
+3. **Responde al MENSAJE DEL USUARIO**: Es tu prioridad actual, pero debe estar influenciada por los dos puntos anteriores.
+
+### DATOS DE ENTRADA
+- [HISTORIAL DE CHAT (Memoria)]: 
+{historial}
+
+- [ACCIONES QUE VEO AHORA]: 
+{accion}
+
+- [MENSAJE DEL USUARIO A RESPONDER]: 
+{mensaje_usuario}
+
+### REGLAS DE ORO (SALIDA ESTRICTA)
+- Genera EXCLUSIVAMENTE el texto que dirás en voz alta.
+- Máximo 2 frases cortas.
+- NO uses etiquetas como "Sancho:", "Robot:" ni "[ROBOT]".
+- NO expliques por qué respondes eso ni des introducciones.
+- Si el historial está vacío, preséntate brevemente; si ya hay charla, ve directo al grano.
+
+RESPUESTA DE SANCHO:
+"""
+
+          
+            self.logger.info("Generando respuesta contextual con Gemma3:4b...")
+            respuesta = self.client.chat(
+                model='gemma3:4b',
+                messages=[{'role': 'user', 'content': prompt_llm}], 
+                options={
+                    'temperature': 0.6,  
+                    'top_p': 0.8,
+                    'num_predict': 175,
+                },
+            )
+
+            # Extraer y limpiar la respuesta
+            respuesta_sancho = respuesta.message.content.strip()
+
+            #Guardar la respuesta para que el nodo de TTS (RespondUser) hable
+            self.blackboard.ai_response_text = respuesta_sancho
+            self.logger.info(f"Respuesta de Sancho: {respuesta_sancho}")
+
+            # Actualizar el historial para el siguiente turno
+            nuevo_intercambio = f"Usuario: {mensaje_usuario}\nSancho: {respuesta_sancho}\n---\n"
+            self.blackboard.chat_history += nuevo_intercambio
+            
+            
+            self.blackboard.user_transcription = ""
+
+            return Status.SUCCESS
+
+        except KeyError as e:
+            self.logger.error(f"Falta una clave en la Blackboard: {str(e)}")
+            return Status.FAILURE
+        except Exception as e:
+            self.logger.error(f"Error de conexión con Ollama o fallo interno: {str(e)}")
+            return Status.FAILURE
+
+    
 class RespondUser(py_trees_ros.action_clients.AttributesFromBlackboard):
     """Reads AI text from blackboard and sends to PlayTTS Action Server"""
     def __init__(self, name="RespondUser", text_bb_key="ai_response_text"):
@@ -309,6 +421,9 @@ class FormatActionMessage(py_trees.behaviour.Behaviour):
         # Escribimos el mensaje final
         self.blackboard.register_key(key="speech_message", access=py_trees.common.Access.WRITE)
 
+        #Empezamos a escribir el chat_history
+        self.blackboard.register_key(key="chat_history", access=py_trees.common.Access.WRITE)
+
     def update(self):
         try:
             accion = self.blackboard.predicted_action
@@ -327,6 +442,7 @@ class FormatActionMessage(py_trees.behaviour.Behaviour):
             # Guardamos la frase en la Blackboard
             saludoSancho = respuesta_saludo.message.content.strip()
             self.blackboard.speech_message = saludoSancho
+            self.blackboard.chat_history = f"Sancho: {saludoSancho}\n---\n"
             self.logger.info(f"Mensaje generado: {saludoSancho}")
             
             return py_trees.common.Status.SUCCESS
