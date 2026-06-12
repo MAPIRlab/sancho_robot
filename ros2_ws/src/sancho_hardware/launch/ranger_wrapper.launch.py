@@ -10,7 +10,6 @@ def generate_launch_description():
         # Wrap the remap and the include inside a GroupAction
         GroupAction(
             actions=[
-                SetRemap(src='/battery_state', dst='/fake_battery'),
                 IncludeLaunchDescription(
                     XMLLaunchDescriptionSource(
                         os.path.join(get_package_share_directory('ranger_bringup'), 'launch', 'ranger_mini_v2.launch.xml')
