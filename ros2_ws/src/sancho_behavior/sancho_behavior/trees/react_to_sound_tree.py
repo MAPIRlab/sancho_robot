@@ -45,7 +45,7 @@ def create_reaction_subtree(name: str = "ReactToSound", config: dict = None) -> 
         movement_gate,
         stabilize_camera,
         identification_gate,
-        GreetUser(),
+        #GreetUser(),
         interaction_subtree
     ])
     turn_decision.add_children([

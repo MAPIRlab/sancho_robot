@@ -189,9 +189,6 @@ def create_mission_subtree() -> py_trees.behaviour.Behaviour:
         # Cambiamos la UI de la cara de SANCHO a "idle"
         SetFaceMode(mode="idle", name="SetFaceIdle"),
         
-        # Creamos el sub arbol de interacción una vez se haya saludado al usuario con el mensaje personalizado
-        interaction_subtree,
-        
         report_status("SUCCESS", "SetActionSuccess") 
     ])
 

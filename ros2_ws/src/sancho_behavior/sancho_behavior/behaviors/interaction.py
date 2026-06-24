@@ -382,9 +382,6 @@ RESPUESTA DE SANCHO:
             # Actualizar el historial para el siguiente turno
             nuevo_intercambio = f"Usuario: {mensaje_usuario}\nSancho: {respuesta_sancho}\n---\n"
             self.blackboard.chat_history += nuevo_intercambio
-            
-            
-            self.blackboard.user_transcription = ""
 
             return Status.SUCCESS
 
