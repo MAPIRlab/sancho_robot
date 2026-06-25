@@ -43,20 +43,112 @@ class GreetUser(py_trees_ros.action_clients.FromCallback):
         if action:
             user = f" {speaker_name}" if speaker_name != "Unknown" and speaker_name != "amigo" else ""
             greetings = [
-                f"¡Hola {user}! Veo que estás realizando la acción de {action}. ¿En qué te puedo ayudar?",
-                f"¿Qué tal {user}? Parece que andas haciendo la acción de {action}.",
-                f"¡Hola! Me he fijado en que estás realizando la acción de {action}, ¿Verdad {user}?"
+                f"Vaya, que emocionante. ¿Que nuevas funcionalidades estás implementando?",
+                f"Vaya, que emocionante. ¿Que nuevas funcionalidades estás implementando exactamente?"
             ]
         else:
             greetings = [
-                "¡Hola! ¿En qué puedo ayudarte?",
-                "¡Hola! Creo que no nos conocemos. Soy Sancho.",
-                "¿Qué tal? ¡Dime!"
+                f"Vaya, que emocionante. ¿Que nuevas funcionalidades estás implementando?",
+                f"Vaya, que emocionante. ¿Que nuevas funcionalidades estás implementando exactamente?"
             ]
 
         action_goal = PlayTTS.Goal()    
         action_goal.text = random.choice(greetings)
         return action_goal
+    
+
+class SecondInteraction(py_trees_ros.action_clients.FromCallback):
+    """
+    Reads user information and plays a random greeting message
+    """
+    def __init__(self, name="SecondInteraction"):
+        super().__init__(
+            name=name,
+            action_type=PlayTTS,
+            action_name="/play_tts",
+            wait_for_server_timeout_sec=0.0
+        )
+        
+        self.blackboard.register_key("speaker_info_json", access=py_trees.common.Access.READ)
+
+        #Get the action prediction
+        self.blackboard.register_key("predicted_action", access=py_trees.common.Access.READ)
+
+    def get_goal(self):
+        # Read user name
+        try:
+            raw_json = self.blackboard.speaker_info_json if self.blackboard.exists("speaker_info_json") else "{}"
+            speaker_data = json.loads(raw_json)
+            speaker_name = speaker_data.get("name", "amigo")
+            speaker_id = str(speaker_data.get("id", "0"))
+        except (TypeError, json.JSONDecodeError):
+            speaker_name = "amigo"
+            speaker_id = "0"
+
+
+        action = self.blackboard.predicted_action if self.blackboard.exists("predicted_action") else ""
+
+        # Check if the person is truly unknown
+        if action:
+            user = f" {speaker_name}" if speaker_name != "Unknown" and speaker_name != "amigo" else ""
+            greetings = [
+                f"Que interesante! Un sistema de reconocimiento de acciones humanas me ayudaría a adaptarme a conversaciones más fácilmente",
+                f"Que interesante funcionalidad! Un sistema de reconocimiento de acciones humanas me ayudaría a adaptarme a conversaciones más fácilmente",
+            ]
+        else:
+            greetings = [
+                f"Que interesante! Un sistema de reconocimiento de acciones humanas me ayudaría a adaptarme a conversaciones más fácilmente",
+                f"Que interesante funcionalidad! Un sistema de reconocimiento de acciones humanas me ayudaría a adaptarme a conversaciones más fácilmente",
+            ]
+
+        action_goal = PlayTTS.Goal()    
+        action_goal.text = random.choice(greetings)
+        return action_goal
+
+import time
+import py_trees
+
+class WaitDuration(py_trees.behaviour.Behaviour):
+    """
+    Nodo que no hace nada más que esperar un tiempo determinado.
+    Devuelve RUNNING mientras espera y SUCCESS cuando termina el tiempo.
+    """
+    def __init__(self, name="WaitDuration", duration_sec=8.0):
+        super().__init__(name)
+        self.duration_sec = duration_sec
+        self.start_time = 0.0
+
+    def setup(self, **kwargs):
+        """Se llama una sola vez cuando el árbol se inicializa."""
+        pass
+
+    def initialise(self):
+        """
+        Se llama cada vez que el nodo entra por primera vez 
+        (o vuelve a entrar después de haber terminado/fallado).
+        Aquí es donde reseteamos el cronómetro.
+        """
+        self.start_time = time.time()
+        self.logger.info(f"[{self.name}] Empezando pausa de {self.duration_sec} segundos...")
+
+    def update(self):
+        """
+        Se ejecuta en cada 'tick' del árbol.
+        Comprueba cuánto tiempo ha pasado.
+        """
+        elapsed_time = time.time() - self.start_time
+
+        if elapsed_time < self.duration_sec:
+            # Aún no ha pasado el tiempo. Le decimos al árbol que seguimos trabajando en ello.
+            return py_trees.common.Status.RUNNING
+        else:
+            # El tiempo se agotó. Pasamos al siguiente nodo.
+            self.logger.info(f"[{self.name}] Pausa terminada. Pasando al siguiente nodo.")
+            return py_trees.common.Status.SUCCESS
+
+    def terminate(self, new_status):
+        """Se llama cuando el nodo termina o es interrumpido por un nodo de mayor prioridad."""
+        pass
 
 
 class IdentifyCentralTarget(py_trees_ros.service_clients.FromConstant):

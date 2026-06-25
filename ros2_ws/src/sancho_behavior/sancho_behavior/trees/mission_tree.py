@@ -8,6 +8,7 @@ from sancho_behavior.behaviors.interaction import WaitForSocialInteraction, Resp
 from sancho_behavior.behaviors.layer_reporter import LayerReporter
 from sancho_behavior.behaviors.preemption_contract import WithPreemptionContract
 from sancho_behavior.behaviors.action_recognition import PredictHumanAction
+from sancho_behavior.behaviors.interaction import GreetUser, SecondInteraction
 
 def report_status(status: str, name: str) -> py_trees.behaviour.Behaviour:
     """Helper to signal the Action Server that the mission ended."""
@@ -187,8 +188,10 @@ def create_mission_subtree() -> py_trees.behaviour.Behaviour:
         RespondUser(name="DeliverActionFeedback", text_bb_key="speech_message"), 
 
         # Cambiamos la UI de la cara de SANCHO a "idle"
-        SetFaceMode(mode="idle", name="SetFaceIdle"),
-        
+        #SetFaceMode(mode="idle", name="SetFaceIdle"),
+        GreetUser(),
+        SecondInteraction(),
+
         report_status("SUCCESS", "SetActionSuccess") 
     ])
 
