@@ -43,67 +43,21 @@ class GreetUser(py_trees_ros.action_clients.FromCallback):
         if action:
             user = f" {speaker_name}" if speaker_name != "Unknown" and speaker_name != "amigo" else ""
             greetings = [
-                f"Vaya, que emocionante. ¿Que nuevas funcionalidades estás implementando?",
-                f"Vaya, que emocionante. ¿Que nuevas funcionalidades estás implementando exactamente?"
+                f"¡Hola {user}! Veo que estás realizando la acción de {action}. ¿En qué te puedo ayudar?",
+                f"¿Qué tal {user}? Parece que andas haciendo la acción de {action}.",
+                f"¡Hola! Me he fijado en que estás realizando la acción de {action}, ¿Verdad {user}?"
             ]
         else:
             greetings = [
-                f"Vaya, que emocionante. ¿Que nuevas funcionalidades estás implementando?",
-                f"Vaya, que emocionante. ¿Que nuevas funcionalidades estás implementando exactamente?"
+                "¡Hola! ¿En qué puedo ayudarte?",
+                "¡Hola! Creo que no nos conocemos. Soy Sancho.",
+                "¿Qué tal? ¡Dime!"
             ]
 
         action_goal = PlayTTS.Goal()    
         action_goal.text = random.choice(greetings)
         return action_goal
     
-
-class SecondInteraction(py_trees_ros.action_clients.FromCallback):
-    """
-    Reads user information and plays a random greeting message
-    """
-    def __init__(self, name="SecondInteraction"):
-        super().__init__(
-            name=name,
-            action_type=PlayTTS,
-            action_name="/play_tts",
-            wait_for_server_timeout_sec=0.0
-        )
-        
-        self.blackboard.register_key("speaker_info_json", access=py_trees.common.Access.READ)
-
-        #Get the action prediction
-        self.blackboard.register_key("predicted_action", access=py_trees.common.Access.READ)
-
-    def get_goal(self):
-        # Read user name
-        try:
-            raw_json = self.blackboard.speaker_info_json if self.blackboard.exists("speaker_info_json") else "{}"
-            speaker_data = json.loads(raw_json)
-            speaker_name = speaker_data.get("name", "amigo")
-            speaker_id = str(speaker_data.get("id", "0"))
-        except (TypeError, json.JSONDecodeError):
-            speaker_name = "amigo"
-            speaker_id = "0"
-
-
-        action = self.blackboard.predicted_action if self.blackboard.exists("predicted_action") else ""
-
-        # Check if the person is truly unknown
-        if action:
-            user = f" {speaker_name}" if speaker_name != "Unknown" and speaker_name != "amigo" else ""
-            greetings = [
-                f"Que interesante! Un sistema de reconocimiento de acciones humanas me ayudaría a adaptarme a conversaciones más fácilmente",
-                f"Que interesante funcionalidad! Un sistema de reconocimiento de acciones humanas me ayudaría a adaptarme a conversaciones más fácilmente",
-            ]
-        else:
-            greetings = [
-                f"Que interesante! Un sistema de reconocimiento de acciones humanas me ayudaría a adaptarme a conversaciones más fácilmente",
-                f"Que interesante funcionalidad! Un sistema de reconocimiento de acciones humanas me ayudaría a adaptarme a conversaciones más fácilmente",
-            ]
-
-        action_goal = PlayTTS.Goal()    
-        action_goal.text = random.choice(greetings)
-        return action_goal
 
 import time
 import py_trees

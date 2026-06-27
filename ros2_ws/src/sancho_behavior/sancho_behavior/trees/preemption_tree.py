@@ -52,7 +52,7 @@ def create_preemption_subtree() -> py_trees.behaviour.Behaviour:
         name="ReactToSoundProxy",
         subtree_id="react_to_sound"
     )
-    #reaction_subtree = react_to_sound_tree.create_reaction_subtree(name="ReactToSound")  # temporary direct call to ensure subtree is created for ProxySubtreeBehavior; can be removed once integrated into main tree
+    reaction_subtree = react_to_sound_tree.create_reaction_subtree(name="ReactToSound")  # temporary direct call to ensure subtree is created for ProxySubtreeBehavior; can be removed once integrated into main tree
 
     clear_hotword_success = py_trees.behaviours.UnsetBlackboardVariable(
         name="ClearHotwordEvent",
